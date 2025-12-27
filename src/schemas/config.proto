@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package config;
+
+option go_package = "config-server/src/schemas/config";
+
+message ConfigMsg {
+    enum ConfigClientCmd {
+        update_mem_config = 0;
+        update_config_object = 1;
+        get_mem_config = 2; 
+        get_config_object = 3;
+        add_config_listener = 4; 
+        dump_mem_config = 5;
+        get_notif_loglevel = 6;
+        update_notif_loglevel = 7;
+    }
+    
+    enum ConfigServerMsg {
+        propagate_mem_config = 0;
+        mem_config_update_done = 1;
+        propagate_config = 2;
+        config_update_done = 3;
+        mem_config_update_failed = 4;
+        config_update_failed = 5;
+        propagate_notif_loglevel = 6;
+        send_config_init = 7;
+        send_mem_config_init = 8;
+        send_notif_loglevel_init = 9;  
+    }
+
+    ConfigClientCmd ReqClient = 1; 
+    map<string, KeysValues> SectionsKeysValues = 2;
+    ConfigServerMsg RespServer = 3;
+}
+
+message KeysValues {
+    map<string, string> KeyValue = 1;
+}
