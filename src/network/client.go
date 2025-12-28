@@ -14,7 +14,7 @@ import (
 // Client provides an interface to interact with the Config Server.
 type Client struct {
 	addr    string
-	sock    *safesocket.Socket
+	sock    safesocket.Socket
 	Handler *ConfigProtoHandler
 }
 
@@ -39,13 +39,13 @@ func NewClient(addr string, config *core.Config) (*Client, error) {
 // connect establishes the connection and acts the handshake.
 func (c *Client) connect() error {
 	// TODO: Determine correct Client IP dynamically if needed.
-	client, err := safesocket.Create("tcp-hello", c.addr, "127.0.0.1")
+	client, err := safesocket.Create("tcp-hello", c.addr, "127.0.0.1", safesocket.SocketTypeClient, false)
 	if err != nil {
 		fmt.Printf("Mock: Failed to connect to %s (using safe-socket)\n", c.addr)
 		return err
 	}
 	c.sock = client
-	return nil
+	return c.sock.Open()
 }
 
 // -----------------------------------------------------------------------------
