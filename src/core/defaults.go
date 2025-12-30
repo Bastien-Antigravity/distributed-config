@@ -42,10 +42,11 @@ func NewDefaultConfig() *Config {
 			},
 			Database: &models.DatabaseCapability{
 				IP:       "127.0.0.2",
-				Port:     "5123",
-				Endpoint: "http://db:5123",
+				Port:     "5432",
+				DBName:   "maindb",
+				User:     "${DB_USER}",
+				Password: "${DB_PASSWORD}",
 				SSLCert:  "false",
-				Backend:  "Database/backend.db",
 			},
 			FileSystem: &models.FileSystemCapability{
 				TempPath: "./fs_temp",

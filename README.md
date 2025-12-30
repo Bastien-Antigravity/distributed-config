@@ -6,6 +6,15 @@ A robust, strategy-based configuration management library for distributed system
 
 `distributed-config` provides a unified interface for loading, validating, and synchronizing configuration across different environments. It supports local files, environment variables, and remote configuration servers.
 
+## Configuration Loading Process
+
+The library uses a layered approach to build the final configuration:
+
+1.  **Code Defaults**: The application initializes with a hardcoded set of "safe" defaults (defined in `src/core/defaults.go`). This ensures the application can always start, even without a config file.
+2.  **File Overrides**: It looks for a YAML file named after the executable (e.g., `config-cli.yaml` or `default.yaml` in specific modes). Values found in this file **overwrite** the defaults. This allows you to specify *only* the changes you need (e.g., just the DB password) rather than a full config file.
+3.  **Environment Variables**: Values in the YAML file can use `${VAR_NAME}` syntax. These are expanded using the system's environment variables at runtime.
+4.  **Remote Sync** (Profile Dependent): Finally, if the selected profile supports it (like `production`), the library connects to the Config Server to fetch the latest "MemConfig" updates.
+
 ## Features
 
 - **Multi-Profile Strategy**: Built-in support for `production`, `preprod`, `test`, and `standalone` environments.

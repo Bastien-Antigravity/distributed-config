@@ -6,7 +6,8 @@ package models
 type DatabaseCapability struct {
 	IP       string `yaml:"ip"`
 	Port     string `yaml:"port"`
-	Endpoint string `yaml:"endpoint"`
+	DBName   string `yaml:"db_name"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
 	SSLCert  string `yaml:"ssl_cert"`
-	Backend  string `yaml:"backend"`
 }
