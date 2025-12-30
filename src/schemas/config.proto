@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package config;
 
-option go_package = "config-server/src/schemas/config";
+option go_package = "github.com/Bastien-Antigravity/distributed-config/src/schemas";
 
 message ConfigMsg {
     enum ConfigClientCmd {

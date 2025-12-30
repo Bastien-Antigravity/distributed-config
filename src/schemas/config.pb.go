@@ -2,17 +2,16 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v6.33.0
-// source: src/schemas/config/config.proto
+// source: src/schemas/config.proto
 
 package schemas
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -59,50 +58,31 @@ var (
 	}
 )
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x ConfigMsg_ConfigClientCmd) Enum() *ConfigMsg_ConfigClientCmd {
 	p := new(ConfigMsg_ConfigClientCmd)
 	*p = x
 	return p
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x ConfigMsg_ConfigClientCmd) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (ConfigMsg_ConfigClientCmd) Descriptor() protoreflect.EnumDescriptor {
-	return file_src_schemas_config_config_proto_enumTypes[0].Descriptor()
+	return file_src_schemas_config_proto_enumTypes[0].Descriptor()
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (ConfigMsg_ConfigClientCmd) Type() protoreflect.EnumType {
-	return &file_src_schemas_config_config_proto_enumTypes[0]
+	return &file_src_schemas_config_proto_enumTypes[0]
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x ConfigMsg_ConfigClientCmd) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
 // Deprecated: Use ConfigMsg_ConfigClientCmd.Descriptor instead.
-
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (ConfigMsg_ConfigClientCmd) EnumDescriptor() ([]byte, []int) {
-	return file_src_schemas_config_config_proto_rawDescGZIP(), []int{0, 0}
+	return file_src_schemas_config_proto_rawDescGZIP(), []int{0, 0}
 }
 
 type ConfigMsg_ConfigServerMsg int32
@@ -148,50 +128,31 @@ var (
 	}
 )
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x ConfigMsg_ConfigServerMsg) Enum() *ConfigMsg_ConfigServerMsg {
 	p := new(ConfigMsg_ConfigServerMsg)
 	*p = x
 	return p
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x ConfigMsg_ConfigServerMsg) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (ConfigMsg_ConfigServerMsg) Descriptor() protoreflect.EnumDescriptor {
-	return file_src_schemas_config_config_proto_enumTypes[1].Descriptor()
+	return file_src_schemas_config_proto_enumTypes[1].Descriptor()
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (ConfigMsg_ConfigServerMsg) Type() protoreflect.EnumType {
-	return &file_src_schemas_config_config_proto_enumTypes[1]
+	return &file_src_schemas_config_proto_enumTypes[1]
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x ConfigMsg_ConfigServerMsg) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
 // Deprecated: Use ConfigMsg_ConfigServerMsg.Descriptor instead.
-
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (ConfigMsg_ConfigServerMsg) EnumDescriptor() ([]byte, []int) {
-	return file_src_schemas_config_config_proto_rawDescGZIP(), []int{0, 1}
+	return file_src_schemas_config_proto_rawDescGZIP(), []int{0, 1}
 }
 
 type ConfigMsg struct {
@@ -203,33 +164,21 @@ type ConfigMsg struct {
 	sizeCache          protoimpl.SizeCache
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *ConfigMsg) Reset() {
 	*x = ConfigMsg{}
-	mi := &file_src_schemas_config_config_proto_msgTypes[0]
+	mi := &file_src_schemas_config_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *ConfigMsg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (*ConfigMsg) ProtoMessage() {}
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *ConfigMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_src_schemas_config_config_proto_msgTypes[0]
+	mi := &file_src_schemas_config_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -241,17 +190,10 @@ func (x *ConfigMsg) ProtoReflect() protoreflect.Message {
 }
 
 // Deprecated: Use ConfigMsg.ProtoReflect.Descriptor instead.
-
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (*ConfigMsg) Descriptor() ([]byte, []int) {
-	return file_src_schemas_config_config_proto_rawDescGZIP(), []int{0}
+	return file_src_schemas_config_proto_rawDescGZIP(), []int{0}
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *ConfigMsg) GetReqClient() ConfigMsg_ConfigClientCmd {
 	if x != nil {
 		return x.ReqClient
@@ -259,9 +201,6 @@ func (x *ConfigMsg) GetReqClient() ConfigMsg_ConfigClientCmd {
 	return ConfigMsg_update_mem_config
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *ConfigMsg) GetSectionsKeysValues() map[string]*KeysValues {
 	if x != nil {
 		return x.SectionsKeysValues
@@ -269,9 +208,6 @@ func (x *ConfigMsg) GetSectionsKeysValues() map[string]*KeysValues {
 	return nil
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *ConfigMsg) GetRespServer() ConfigMsg_ConfigServerMsg {
 	if x != nil {
 		return x.RespServer
@@ -286,33 +222,21 @@ type KeysValues struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *KeysValues) Reset() {
 	*x = KeysValues{}
-	mi := &file_src_schemas_config_config_proto_msgTypes[1]
+	mi := &file_src_schemas_config_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *KeysValues) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (*KeysValues) ProtoMessage() {}
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *KeysValues) ProtoReflect() protoreflect.Message {
-	mi := &file_src_schemas_config_config_proto_msgTypes[1]
+	mi := &file_src_schemas_config_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -324,17 +248,10 @@ func (x *KeysValues) ProtoReflect() protoreflect.Message {
 }
 
 // Deprecated: Use KeysValues.ProtoReflect.Descriptor instead.
-
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (*KeysValues) Descriptor() ([]byte, []int) {
-	return file_src_schemas_config_config_proto_rawDescGZIP(), []int{1}
+	return file_src_schemas_config_proto_rawDescGZIP(), []int{1}
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 func (x *KeysValues) GetKeyValue() map[string]string {
 	if x != nil {
 		return x.KeyValue
@@ -342,11 +259,11 @@ func (x *KeysValues) GetKeyValue() map[string]string {
 	return nil
 }
 
-var File_src_schemas_config_config_proto protoreflect.FileDescriptor
+var File_src_schemas_config_proto protoreflect.FileDescriptor
 
-const file_src_schemas_config_config_proto_rawDesc = "" +
+const file_src_schemas_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1fsrc/schemas/config/config.proto\x12\x06config\"\xb2\x06\n" +
+	"\x18src/schemas/config.proto\x12\x06config\"\xb2\x06\n" +
 	"\tConfigMsg\x12?\n" +
 	"\tReqClient\x18\x01 \x01(\x0e2!.config.ConfigMsg.ConfigClientCmdR\tReqClient\x12Y\n" +
 	"\x12SectionsKeysValues\x18\x02 \x03(\v2).config.ConfigMsg.SectionsKeysValuesEntryR\x12SectionsKeysValues\x12A\n" +
@@ -381,26 +298,23 @@ const file_src_schemas_config_config_proto_rawDesc = "" +
 	"\bKeyValue\x18\x01 \x03(\v2 .config.KeysValues.KeyValueEntryR\bKeyValue\x1a;\n" +
 	"\rKeyValueEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\"Z config-server/src/schemas/configb\x06proto3"
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B?Z=github.com/Bastien-Antigravity/distributed-config/src/schemasb\x06proto3"
 
 var (
-	file_src_schemas_config_config_proto_rawDescOnce sync.Once
-	file_src_schemas_config_config_proto_rawDescData []byte
+	file_src_schemas_config_proto_rawDescOnce sync.Once
+	file_src_schemas_config_proto_rawDescData []byte
 )
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-func file_src_schemas_config_config_proto_rawDescGZIP() []byte {
-	file_src_schemas_config_config_proto_rawDescOnce.Do(func() {
-		file_src_schemas_config_config_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_src_schemas_config_config_proto_rawDesc), len(file_src_schemas_config_config_proto_rawDesc)))
+func file_src_schemas_config_proto_rawDescGZIP() []byte {
+	file_src_schemas_config_proto_rawDescOnce.Do(func() {
+		file_src_schemas_config_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_src_schemas_config_proto_rawDesc), len(file_src_schemas_config_proto_rawDesc)))
 	})
-	return file_src_schemas_config_config_proto_rawDescData
+	return file_src_schemas_config_proto_rawDescData
 }
 
-var file_src_schemas_config_config_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_src_schemas_config_config_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_src_schemas_config_config_proto_goTypes = []any{
+var file_src_schemas_config_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_src_schemas_config_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_src_schemas_config_proto_goTypes = []any{
 	(ConfigMsg_ConfigClientCmd)(0), // 0: config.ConfigMsg.ConfigClientCmd
 	(ConfigMsg_ConfigServerMsg)(0), // 1: config.ConfigMsg.ConfigServerMsg
 	(*ConfigMsg)(nil),              // 2: config.ConfigMsg
@@ -408,7 +322,7 @@ var file_src_schemas_config_config_proto_goTypes = []any{
 	nil,                            // 4: config.ConfigMsg.SectionsKeysValuesEntry
 	nil,                            // 5: config.KeysValues.KeyValueEntry
 }
-var file_src_schemas_config_config_proto_depIdxs = []int32{
+var file_src_schemas_config_proto_depIdxs = []int32{
 	0, // 0: config.ConfigMsg.ReqClient:type_name -> config.ConfigMsg.ConfigClientCmd
 	4, // 1: config.ConfigMsg.SectionsKeysValues:type_name -> config.ConfigMsg.SectionsKeysValuesEntry
 	1, // 2: config.ConfigMsg.RespServer:type_name -> config.ConfigMsg.ConfigServerMsg
@@ -421,34 +335,27 @@ var file_src_schemas_config_config_proto_depIdxs = []int32{
 	0, // [0:5] is the sub-list for field type_name
 }
 
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-func init() { file_src_schemas_config_config_proto_init() }
-
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-func file_src_schemas_config_config_proto_init() {
-	if File_src_schemas_config_config_proto != nil {
+func init() { file_src_schemas_config_proto_init() }
+func file_src_schemas_config_proto_init() {
+	if File_src_schemas_config_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_src_schemas_config_config_proto_rawDesc), len(file_src_schemas_config_config_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_src_schemas_config_proto_rawDesc), len(file_src_schemas_config_proto_rawDesc)),
 			NumEnums:      2,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_src_schemas_config_config_proto_goTypes,
-		DependencyIndexes: file_src_schemas_config_config_proto_depIdxs,
-		EnumInfos:         file_src_schemas_config_config_proto_enumTypes,
-		MessageInfos:      file_src_schemas_config_config_proto_msgTypes,
+		GoTypes:           file_src_schemas_config_proto_goTypes,
+		DependencyIndexes: file_src_schemas_config_proto_depIdxs,
+		EnumInfos:         file_src_schemas_config_proto_enumTypes,
+		MessageInfos:      file_src_schemas_config_proto_msgTypes,
 	}.Build()
-	File_src_schemas_config_config_proto = out.File
-	file_src_schemas_config_config_proto_goTypes = nil
-	file_src_schemas_config_config_proto_depIdxs = nil
+	File_src_schemas_config_proto = out.File
+	file_src_schemas_config_proto_goTypes = nil
+	file_src_schemas_config_proto_depIdxs = nil
 }
