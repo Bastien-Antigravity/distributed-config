@@ -74,14 +74,13 @@ func (c *Client) GetConfig() (*core.Config, error) {
 		}
 
 		// Receive response (safe-socket handles framing)
-		buf := make([]byte, 65535)
-		n, err := c.sock.Receive(buf)
+		data, err := c.sock.Receive()
 		if err != nil {
 			return nil, err
 		}
 
 		// Pass actual read bytes
-		if err := c.Handler.HandleIncoming(buf[:n]); err != nil {
+		if err := c.Handler.HandleIncoming(data); err != nil {
 			return nil, err
 		}
 	} else {
