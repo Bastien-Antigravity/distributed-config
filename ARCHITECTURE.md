@@ -16,7 +16,7 @@ flowchart TD
     style App fill:#37474f,stroke:#263238,stroke-width:3px,color:#ffffff
 
     %% Nodes
-    App[Application] -->|Init(profile)| Facade(Facade):::core
+    App[Application] -->|"Init(profile)"| Facade(Facade):::core
     Facade -->|Request| Factory(Factory):::core
     Factory -->|Create| StratInterface[Strategy Interface]:::core
 
