@@ -1,4 +1,4 @@
-package distributed_config
+﻿package distributed_config
 
 import (
 	"github.com/Bastien-Antigravity/distributed-config/src/facade"
@@ -10,8 +10,6 @@ import (
 // It wraps the core configuration data and provides access to helper methods.
 type Config = facade.Config
 
-// Version is the current version of the distributed-config library.
-const Version = "1.4.0"
 
 // New initializes a new configuration instance based on the specified profile.
 //
