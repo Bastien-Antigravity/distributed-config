@@ -1,0 +1,10 @@
+services:
+  distributed-config:
+    build: .
+    image: distributed-config:latest
+    container_name: distributed-config
+    restart: unless-stopped
+networks:
+  default:
+    name: teleremote_network
+    external: true
