@@ -19,12 +19,12 @@ func NewDefaultConfig() *Config {
 			},
 			ConfigServer: &models.ConfigServerCapability{
 				IP:      "127.0.0.2",
-				Port:    "1026",
+				Port:    "3306",
 				Refresh: "300",
 			},
 			Notification: &models.NotificationCapability{
 				IP:   "127.0.0.2",
-				Port: "10080",
+				Port: "1026",
 			},
 			Telebot: &models.TelebotCapability{
 				Token:  "${TELEBOT_TOKEN}",
