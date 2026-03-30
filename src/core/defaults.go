@@ -30,7 +30,7 @@ func NewDefaultConfig() *Config {
 				Token:  "${TELEBOT_TOKEN}",
 				ChatID: "${TELEBOT_CHAT_ID}",
 				IP:     "127.0.0.2",
-				Port:   "31337",
+				Port:   "1863",
 			},
 			Scheduler: &models.SchedulerCapability{
 				IP:   "127.0.0.2",
