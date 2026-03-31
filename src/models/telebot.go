@@ -4,8 +4,8 @@ package models
 // -----------------------------------------------------------------------------
 
 type TelebotCapability struct {
-	Token  string `yaml:"token"`
-	ChatID string `yaml:"chat_id"`
-	IP     string `yaml:"ip"`
-	Port   string `yaml:"port"`
+	Token  string `yaml:"token" json:"token"`
+	ChatID string `yaml:"chat_id" json:"chat_id"`
+	IP     string `yaml:"ip" json:"ip"`
+	Port   string `yaml:"port" json:"port"`
 }

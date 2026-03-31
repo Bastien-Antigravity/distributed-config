@@ -4,6 +4,6 @@ package models
 // -----------------------------------------------------------------------------
 
 type FileSystemCapability struct {
-	TempPath string `yaml:"temp_path"`
-	DataPath string `yaml:"data_path"`
+	TempPath string `yaml:"temp_path" json:"temp_path"`
+	DataPath string `yaml:"data_path" json:"data_path"`
 }

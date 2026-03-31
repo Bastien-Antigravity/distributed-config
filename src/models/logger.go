@@ -4,6 +4,6 @@ package models
 // -----------------------------------------------------------------------------
 
 type LoggerCapability struct {
-	IP   string `yaml:"ip"`
-	Port string `yaml:"port"`
+	IP   string `yaml:"ip" json:"ip"`
+	Port string `yaml:"port" json:"port"`
 }

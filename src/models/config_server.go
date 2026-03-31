@@ -4,7 +4,7 @@ package models
 // -----------------------------------------------------------------------------
 
 type ConfigServerCapability struct {
-	IP      string `yaml:"ip"`
-	Port    string `yaml:"port"`
-	Refresh string `yaml:"refresh"`
+	IP      string `yaml:"ip" json:"ip"`
+	Port    string `yaml:"port" json:"port"`
+	Refresh string `yaml:"refresh" json:"refresh"`
 }

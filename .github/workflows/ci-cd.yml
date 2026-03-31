@@ -1,0 +1,82 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [develop, main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build all packages
+        run: go build ./...
+
+      - name: Build Python shared library
+        run: |
+          mkdir -p python/distributed_config
+          go build -o python/distributed_config/libdistributed_config.so -buildmode=c-shared python/capi/main.go
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run Python tests
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/python
+          pytest python/tests
+
+      - name: Run standard unit tests
+        run: go test -race -coverprofile=coverage.out ./...
+        continue-on-error: false
+
+      - name: Upload coverage (optional)
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.out
+        if: success()
+
+      - name: Build integration test binary
+        run: go build -o /tmp/integration-test ./cmd/test
+
+      - name: Run integration test
+        # The test expects a config/default.yaml file.
+        # Create a minimal one if it doesn't exist.
+        run: |
+          if [ ! -f config/default.yaml ]; then
+            mkdir -p config
+            cat > config/default.yaml << EOF
+          common:
+            name: common
+            reset: false
+          capabilities:
+            logger:
+              ip: 127.0.0.2
+              port: "9020"
+          common_file_path: ""
+          memconfigpath: ""
+          EOF
+          fi
+          /tmp/integration-test
+
+      - name: Build config-cli (optional)
+        run: go build -o /tmp/config-cli ./cmd/config-cli
+        # We don't run it because it blocks waiting for input.

@@ -4,6 +4,6 @@ package models
 // -----------------------------------------------------------------------------
 
 type NotificationCapability struct {
-	IP   string `yaml:"ip"`
-	Port string `yaml:"port"`
+	IP   string `yaml:"ip" json:"ip"`
+	Port string `yaml:"port" json:"port"`
 }
