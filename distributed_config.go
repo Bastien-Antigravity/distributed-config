@@ -1,4 +1,4 @@
-﻿package distributed_config
+package distributed_config
 
 import (
 	"github.com/Bastien-Antigravity/distributed-config/src/facade"
