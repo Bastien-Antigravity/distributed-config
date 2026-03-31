@@ -57,6 +57,42 @@ func main() {
 }
 ```
 
+## Python Library
+
+A Python wrapper is available in the `python/` directory. It uses a C-shared Go library to provide the same robust configuration logic to Python applications.
+
+### Prerequisites
+
+- **Go 1.25+**: Required to compile the underlying shared library.
+- **Python 3.12+**: Tested and supported version.
+
+### Building & Packaging
+
+You can easily build the Go shared library and generate Python wheels using the provided `Makefile`:
+
+```bash
+# Compiles the Go shared library and builds the distribution wheels
+make python-build
+```
+
+The compiled library will be placed in `python/distributed_config/` and the wheels will be available in `python/dist/`.
+
+### Python Usage
+
+```python
+from distributed_config import DistributedConfig
+
+# Initialize with a profile: "production", "preprod", "test", or "standalone"
+with DistributedConfig("test") as dc:
+    config = dc.get_config()
+    
+    # Access configuration values as a standard Python dictionary
+    print(f"Service Name: {config['common']['name']}")
+    
+    if 'database' in config['capabilities']:
+        print(f"DB Host: {config['capabilities']['database']['ip']}")
+```
+
 ## Configuration Profiles
 
 | Profile      | Description |
