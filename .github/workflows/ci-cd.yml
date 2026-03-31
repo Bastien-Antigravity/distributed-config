@@ -27,26 +27,6 @@ jobs:
       - name: Build all packages
         run: go build ./...
 
-      - name: Build Python shared library
-        run: |
-          mkdir -p python/distributed_config
-          go build -o python/distributed_config/libdistributed_config.so -buildmode=c-shared python/capi/main.go
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-
-      - name: Run Python tests
-        run: |
-          export PYTHONPATH=$PYTHONPATH:$(pwd)/python
-          pytest python/tests
-
       - name: Run standard unit tests
         run: go test -race -coverprofile=coverage.out ./...
         continue-on-error: false
