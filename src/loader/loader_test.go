@@ -39,15 +39,15 @@ capabilities:
 
 	t.Run("TestSecretManagement-EnvExpansion", func(t *testing.T) {
 		// Mock environment variables
-		t.Setenv("DB_PASSWORD_MOCK", "TopSecret123!")
-		t.Setenv("SERVICE_ID", "S123")
+		t.Setenv("TS_PASSWORD_MOCK", "TopSecret123!")
+		t.Setenv("TS_SERVICE_ID", "S123")
 
 		yamlContent := `
 common:
-  name: "service-${SERVICE_ID}"
+  name: "service-${TS_SERVICE_ID}"
 capabilities:
   timescale_db:
-    password: "${DB_PASSWORD_MOCK}"
+    password: "${TS_PASSWORD_MOCK}"
 `
 		configPath := filepath.Join(tempDir, "secrets.yaml")
 		if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
