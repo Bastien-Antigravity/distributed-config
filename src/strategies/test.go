@@ -37,9 +37,9 @@ func (s *TestStrategy) Name() string { return "test" }
 func (s *TestStrategy) Load(cfg *core.Config) error {
 	fmt.Println("Strategy: Test (Production-Like Logic)")
 
-	// 1. Bootstrap: Load File to populate defaults (specifically Server IP: 127.0.0.2)
-	// This ensures cfg.Capabilities.ConfigServer is not nil
-	if err := loader.LoadConfigFromFile(cfg, "config_test.yaml"); err != nil {
+	// 1. Bootstrap: Resolve Path and Load Default File
+	fullPath := loader.ResolveConfigPath("test")
+	if err := loader.LoadConfigFromFile(cfg, fullPath); err != nil {
 		return err
 	}
 
@@ -84,6 +84,15 @@ func (s *TestStrategy) Sync(cfg *core.Config) error {
 	if s.Client != nil {
 		fmt.Println("Test: Syncing updates to Server...")
 		return s.Client.UpdateConfig(cfg)
+	}
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *TestStrategy) GetHandler() *network.ConfigProtoHandler {
+	if s.Client != nil {
+		return s.Client.Handler
 	}
 	return nil
 }

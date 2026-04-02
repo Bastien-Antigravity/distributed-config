@@ -35,8 +35,8 @@ func CheckTestIPs(config *core.Config) error {
 	}
 
 	caps := config.Capabilities
-	if caps.Logger != nil {
-		if err := check("logger", caps.Logger.IP); err != nil {
+	if caps.LogServer != nil {
+		if err := check("log_server", caps.LogServer.IP); err != nil {
 			return err
 		}
 	}
@@ -45,13 +45,13 @@ func CheckTestIPs(config *core.Config) error {
 			return err
 		}
 	}
-	if caps.Notification != nil {
-		if err := check("notification", caps.Notification.IP); err != nil {
+	if caps.NotifServer != nil {
+		if err := check("notif_server", caps.NotifServer.IP); err != nil {
 			return err
 		}
 	}
-	if caps.Telebot != nil {
-		if err := check("telebot", caps.Telebot.IP); err != nil {
+	if caps.TeleRemote != nil {
+		if err := check("tele_remote", caps.TeleRemote.IP); err != nil {
 			return err
 		}
 	}
@@ -60,13 +60,13 @@ func CheckTestIPs(config *core.Config) error {
 			return err
 		}
 	}
-	if caps.Monitoring != nil {
-		if err := check("monitoring", caps.Monitoring.IP); err != nil {
+	if caps.WebInterface != nil {
+		if err := check("web_interface", caps.WebInterface.IP); err != nil {
 			return err
 		}
 	}
-	if caps.Database != nil {
-		if err := check("database", caps.Database.IP); err != nil {
+	if caps.TimescaleDb != nil {
+		if err := check("timescale_db", caps.TimescaleDb.IP); err != nil {
 			return err
 		}
 	}
@@ -92,8 +92,8 @@ func CheckProductionIPs(config *core.Config) error {
 	}
 
 	caps := config.Capabilities
-	if caps.Logger != nil {
-		if err := check("logger", caps.Logger.IP); err != nil {
+	if caps.LogServer != nil {
+		if err := check("log_server", caps.LogServer.IP); err != nil {
 			return err
 		}
 	}
@@ -102,13 +102,13 @@ func CheckProductionIPs(config *core.Config) error {
 			return err
 		}
 	}
-	if caps.Notification != nil {
-		if err := check("notification", caps.Notification.IP); err != nil {
+	if caps.NotifServer != nil {
+		if err := check("notif_server", caps.NotifServer.IP); err != nil {
 			return err
 		}
 	}
-	if caps.Telebot != nil {
-		if err := check("telebot", caps.Telebot.IP); err != nil {
+	if caps.TeleRemote != nil {
+		if err := check("tele_remote", caps.TeleRemote.IP); err != nil {
 			return err
 		}
 	}
@@ -117,13 +117,13 @@ func CheckProductionIPs(config *core.Config) error {
 			return err
 		}
 	}
-	if caps.Monitoring != nil {
-		if err := check("monitoring", caps.Monitoring.IP); err != nil {
+	if caps.WebInterface != nil {
+		if err := check("web_interface", caps.WebInterface.IP); err != nil {
 			return err
 		}
 	}
-	if caps.Database != nil {
-		if err := check("database", caps.Database.IP); err != nil {
+	if caps.TimescaleDb != nil {
+		if err := check("timescale_db", caps.TimescaleDb.IP); err != nil {
 			return err
 		}
 	}

@@ -58,8 +58,8 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 	}
 
 	// 3. File Load
-	// 3. File Load
-	if err := loader.LoadConfigFromFileSafe(cfg, "config.yaml"); err != nil {
+	fullPath := loader.ResolveConfigPath("config")
+	if err := loader.LoadConfigFromFileSafe(cfg, fullPath); err != nil {
 		return err
 	}
 
@@ -77,6 +77,15 @@ func (s *ProductionStrategy) Sync(cfg *core.Config) error {
 	if s.Client != nil {
 		fmt.Println("Production: Syncing updates to Server...")
 		return s.Client.UpdateConfig(cfg)
+	}
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *ProductionStrategy) GetHandler() *network.ConfigProtoHandler {
+	if s.Client != nil {
+		return s.Client.Handler
 	}
 	return nil
 }

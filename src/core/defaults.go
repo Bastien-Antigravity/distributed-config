@@ -13,39 +13,39 @@ func NewDefaultConfig() *Config {
 			Reset: false,
 		},
 		Capabilities: Capabilities{
-			Logger: &models.LoggerCapability{
-				IP:   "127.0.0.2",
-				Port: "9020",
+			LogServer: &models.LogServerCapability{
+				IP:   "${LS_IP:127.0.0.2}",
+				Port: "${LS_PORT:9020}",
 			},
 			ConfigServer: &models.ConfigServerCapability{
-				IP:      "127.0.0.2",
-				Port:    "3306",
+				IP:      "${CF_IP:127.0.0.2}",
+				Port:    "${CF_PORT:3306}",
 				Refresh: "300",
 			},
-			Notification: &models.NotificationCapability{
-				IP:   "127.0.0.2",
-				Port: "1026",
+			NotifServer: &models.NotifServerCapability{
+				IP:   "${NT_IP:127.0.0.2}",
+				Port: "${NT_PORT:1026}",
 			},
-			Telebot: &models.TelebotCapability{
-				Token:  "${TELEBOT_TOKEN}",
-				ChatID: "${TELEBOT_CHAT_ID}",
-				IP:     "127.0.0.2",
-				Port:   "1863",
+			TeleRemote: &models.TeleRemoteCapability{
+				Token:  "${TR_TOKEN}",
+				ChatID: "${TR_CHATID}",
+				IP:     "${TR_IP:127.0.0.2}",
+				Port:   "${TR_PORT:1863}",
+			},
+			WebInterface: &models.WebInterfaceCapability{
+				IP:   "${WB_IP:127.0.0.2}",
+				Port: "${WB_PORT:8080}",
 			},
 			Scheduler: &models.SchedulerCapability{
 				IP:   "127.0.0.2",
 				Port: "5001",
 			},
-			Monitoring: &models.MonitoringCapability{
-				IP:   "127.0.0.2",
-				Port: "5000",
-			},
-			Database: &models.DatabaseCapability{
-				IP:       "127.0.0.2",
-				Port:     "5432",
-				DBName:   "maindb",
-				User:     "${DB_USER}",
-				Password: "${DB_PASSWORD}",
+			TimescaleDb: &models.TimescaleDbCapability{
+				IP:       "${TS_IP:127.0.0.2}",
+				Port:     "${TS_PORT:5432}",
+				DBName:   "${TS_DBNAME:maindb}",
+				User:     "${TS_USER}",
+				Password: "${TS_PASSWORD}",
 				SSLCert:  "false",
 			},
 			FileSystem: &models.FileSystemCapability{

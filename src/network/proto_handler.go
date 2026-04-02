@@ -19,9 +19,10 @@ type ConfigProtoHandler struct {
 	parentConfig *core.Config
 
 	// Callbacks - aligned with legacy structure
-	loggerRefreshLogLevel func(map[string][]string)
-	notifRefreshSender    func(map[string]map[string]string) map[string][]string
-	loggerLog             func(string, string)
+	logServerRefreshLogLevel func(map[string][]string)
+	notifServerRefreshSender func(map[string]map[string]string) map[string][]string
+	logServerLog             func(string, string)
+	onMemConfUpdate          func(map[string]map[string]string)
 }
 
 // ConnectionHandler interface support removed
@@ -41,20 +42,26 @@ func NewConfigHandler(name string, config *core.Config) *ConfigProtoHandler {
 // Setters for callbacks
 // -----------------------------------------------------------------------------
 
-func (h *ConfigProtoHandler) SetLoggerCallBack(cb func(map[string][]string)) {
-	h.loggerRefreshLogLevel = cb
+func (h *ConfigProtoHandler) SetLogServerCallBack(cb func(map[string][]string)) {
+	h.logServerRefreshLogLevel = cb
 }
 
 // -----------------------------------------------------------------------------
 
-func (h *ConfigProtoHandler) SetNotifCallBack(cb func(map[string]map[string]string) map[string][]string) {
-	h.notifRefreshSender = cb
+func (h *ConfigProtoHandler) SetNotifServerCallBack(cb func(map[string]map[string]string) map[string][]string) {
+	h.notifServerRefreshSender = cb
 }
 
 // -----------------------------------------------------------------------------
 
-func (h *ConfigProtoHandler) SetLoggerLog(cb func(string, string)) {
-	h.loggerLog = cb
+func (h *ConfigProtoHandler) SetLogServerLog(cb func(string, string)) {
+	h.logServerLog = cb
+}
+
+// -----------------------------------------------------------------------------
+
+func (h *ConfigProtoHandler) SetOnMemConfUpdate(cb func(map[string]map[string]string)) {
+	h.onMemConfUpdate = cb
 }
 
 // HandleOutgoing implements ConnectionHandler
@@ -196,7 +203,14 @@ func (h *ConfigProtoHandler) updateMemConfig(sections map[string]*pb.KeysValues)
 	if h.parentConfig.MemConfig == nil {
 		h.parentConfig.MemConfig = make(map[string]map[string]string)
 	}
+	updates := make(map[string]map[string]string)
 	for sectKey, kv := range sections {
-		h.parentConfig.MemConfig[sectKey] = kv.GetKeyValue()
+		val := kv.GetKeyValue()
+		h.parentConfig.MemConfig[sectKey] = val
+		updates[sectKey] = val
+	}
+
+	if h.onMemConfUpdate != nil {
+		h.onMemConfUpdate(updates)
 	}
 }

@@ -29,13 +29,13 @@ type Config struct {
 // -----------------------------------------------------------------------------
 
 type Capabilities struct {
-	Logger       *models.LoggerCapability       `yaml:"logger" json:"logger,omitempty"`
+	LogServer    *models.LogServerCapability    `yaml:"log_server" json:"log_server,omitempty"`
 	ConfigServer *models.ConfigServerCapability `yaml:"config_server" json:"config_server,omitempty"`
-	Notification *models.NotificationCapability `yaml:"notification" json:"notification,omitempty"`
-	Telebot      *models.TelebotCapability      `yaml:"telebot" json:"telebot,omitempty"`
+	NotifServer  *models.NotifServerCapability  `yaml:"notif_server" json:"notif_server,omitempty"`
+	TeleRemote   *models.TeleRemoteCapability   `yaml:"tele_remote" json:"tele_remote,omitempty"`
 	Scheduler    *models.SchedulerCapability    `yaml:"scheduler" json:"scheduler,omitempty"`
-	Monitoring   *models.MonitoringCapability   `yaml:"monitoring" json:"monitoring,omitempty"`
-	Database     *models.DatabaseCapability     `yaml:"database" json:"database,omitempty"`
+	WebInterface *models.WebInterfaceCapability `yaml:"web_interface" json:"web_interface,omitempty"`
+	TimescaleDb  *models.TimescaleDbCapability  `yaml:"timescale_db" json:"timescale_db,omitempty"`
 	FileSystem   *models.FileSystemCapability   `yaml:"file_system" json:"file_system,omitempty"`
 	Jupyter      *models.JupyterCapability      `yaml:"jupyter" json:"jupyter,omitempty"`
 }

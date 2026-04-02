@@ -55,6 +55,9 @@ func NewConfig(profile string) *Config {
 		fmt.Printf("Config Sync Warning: %v\n", err)
 	}
 
+	// 4. Store Handler for Callback wiring
+	configWrapper.handler = strategy.GetHandler()
+
 	return configWrapper
 }
 
@@ -63,4 +66,7 @@ func NewConfig(profile string) *Config {
 
 func (config *Config) OnMemConfUpdate(onMemConfUpdateFn func(map[string]map[string]string)) {
 	config.ParentOnMemConfUpdate = onMemConfUpdateFn
+	if config.handler != nil {
+		config.handler.SetOnMemConfUpdate(onMemConfUpdateFn)
+	}
 }

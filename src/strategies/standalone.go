@@ -2,12 +2,9 @@ package strategies
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
+	"github.com/Bastien-Antigravity/distributed-config/src/network"
 )
 
 // StandaloneStrategy: Local YAML only. No Server.
@@ -35,20 +32,10 @@ func (s *StandaloneStrategy) Name() string { return "standalone" }
 func (s *StandaloneStrategy) Load(cfg *core.Config) error {
 	fmt.Println("Strategy: Standalone")
 
-	// 1. Determine File Path (Exe Name)
-	exePath, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	exeName := filepath.Base(exePath)
-	baseName := strings.TrimSuffix(exeName, filepath.Ext(exeName))
-	yamlName := baseName + ".yaml"
-	fullPath := filepath.Join(filepath.Dir(exePath), yamlName)
+	// 1. Resolve Path (Exe name or config/ fallback)
+	fullPath := loader.ResolveConfigPath("standalone")
 
 	// 2. Load File (Generates default if missing - standard loader behavior)
-	// For standalone, standard defaults (which might be the Test defaults currently) are used.
-	// If we want specific "Standalone" defaults different from "Test", we'd need a specific generator.
-	// For now, using standard loader.
 	return loader.LoadConfigFromFile(cfg, fullPath)
 }
 
@@ -56,5 +43,11 @@ func (s *StandaloneStrategy) Load(cfg *core.Config) error {
 
 func (s *StandaloneStrategy) Sync(cfg *core.Config) error {
 	// No sync in standalone
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *StandaloneStrategy) GetHandler() *network.ConfigProtoHandler {
 	return nil
 }

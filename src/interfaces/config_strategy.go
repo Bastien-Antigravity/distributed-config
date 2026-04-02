@@ -1,6 +1,9 @@
 package interfaces
 
-import "github.com/Bastien-Antigravity/distributed-config/src/core"
+import (
+	"github.com/Bastien-Antigravity/distributed-config/src/core"
+	"github.com/Bastien-Antigravity/distributed-config/src/network"
+)
 
 // ConfigStrategy defines the behavior for different configuration profiles.
 // -----------------------------------------------------------------------------
@@ -15,4 +18,7 @@ type ConfigStrategy interface {
 
 	// Sync performs any necessary synchronization (e.g., pushing updates to server).
 	Sync(cfg *core.Config) error
+
+	// GetHandler returns the network handler if the strategy supports it.
+	GetHandler() *network.ConfigProtoHandler
 }

@@ -55,15 +55,23 @@ func (s *PreprodStrategy) Load(cfg *core.Config) error {
 		}
 	}
 
-	// 3. File Load (Sync-check only, no generation of defaults preferred)
-	// We use safe loader that DOES NOT generate defaults if missing?
-	// User said: "on error if problem with config we write an empty skeleton config.yaml file"
-	return loader.LoadConfigFromFileSafe(cfg, "config_preprod.yaml")
+	// 3. File Load
+	fullPath := loader.ResolveConfigPath("config_preprod")
+	return loader.LoadConfigFromFileSafe(cfg, fullPath)
 }
 
 // -----------------------------------------------------------------------------
 
 func (s *PreprodStrategy) Sync(cfg *core.Config) error {
 	fmt.Println("Preprod: Sync disabled (Read-Only Mode)")
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *PreprodStrategy) GetHandler() *network.ConfigProtoHandler {
+	if s.Client != nil {
+		return s.Client.Handler
+	}
 	return nil
 }

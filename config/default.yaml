@@ -1,11 +1,44 @@
-capabilities:
-  database:
-    ip: "127.0.0.2"
-    port: "5432"
-    db_name: "maindb"
-    user: "${DB_USER}"
-    password: "${DB_PASSWORD}"
-    ssl_cert: "false"
+# Distributed Config - Default Template
+# -----------------------------------------------------------------------------
+# This file is automatically discovered by the library as a global fallback.
+# Values here can be overridden by system Environment Variables.
 
-feature_flags:
-  new_ui: "true"
+common:
+  name: "distributed-config-service"
+  reset: false
+
+capabilities:
+  log_server:
+    ip: "${LS_IP:127.0.0.2}"
+    port: "${LS_PORT:9020}"
+    level: "${LS_LEVEL:INFO}"
+
+  # Base Connection for Distributed Mode
+  config_server:
+    ip: "${CF_IP:127.0.0.2}"         # Injected from environment
+    port: "${CF_PORT:3306}"     # Injected from environment
+
+  notif_server:
+    ip: "${NT_IP:127.0.0.2}"
+    port: "${NT_PORT:1026}"
+
+  tele_remote:
+    token: "${TR_TOKEN}"
+    chat_id: "${TR_CHATID}"
+    ip: "${TR_IP:127.0.0.2}"
+    port: "${TR_PORT:1863}"
+    
+  # Example Capability with Secrets
+  timescale_db:
+    ip: "${TS_IP:127.0.0.2}"
+    db_name: "${TS_DBNAME:app_db}"
+    user: "${TS_USER:dbuser}"
+    password: "${TS_PASSWORD}" # RELIABLE: Loaded from system ENV (Secrets Manager)
+
+  web_interface:
+    ip: "${WB_IP:127.0.0.2}"
+    port: "${WB_PORT:8080}"
+    
+  scheduler:
+    ip: "${SC_IP:127.0.0.2}"
+    port: "${SC_PORT:5001}"
