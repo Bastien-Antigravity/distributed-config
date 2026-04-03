@@ -39,3 +39,13 @@ type Capabilities struct {
 	FileSystem   *models.FileSystemCapability   `yaml:"file_system" json:"file_system,omitempty"`
 	Jupyter      *models.JupyterCapability      `yaml:"jupyter" json:"jupyter,omitempty"`
 }
+// Get returns a value from a specified section and key.
+// Returns an empty string if not found.
+func (c *Config) Get(section, key string) string {
+	if s, ok := c.MemConfig[section]; ok {
+		if val, ok := s[key]; ok {
+			return val
+		}
+	}
+	return ""
+}
