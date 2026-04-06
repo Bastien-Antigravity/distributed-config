@@ -1,7 +1,5 @@
 package core
 
-import "github.com/Bastien-Antigravity/distributed-config/src/models"
-
 // NewDefaultConfig returns a Config struct populated with default values.
 // This replaces the External String Template to keep data and defaults "merged".
 // -----------------------------------------------------------------------------
@@ -12,49 +10,49 @@ func NewDefaultConfig() *Config {
 			Name:  "common",
 			Reset: false,
 		},
-		Capabilities: Capabilities{
-			LogServer: &models.LogServerCapability{
-				IP:   "${LS_IP:127.0.0.2}",
-				Port: "${LS_PORT:9020}",
+		Capabilities: map[string]interface{}{
+			"log_server": map[string]interface{}{
+				"ip":   "${LS_IP:127.0.0.2}",
+				"port": "${LS_PORT:9020}",
 			},
-			ConfigServer: &models.ConfigServerCapability{
-				IP:      "${CF_IP:127.0.0.2}",
-				Port:    "${CF_PORT:3306}",
-				Refresh: "300",
+			"config_server": map[string]interface{}{
+				"ip":      "${CF_IP:127.0.0.2}",
+				"port":    "${CF_PORT:3306}",
+				"refresh": "300",
 			},
-			NotifServer: &models.NotifServerCapability{
-				IP:   "${NT_IP:127.0.0.2}",
-				Port: "${NT_PORT:1026}",
+			"notif_server": map[string]interface{}{
+				"ip":   "${NT_IP:127.0.0.2}",
+				"port": "${NT_PORT:1026}",
 			},
-			TeleRemote: &models.TeleRemoteCapability{
-				Token:  "${TR_TOKEN}",
-				ChatID: "${TR_CHATID}",
-				IP:     "${TR_IP:127.0.0.2}",
-				Port:   "${TR_PORT:1863}",
+			"tele_remote": map[string]interface{}{
+				"token":   "${TR_TOKEN}",
+				"chat_id": "${TR_CHATID}",
+				"ip":      "${TR_IP:127.0.0.2}",
+				"port":    "${TR_PORT:1863}",
 			},
-			WebInterface: &models.WebInterfaceCapability{
-				IP:   "${WB_IP:127.0.0.2}",
-				Port: "${WB_PORT:8080}",
+			"web_interface": map[string]interface{}{
+				"ip":   "${WB_IP:127.0.0.2}",
+				"port": "${WB_PORT:8080}",
 			},
-			Scheduler: &models.SchedulerCapability{
-				IP:   "127.0.0.2",
-				Port: "5001",
+			"scheduler": map[string]interface{}{
+				"ip":   "127.0.0.2",
+				"port": "5001",
 			},
-			TimescaleDb: &models.TimescaleDbCapability{
-				IP:       "${TS_IP:127.0.0.2}",
-				Port:     "${TS_PORT:5432}",
-				DBName:   "${TS_DBNAME:maindb}",
-				User:     "${TS_USER}",
-				Password: "${TS_PASSWORD}",
-				SSLCert:  "false",
+			"timescale_db": map[string]interface{}{
+				"ip":       "${TS_IP:127.0.0.2}",
+				"port":     "${TS_PORT:5432}",
+				"db_name":  "${TS_DBNAME:maindb}",
+				"user":     "${TS_USER}",
+				"password": "${TS_PASSWORD}",
+				"ssl_cert": "false",
 			},
-			FileSystem: &models.FileSystemCapability{
-				TempPath: "./fs_temp",
-				DataPath: "./fs_data",
+			"file_system": map[string]interface{}{
+				"temp_path": "./fs_temp",
+				"data_path": "./fs_data",
 			},
-			Jupyter: &models.JupyterCapability{
-				IP:   "127.0.0.2",
-				Port: "8888",
+			"jupyter": map[string]interface{}{
+				"ip":   "127.0.0.2",
+				"port": "8888",
 			},
 		},
 	}

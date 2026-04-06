@@ -22,6 +22,7 @@ The library is tested across four distinct layers to ensure reliability and safe
 
 ### 1. Configuration Discovery (`src/loader/path_resolver_test.go`)
 Ensures that the library can find configuration files in various environments (Development, Installed, Containerized).
+*   **Testing Sandbox**: End-to-end integration across microservices should be tested locally inside the `testing-sandbox/` directory using native `docker-compose`.
 *   **Priority Rules**: Verifies that `config/` subfolders are prioritized over root folders.
 *   **Fallback Logic**: Tests that `default.yaml` is used if specific configuration files are missing.
 
@@ -33,8 +34,8 @@ Tests the parsing logic and security features.
 
 ### 3. Network & Dynamic Updates (`src/network/network_test.go`)
 Tests the bidirectional communication with the Config Server.
-*   **Protobuf Integrity**: Validates the serialization and deserialization of configuration messages.
-*   **Callback System**: Ensures that registering a listener via `cfg.OnMemConfUpdate(...)` correctly triggers when the server pushes new data.
+*   **Protobuf Integrity**: Validates the serialization and deserialization of the underlying raw JSON mapping blobs inside Protobuf payload bytes.
+*   **Callback System**: Ensures that registering a listener via `cfg.OnMemConfUpdate(...)` or `cfg.OnRegistryUpdate(...)` triggers accurately upon config changes.
 *   **Memory Sync**: Verifies that incoming server data correctly updates the internal `MemConfig` map.
 
 ### 4. Safety & Integrity (`src/loader/validator_test.go`)

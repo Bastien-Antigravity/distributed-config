@@ -63,7 +63,7 @@ func (c *Client) Close() error {
 // GetConfig fetches configuration from the server.
 func (c *Client) GetConfig() (*core.Config, error) {
 	// Send request via Handler
-	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_get_mem_config, nil)
+	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_GET_SYNC, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (c *Client) GetConfig() (*core.Config, error) {
 
 // UpdateConfig sends configuration updates to the server
 func (c *Client) UpdateConfig(cfg *core.Config) error {
-	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_update_mem_config, nil)
+	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_PUT_SYNC, cfg.MemConfig)
 	if err != nil {
 		return err
 	}

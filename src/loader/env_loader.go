@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
-	"github.com/Bastien-Antigravity/distributed-config/src/models"
 )
 
 // LoadCommonFromEnv populates the Common configuration from Environment Variables.
@@ -25,17 +24,22 @@ func LoadCommonFromEnv(config *core.Config) {
 		}
 	}
 
-	// Example: If Common requires Config Server IP to be bootstrapped from Env
+	// Wait: generic approach for ConfigServer bootstrapping if missing YAML
 	if val, exists := os.LookupEnv("CF_IP"); exists {
-		if config.Capabilities.ConfigServer == nil {
-			config.Capabilities.ConfigServer = &models.ConfigServerCapability{}
+		if config.Capabilities["config_server"] == nil {
+			config.Capabilities["config_server"] = make(map[string]interface{})
 		}
-		config.Capabilities.ConfigServer.IP = val
+		// Go type assertion trick for nested maps
+		if m, ok := config.Capabilities["config_server"].(map[string]interface{}); ok {
+			m["ip"] = val
+		}
 	}
 	if val, exists := os.LookupEnv("CF_PORT"); exists {
-		if config.Capabilities.ConfigServer == nil {
-			config.Capabilities.ConfigServer = &models.ConfigServerCapability{}
+		if config.Capabilities["config_server"] == nil {
+			config.Capabilities["config_server"] = make(map[string]interface{})
 		}
-		config.Capabilities.ConfigServer.Port = val
+		if m, ok := config.Capabilities["config_server"].(map[string]interface{}); ok {
+			m["port"] = val
+		}
 	}
 }

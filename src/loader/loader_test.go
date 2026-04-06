@@ -8,6 +8,11 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 )
 
+type MockTS struct {
+	DBName   string `json:"db_name"`
+	Password string `json:"password"`
+}
+
 func TestLoader(t *testing.T) {
 	tempDir := t.TempDir()
 
@@ -32,8 +37,11 @@ capabilities:
 		if cfg.Common.Name != "test-app" {
 			t.Errorf("Expected name 'test-app', got '%s'", cfg.Common.Name)
 		}
-		if cfg.Capabilities.TimescaleDb.DBName != "prod_db" {
-			t.Errorf("Expected db_name 'prod_db', got '%s'", cfg.Capabilities.TimescaleDb.DBName)
+		
+		var ts MockTS
+		cfg.GetCapability("timescale_db", &ts)
+		if ts.DBName != "prod_db" {
+			t.Errorf("Expected db_name 'prod_db', got '%s'", ts.DBName)
 		}
 	})
 
@@ -62,8 +70,11 @@ capabilities:
 		if cfg.Common.Name != "service-S123" {
 			t.Errorf("Expected name 'service-S123', got '%s'", cfg.Common.Name)
 		}
-		if cfg.Capabilities.TimescaleDb.Password != "TopSecret123!" {
-			t.Errorf("Expected expansion to 'TopSecret123!', got '%s'", cfg.Capabilities.TimescaleDb.Password)
+		
+		var ts MockTS
+		cfg.GetCapability("timescale_db", &ts)
+		if ts.Password != "TopSecret123!" {
+			t.Errorf("Expected expansion to 'TopSecret123!', got '%s'", ts.Password)
 		}
 	})
 

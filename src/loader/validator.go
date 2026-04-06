@@ -15,8 +15,18 @@ func ValidateCommonConfig(config *core.Config) error {
 	}
 
 	// Assuming Config Server details are required for Distributed Mode
-	if config.Capabilities.ConfigServer == nil || config.Capabilities.ConfigServer.IP == "" || config.Capabilities.ConfigServer.Port == "" {
+	val, ok := config.Capabilities["config_server"]
+	if !ok {
 		return fmt.Errorf("missing required config server details (CF_IP, CF_PORT) for distributed mode")
+	}
+	if m, ok := val.(map[string]interface{}); ok {
+		ip, _ := m["ip"].(string)
+		port, _ := m["port"].(string)
+		if ip == "" || port == "" {
+			return fmt.Errorf("missing required config server details")
+		}
+	} else {
+		return fmt.Errorf("invalid config_server capability map")
 	}
 
 	return nil
@@ -26,56 +36,15 @@ func ValidateCommonConfig(config *core.Config) error {
 // -----------------------------------------------------------------------------
 
 func CheckTestIPs(config *core.Config) error {
-	// Helper to check individual IP
-	check := func(name, ip string) error {
-		if ip != "" && ip != "127.0.0.2" {
-			return fmt.Errorf("test integrity failure: %s IP must be 127.0.0.2, got %s", name, ip)
-		}
-		return nil
-	}
-
-	caps := config.Capabilities
-	if caps.LogServer != nil {
-		if err := check("log_server", caps.LogServer.IP); err != nil {
-			return err
+	for name, capInterface := range config.Capabilities {
+		if m, ok := capInterface.(map[string]interface{}); ok {
+			if ipRaw, exists := m["ip"]; exists {
+				if ip, ok := ipRaw.(string); ok && ip != "" && ip != "127.0.0.2" {
+					return fmt.Errorf("test integrity failure: %s IP must be 127.0.0.2, got %s", name, ip)
+				}
+			}
 		}
 	}
-	if caps.ConfigServer != nil {
-		if err := check("config_server", caps.ConfigServer.IP); err != nil {
-			return err
-		}
-	}
-	if caps.NotifServer != nil {
-		if err := check("notif_server", caps.NotifServer.IP); err != nil {
-			return err
-		}
-	}
-	if caps.TeleRemote != nil {
-		if err := check("tele_remote", caps.TeleRemote.IP); err != nil {
-			return err
-		}
-	}
-	if caps.Scheduler != nil {
-		if err := check("scheduler", caps.Scheduler.IP); err != nil {
-			return err
-		}
-	}
-	if caps.WebInterface != nil {
-		if err := check("web_interface", caps.WebInterface.IP); err != nil {
-			return err
-		}
-	}
-	if caps.TimescaleDb != nil {
-		if err := check("timescale_db", caps.TimescaleDb.IP); err != nil {
-			return err
-		}
-	}
-	if caps.Jupyter != nil {
-		if err := check("jupyter", caps.Jupyter.IP); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -83,55 +52,14 @@ func CheckTestIPs(config *core.Config) error {
 // -----------------------------------------------------------------------------
 
 func CheckProductionIPs(config *core.Config) error {
-	// Helper to check individual IP
-	check := func(name, ip string) error {
-		if ip == "127.0.0.2" {
-			return fmt.Errorf("production integrity failure: %s IP cannot be 127.0.0.2 (Test IP detected)", name)
-		}
-		return nil
-	}
-
-	caps := config.Capabilities
-	if caps.LogServer != nil {
-		if err := check("log_server", caps.LogServer.IP); err != nil {
-			return err
+	for name, capInterface := range config.Capabilities {
+		if m, ok := capInterface.(map[string]interface{}); ok {
+			if ipRaw, exists := m["ip"]; exists {
+				if ip, ok := ipRaw.(string); ok && ip == "127.0.0.2" {
+					return fmt.Errorf("production integrity failure: %s IP cannot be 127.0.0.2 (Test IP detected)", name)
+				}
+			}
 		}
 	}
-	if caps.ConfigServer != nil {
-		if err := check("config_server", caps.ConfigServer.IP); err != nil {
-			return err
-		}
-	}
-	if caps.NotifServer != nil {
-		if err := check("notif_server", caps.NotifServer.IP); err != nil {
-			return err
-		}
-	}
-	if caps.TeleRemote != nil {
-		if err := check("tele_remote", caps.TeleRemote.IP); err != nil {
-			return err
-		}
-	}
-	if caps.Scheduler != nil {
-		if err := check("scheduler", caps.Scheduler.IP); err != nil {
-			return err
-		}
-	}
-	if caps.WebInterface != nil {
-		if err := check("web_interface", caps.WebInterface.IP); err != nil {
-			return err
-		}
-	}
-	if caps.TimescaleDb != nil {
-		if err := check("timescale_db", caps.TimescaleDb.IP); err != nil {
-			return err
-		}
-	}
-	if caps.Jupyter != nil {
-		if err := check("jupyter", caps.Jupyter.IP); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }

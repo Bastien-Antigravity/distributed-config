@@ -1,6 +1,7 @@
 package network
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
@@ -24,17 +25,18 @@ func TestNetworkProtoHandler(t *testing.T) {
 			}
 		})
 
+		payloadMap := map[string]map[string]string{
+			"SECTION1": {
+				"KEY1": "VAL1",
+				"KEY2": "VAL2",
+			},
+		}
+		dataPayload, _ := json.Marshal(payloadMap)
+
 		// Create a mock PropagateMemConfig message
 		msg := &pb.ConfigMsg{
-			RespServer: pb.ConfigMsg_propagate_mem_config,
-			SectionsKeysValues: map[string]*pb.KeysValues{
-				"SECTION1": {
-					KeyValue: map[string]string{
-						"KEY1": "VAL1",
-						"KEY2": "VAL2",
-					},
-				},
-			},
+			Command: pb.ConfigMsg_BROADCAST_SYNC,
+			Payload: dataPayload,
 		}
 
 		data, err := proto.Marshal(msg)
@@ -58,8 +60,7 @@ func TestNetworkProtoHandler(t *testing.T) {
 	})
 
 	t.Run("TestOutgoingRequests", func(t *testing.T) {
-		// Test get_mem_config request generation
-		data, err := handler.HandleOutgoing(pb.ConfigMsg_get_mem_config, nil)
+		data, err := handler.HandleOutgoing(pb.ConfigMsg_GET_SYNC, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,8 +70,8 @@ func TestNetworkProtoHandler(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if msg.ReqClient != pb.ConfigMsg_get_mem_config {
-			t.Errorf("Expected ReqClient get_mem_config, got %v", msg.ReqClient)
+		if msg.Command != pb.ConfigMsg_GET_SYNC {
+			t.Errorf("Expected ReqClient get_mem_config, got %v", msg.Command)
 		}
 	})
 
@@ -78,7 +79,7 @@ func TestNetworkProtoHandler(t *testing.T) {
 		// Populate some mem config to send
 		config.MemConfig["OUTGOING"] = map[string]string{"STATUS": "OK"}
 
-		data, err := handler.HandleOutgoing(pb.ConfigMsg_update_mem_config, nil)
+		data, err := handler.HandleOutgoing(pb.ConfigMsg_PUT_SYNC, nil) // passing nil defaults to MemConfig
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -88,12 +89,15 @@ func TestNetworkProtoHandler(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if msg.ReqClient != pb.ConfigMsg_update_mem_config {
-			t.Errorf("Expected ReqClient update_mem_config, got %v", msg.ReqClient)
+		if msg.Command != pb.ConfigMsg_PUT_SYNC {
+			t.Errorf("Expected ReqClient put_sync, got %v", msg.Command)
 		}
 
-		if msg.SectionsKeysValues["OUTGOING"].KeyValue["STATUS"] != "OK" {
-			t.Errorf("Expected update payload to contain STATUS=OK, got %v", msg.SectionsKeysValues["OUTGOING"])
+		var decoded map[string]map[string]string
+		json.Unmarshal(msg.Payload, &decoded)
+
+		if decoded["OUTGOING"]["STATUS"] != "OK" {
+			t.Errorf("Expected update payload to contain STATUS=OK")
 		}
 	})
 }

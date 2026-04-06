@@ -57,11 +57,16 @@ func main() {
 	// Options: "production", "preprod", "test", "standalone"
 	cfg := distributed_config.New("production")
 
-	// Access static configuration values
+	// Access static configuration values using typed unmarshaling helpers
 	fmt.Printf("Service Name: %s\n", cfg.Common.Name)
 	
-	if cfg.Capabilities.TimescaleDb != nil {
-		fmt.Printf("DB Host: %s\n", cfg.Capabilities.TimescaleDb.IP)
+	type GenericServer struct {
+		IP   string `json:"ip"`
+		Port string `json:"port"`
+	}
+	var tsDb GenericServer
+	if err := cfg.GetCapability("timescaledb", &tsDb); err == nil && tsDb.IP != "" {
+		fmt.Printf("DB Host: %s\n", tsDb.IP)
 	}
 
     // Access dynamic (Memory) configuration
@@ -73,6 +78,11 @@ func main() {
     // Register a callback for when remote configuration is updated
     cfg.OnMemConfUpdate(func(updates map[string]map[string]string) {
         fmt.Println("Memory Configuration updated remotely!")
+    })
+
+    // Register a callback for when the Service Registry shifts (nodes join/leave)
+    cfg.OnRegistryUpdate(func(registry map[string][]string) {
+        fmt.Printf("Active nodes tracking %d services\n", len(registry["active_services"]))
     })
 }
 ```

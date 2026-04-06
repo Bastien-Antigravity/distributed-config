@@ -10,7 +10,6 @@ func NewSkeletonConfig() *Config {
 			Name:  "CHANGE_ME",
 			Reset: false,
 		},
-		// Empty capabilities or minimal comments if using a better YAML encoder
-		Capabilities: Capabilities{},
+		Capabilities: make(map[string]interface{}),
 	}
 }

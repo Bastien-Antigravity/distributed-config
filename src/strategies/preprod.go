@@ -39,8 +39,13 @@ func (s *PreprodStrategy) Load(cfg *core.Config) error {
 	loader.LoadCommonFromEnv(cfg)
 
 	// 2. Server Load (GET)
-	if cfg.Capabilities.ConfigServer != nil {
-		addr := fmt.Sprintf("%s:%s", cfg.Capabilities.ConfigServer.IP, cfg.Capabilities.ConfigServer.Port)
+	type ConfigServerCap struct {
+		IP   string `json:"ip"`
+		Port string `json:"port"`
+	}
+	var cs ConfigServerCap
+	if err := cfg.GetCapability("config_server", &cs); err == nil && cs.IP != "" {
+		addr := fmt.Sprintf("%s:%s", cs.IP, cs.Port)
 		client, err := network.NewClient(addr, cfg)
 		if err == nil {
 			s.Client = client

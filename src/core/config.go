@@ -1,6 +1,6 @@
 package core
 
-import "github.com/Bastien-Antigravity/distributed-config/src/models"
+import "encoding/json"
 
 // Common Config
 // -----------------------------------------------------------------------------
@@ -14,8 +14,8 @@ type CommonConfig struct {
 // -----------------------------------------------------------------------------
 
 type Config struct {
-	Common       CommonConfig `yaml:"common" json:"common"`
-	Capabilities Capabilities `yaml:"capabilities" json:"capabilities"`
+	Common       CommonConfig           `yaml:"common" json:"common"`
+	Capabilities map[string]interface{} `yaml:"capabilities" json:"capabilities"`
 
 	// Internal state
 	COMMON_FILE_PATH string
@@ -23,21 +23,6 @@ type Config struct {
 
 	// Data storage for MemConfig
 	MemConfig map[string]map[string]string `yaml:"-"`
-}
-
-// Capabilities Container
-// -----------------------------------------------------------------------------
-
-type Capabilities struct {
-	LogServer    *models.LogServerCapability    `yaml:"log_server" json:"log_server,omitempty"`
-	ConfigServer *models.ConfigServerCapability `yaml:"config_server" json:"config_server,omitempty"`
-	NotifServer  *models.NotifServerCapability  `yaml:"notif_server" json:"notif_server,omitempty"`
-	TeleRemote   *models.TeleRemoteCapability   `yaml:"tele_remote" json:"tele_remote,omitempty"`
-	Scheduler    *models.SchedulerCapability    `yaml:"scheduler" json:"scheduler,omitempty"`
-	WebInterface *models.WebInterfaceCapability `yaml:"web_interface" json:"web_interface,omitempty"`
-	TimescaleDb  *models.TimescaleDbCapability  `yaml:"timescale_db" json:"timescale_db,omitempty"`
-	FileSystem   *models.FileSystemCapability   `yaml:"file_system" json:"file_system,omitempty"`
-	Jupyter      *models.JupyterCapability      `yaml:"jupyter" json:"jupyter,omitempty"`
 }
 
 // Get returns a value from a specified section and key.
@@ -61,4 +46,18 @@ func (c *Config) Set(section, key, value string) {
 		c.MemConfig[section] = make(map[string]string)
 	}
 	c.MemConfig[section][key] = value
+}
+
+// GetCapability extracts a specific capability dictionary and unmarshals it into the target struct.
+// It uses JSON round-tripping for easy conversion from nested map[string]interface{} to strongly typed structs.
+func (c *Config) GetCapability(key string, target interface{}) error {
+	val, ok := c.Capabilities[key]
+	if !ok || val == nil {
+		return nil // Not found, but not strictly an error (just empty target)
+	}
+	data, err := json.Marshal(val)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, target)
 }

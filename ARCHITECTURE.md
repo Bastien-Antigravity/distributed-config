@@ -45,7 +45,8 @@ flowchart TD
     subgraph Sync [Dynamic Sync]
         direction TB
         Prod & Pre & Test -->|Propagate| Net[Network Config Server]:::net
-        Net -.->|Update| MemConfig[MemConfig Map]:::core
+        Net -.->|BROADCAST_SYNC| MemConfig[MemConfig Map]:::core
+        Net -.->|BROADCAST_REGISTRY| Registry[Service Registry JSON]:::core
         MemConfig -.->|Trigger| Callback[User Callback]:::core
     end
     style Sync fill:#fffde7,stroke:#fff176,stroke-width:2px,color:#f57f17
@@ -73,9 +74,9 @@ Implements the core logic for retrieving and synchronizing configuration based o
 *   **Standalone**: Offline mode. Only uses local file discovery via the Loader.
 
 ### 4. Network & Protocol (`src/network`)
-Manages communication with the remote Config Server using the length-prefixed protocol.
+Manages communication with the remote Config Server using a slimmed-down Protobuf protocol wrapping unstructured JSON arrays/maps.
 *   **Safe Socket**: High-performance TCP communication via `github.com/Bastien-Antigravity/safe-socket`.
-*   **Proto Handler**: Maps incoming protobuf messages to the `MemConfig` data structure and triggers registered callbacks.
+*   **Proto Handler**: Parses generic `GET_SYNC`, `PUT_SYNC`, `BROADCAST_SYNC`, and `BROADCAST_REGISTRY` commands. Routes unstructured JSON blobs to `MemConfig` or Registry callbacks without needing rigidly coupled structs.
 
 ## Configuration Precedence
 
