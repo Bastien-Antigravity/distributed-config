@@ -10,7 +10,6 @@ import (
 // It wraps the core configuration data and provides access to helper methods.
 type Config = facade.Config
 
-
 // New initializes a new configuration instance based on the specified profile.
 //
 // Profiles:
