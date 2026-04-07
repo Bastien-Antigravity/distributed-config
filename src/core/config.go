@@ -25,6 +25,8 @@ type Config struct {
 	MemConfig map[string]map[string]string `yaml:"-"`
 }
 
+// -----------------------------------------------------------------------------
+
 // Get returns a value from a specified section and key.
 // Returns an empty string if not found.
 func (c *Config) Get(section, key string) string {
@@ -35,6 +37,8 @@ func (c *Config) Get(section, key string) string {
 	}
 	return ""
 }
+
+// -----------------------------------------------------------------------------
 
 // Set sets a value for a specified section and key.
 // Initializes MemConfig and section maps if they are nil.
@@ -47,6 +51,8 @@ func (c *Config) Set(section, key, value string) {
 	}
 	c.MemConfig[section][key] = value
 }
+
+// -----------------------------------------------------------------------------
 
 // GetCapability extracts a specific capability dictionary and unmarshals it into the target struct.
 // It uses JSON round-tripping for easy conversion from nested map[string]interface{} to strongly typed structs.
