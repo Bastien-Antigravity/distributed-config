@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"strings"
+
 	models "github.com/Bastien-Antigravity/distributed-config/src/core"
 
 	"gopkg.in/yaml.v3"
@@ -48,8 +50,18 @@ func LoadConfigFromFile(config *models.Config, filePath string) error {
 		return fmt.Errorf("failed to read config file '%s': %w", filePath, err)
 	}
 
-	// Expand Environment Variables
-	expandedData := os.ExpandEnv(string(data))
+	// Expand Environment Variables with support for ${VAR:default}
+	expandedData := os.Expand(string(data), func(s string) string {
+		parts := strings.SplitN(s, ":", 2)
+		val := os.Getenv(parts[0])
+		if val != "" {
+			return val
+		}
+		if len(parts) > 1 {
+			return parts[1]
+		}
+		return val
+	})
 
 	// Unmarshal YAML
 	if err := yaml.Unmarshal([]byte(expandedData), config); err != nil {

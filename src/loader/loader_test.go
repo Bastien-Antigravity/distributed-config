@@ -78,6 +78,43 @@ capabilities:
 		}
 	})
 
+	t.Run("TestEnvExpansion-WithDefaults", func(t *testing.T) {
+		t.Setenv("VAR_EXISTS", "RealValue")
+		t.Setenv("VAR_EMPTY", "")
+		// VAR_UNSET is not set
+
+		yamlContent := `
+common:
+  name: "${VAR_EXISTS:DefaultValue}"
+capabilities:
+  timescale_db:
+    db_name: "${VAR_UNSET:DefaultDB}"
+    password: "${VAR_EMPTY:DefaultPass}"
+`
+		configPath := filepath.Join(tempDir, "defaults.yaml")
+		if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg := &core.Config{}
+		if err := LoadConfigFromFile(cfg, configPath); err != nil {
+			t.Errorf("Expected success, got error: %v", err)
+		}
+
+		if cfg.Common.Name != "RealValue" {
+			t.Errorf("Expected 'RealValue', got '%s'", cfg.Common.Name)
+		}
+		
+		var ts MockTS
+		cfg.GetCapability("timescale_db", &ts)
+		if ts.DBName != "DefaultDB" {
+			t.Errorf("Expected 'DefaultDB', got '%s'", ts.DBName)
+		}
+		if ts.Password != "DefaultPass" {
+			t.Errorf("Expected 'DefaultPass', got '%s'", ts.Password)
+		}
+	})
+
 	t.Run("TestDefaultGeneration", func(t *testing.T) {
 		configPath := filepath.Join(tempDir, "missing.yaml")
 		// File does not exist yet
