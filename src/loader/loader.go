@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
 	"strings"
 
 	models "github.com/Bastien-Antigravity/distributed-config/src/core"
@@ -50,22 +49,19 @@ func LoadConfigFromFile(config *models.Config, filePath string) error {
 		return fmt.Errorf("failed to read config file '%s': %w", filePath, err)
 	}
 
-	// Expand Environment Variables with support for ${VAR:default}
-	expandedData := os.Expand(string(data), func(s string) string {
-		parts := strings.SplitN(s, ":", 2)
-		val := os.Getenv(parts[0])
-		if val != "" {
-			return val
-		}
-		if len(parts) > 1 {
-			return parts[1]
-		}
-		return val
-	})
+	// Parse into a Node tree to allow type control during expansion
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return fmt.Errorf("failed to parse config file '%s' into nodes: %w", filePath, err)
+	}
 
-	// Unmarshal YAML
-	if err := yaml.Unmarshal([]byte(expandedData), config); err != nil {
-		return fmt.Errorf("failed to parse config file '%s': %w", filePath, err)
+	// Expand Environment Variables and force types
+	// This forces type to !!str for all values EXCEPT true/false (!!bool)
+	processNode(&root)
+
+	// Decode Node tree into config struct
+	if err := root.Decode(config); err != nil {
+		return fmt.Errorf("failed to decode config file '%s': %w", filePath, err)
 	}
 
 	fmt.Printf("Config Loaded from File: %s\n", filePath)
@@ -89,4 +85,40 @@ func LoadConfigFromFileSafe(config *models.Config, filePath string) error {
 	}
 
 	return LoadConfigFromFile(config, filePath)
+}
+
+// processNode recursively traverses the YAML node tree.
+// It expands env variables and forces all scalars to strings, except for booleans.
+// -----------------------------------------------------------------------------
+
+func processNode(n *yaml.Node) {
+	if n.Kind == yaml.ScalarNode {
+		// Expand Environment Variables
+		if strings.Contains(n.Value, "${") {
+			n.Value = os.Expand(n.Value, func(s string) string {
+				parts := strings.SplitN(s, ":", 2)
+				val := os.Getenv(parts[0])
+				if val != "" {
+					return val
+				}
+				if len(parts) > 1 {
+					return parts[1]
+				}
+				return val
+			})
+		}
+
+		// Force types: Booleans remain bool, everything else becomes string
+		lowerVal := strings.ToLower(n.Value)
+		if lowerVal == "true" || lowerVal == "false" {
+			n.Tag = "!!bool"
+			n.Style = 0 // Plain style for booleans
+		} else {
+			n.Tag = "!!str"
+			n.Style = yaml.DoubleQuotedStyle
+		}
+	}
+	for _, child := range n.Content {
+		processNode(child)
+	}
 }

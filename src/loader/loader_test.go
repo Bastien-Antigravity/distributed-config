@@ -115,18 +115,87 @@ capabilities:
 		}
 	})
 
-	t.Run("TestDefaultGeneration", func(t *testing.T) {
-		configPath := filepath.Join(tempDir, "missing.yaml")
-		// File does not exist yet
-		
-		cfg := &core.Config{}
-		if err := LoadConfigFromFile(cfg, configPath); err != nil {
-			t.Errorf("LoadConfigFromFile should handle missing files by creating them: %v", err)
+	t.Run("TestEnvExpansion-ForcesString", func(t *testing.T) {
+		t.Setenv("PORT_VAR", "8080")
+		yamlContent := `
+capabilities:
+  server:
+    port: ${PORT_VAR:9090}
+`
+		configPath := filepath.Join(tempDir, "force_str.yaml")
+		if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+			t.Fatal(err)
 		}
 
-		// Check if file was created
+		cfg := &core.Config{}
+		if err := LoadConfigFromFile(cfg, configPath); err != nil {
+			t.Fatal(err)
+		}
+
+		server, ok := cfg.Capabilities["server"].(map[string]interface{})
+		if !ok {
+			t.Fatal("expected server map")
+		}
+		port, ok := server["port"].(string)
+		if !ok {
+			t.Errorf("expected port to be string, got %T (%v)", server["port"], server["port"])
+		}
+		if port != "8080" {
+			t.Errorf("expected 8080, got %v", port)
+		}
+	})
+
+	t.Run("TestTypes-ConditionalForcing", func(t *testing.T) {
+		t.Setenv("ENABLE_VAR", "true")
+		yamlContent := `
+capabilities:
+  server:
+    port: 8080
+    enabled: ${ENABLE_VAR:false}
+    debug: true
+    label: true-app
+`
+		configPath := filepath.Join(tempDir, "conditional.yaml")
+		if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg := &core.Config{}
+		if err := LoadConfigFromFile(cfg, configPath); err != nil {
+			t.Fatal(err)
+		}
+
+		server := cfg.Capabilities["server"].(map[string]interface{})
+		
+		// 8080 should be string
+		if _, ok := server["port"].(string); !ok {
+			t.Errorf("expected port to be string, got %T", server["port"])
+		}
+
+		// enabled (from env var true) should be bool
+		if _, ok := server["enabled"].(bool); !ok {
+			t.Errorf("expected enabled to be bool, got %T", server["enabled"])
+		}
+
+		// debug (true) should be bool
+		if _, ok := server["debug"].(bool); !ok {
+			t.Errorf("expected debug to be bool, got %T", server["debug"])
+		}
+
+		// label (true-app) should be string
+		if _, ok := server["label"].(string); !ok {
+			t.Errorf("expected label to be string, got %T", server["label"])
+		}
+	})
+
+	t.Run("TestDefaultGeneration", func(t *testing.T) {
+		configPath := filepath.Join(tempDir, "missing.yaml")
+		cfg := &core.Config{}
+		if err := LoadConfigFromFile(cfg, configPath); err != nil {
+			t.Errorf("LoadConfigFromFile should handle missing files: %v", err)
+		}
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			t.Errorf("Expected file %s to be created using defaults", configPath)
+			t.Errorf("Expected file %s to be created", configPath)
 		}
 	})
 }
