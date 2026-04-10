@@ -98,13 +98,10 @@ func processNode(n *yaml.Node) {
 			n.Value = os.Expand(n.Value, func(s string) string {
 				parts := strings.SplitN(s, ":", 2)
 				val := os.Getenv(parts[0])
-				if val != "" {
-					return val
+				if val == "" && len(parts) > 1 {
+					val = parts[1]
 				}
-				if len(parts) > 1 {
-					return parts[1]
-				}
-				return val
+				return strings.Trim(val, "\"")
 			})
 		}
 
