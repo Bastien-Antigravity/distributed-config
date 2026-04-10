@@ -101,6 +101,13 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 	case pb.ConfigMsg_ACK:
 		// No-op
 
+	case pb.ConfigMsg_GET_SYNC: // Added direct sync support
+		var parsed map[string]map[string]string
+		if err := json.Unmarshal(msg.Payload, &parsed); err != nil {
+			return fmt.Errorf("failed to decode GET_SYNC JSON payload: %w", err)
+		}
+		h.updateMemConfig(parsed)
+
 	case pb.ConfigMsg_ERROR:
 		return errors.New("server reported an error: " + string(msg.Payload))
 
