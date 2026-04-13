@@ -1,6 +1,6 @@
 module github.com/Bastien-Antigravity/distributed-config
 
-go 1.25.3
+go 1.25.4
 
 require (
 	github.com/Bastien-Antigravity/safe-socket v1.7.2
