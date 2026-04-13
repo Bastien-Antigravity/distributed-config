@@ -57,7 +57,7 @@ func LoadConfigFromFile(config *models.Config, filePath string) error {
 
 	// Expand Environment Variables and force types
 	// This forces type to !!str for all values EXCEPT true/false (!!bool)
-	processNode(&root)
+	ProcessNode(&root)
 
 	// Decode Node tree into config struct
 	if err := root.Decode(config); err != nil {
@@ -87,11 +87,11 @@ func LoadConfigFromFileSafe(config *models.Config, filePath string) error {
 	return LoadConfigFromFile(config, filePath)
 }
 
-// processNode recursively traverses the YAML node tree.
+// ProcessNode recursively traverses the YAML node tree.
 // It expands env variables and forces all scalars to strings, except for booleans.
 // -----------------------------------------------------------------------------
 
-func processNode(n *yaml.Node) {
+func ProcessNode(n *yaml.Node) {
 	if n.Kind == yaml.ScalarNode {
 		// Expand Environment Variables
 		if strings.Contains(n.Value, "${") {
@@ -116,6 +116,6 @@ func processNode(n *yaml.Node) {
 		}
 	}
 	for _, child := range n.Content {
-		processNode(child)
+		ProcessNode(child)
 	}
 }

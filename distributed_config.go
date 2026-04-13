@@ -2,6 +2,8 @@ package distributed_config
 
 import (
 	"github.com/Bastien-Antigravity/distributed-config/src/facade"
+	"github.com/Bastien-Antigravity/distributed-config/src/loader"
+	"gopkg.in/yaml.v3"
 )
 
 // -----------------------------------------------------------------------------
@@ -19,4 +21,9 @@ type Config = facade.Config
 //   - "standalone": Local YAML only, No network connection.
 func New(profile string) *Config {
 	return facade.NewConfig(profile)
+}
+
+// ProcessNode is a helper that expands environment variables in a YAML node.
+func ProcessNode(n *yaml.Node) {
+	loader.ProcessNode(n)
 }

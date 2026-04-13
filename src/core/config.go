@@ -1,6 +1,9 @@
 package core
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Common Config
 // -----------------------------------------------------------------------------
@@ -66,4 +69,71 @@ func (c *Config) GetCapability(key string, target interface{}) error {
 		return err
 	}
 	return json.Unmarshal(data, target)
+}
+
+// -----------------------------------------------------------------------------
+
+// GetAddress returns the address (host:port) for a given capability.
+// It looks for "ip" and "port" keys in the capability configuration.
+func (c *Config) GetAddress(capability string) (string, error) {
+	return c.getAddr(capability, "ip", "port")
+}
+
+// GetGRPCAddress returns the gRPC address for a given capability.
+// It first looks for "grpc_ip" and "grpc_port". If not found, it falls back
+// to the "ip" and "port" (with port incremented by 1).
+func (c *Config) GetGRPCAddress(capability string) (string, error) {
+	addr, err := c.getAddr(capability, "grpc_ip", "grpc_port")
+	if err == nil {
+		return addr, nil
+	}
+
+	// Fallback to convention: ip:port+1
+	capRaw, ok := c.Capabilities[capability]
+	if !ok {
+		return "", fmt.Errorf("capability %s not found for gRPC fallback", capability)
+	}
+	cap, ok := capRaw.(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("invalid format for capability %s", capability)
+	}
+
+	host := "0.0.0.0"
+	if h, ok := cap["ip"].(string); ok && h != "" {
+		host = h
+	}
+
+	port := 8080
+	if p, ok := cap["port"].(string); ok && p != "" {
+		fmt.Sscanf(p, "%d", &port)
+	}
+
+	return fmt.Sprintf("%s:%d", host, port+1), nil
+}
+
+func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
+	if c.Capabilities == nil {
+		return "", fmt.Errorf("no capabilities found")
+	}
+	capRaw, ok := c.Capabilities[capability]
+	if !ok {
+		return "", fmt.Errorf("capability %s not found", capability)
+	}
+
+	cap, ok := capRaw.(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("invalid capability format for %s", capability)
+	}
+
+	host := "0.0.0.0"
+	if h, ok := cap[hostKey].(string); ok && h != "" {
+		host = h
+	}
+
+	p, ok := cap[portKey].(string)
+	if !ok || p == "" {
+		return "", fmt.Errorf("port key %s missing or empty in capability %s", portKey, capability)
+	}
+
+	return fmt.Sprintf("%s:%s", host, p), nil
 }
