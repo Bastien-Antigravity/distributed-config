@@ -18,7 +18,7 @@ import (
 func LoadConfigFromFile(config *models.Config, filePath string) error {
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		fmt.Printf("Config file '%s' does not exist, creating from default models...\n", filePath)
+		config.Logger.Info("Config file '%s' does not exist, creating from default models...", filePath)
 
 		// Ensure directory exists
 		configDir := filepath.Dir(filePath)
@@ -64,7 +64,7 @@ func LoadConfigFromFile(config *models.Config, filePath string) error {
 		return fmt.Errorf("failed to decode config file '%s': %w", filePath, err)
 	}
 
-	fmt.Printf("Config Loaded from File: %s\n", filePath)
+	config.Logger.Info("Config Loaded from File: %s", filePath)
 	return nil
 }
 
@@ -75,7 +75,7 @@ func LoadConfigFromFile(config *models.Config, filePath string) error {
 
 func LoadConfigFromFileSafe(config *models.Config, filePath string) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		fmt.Printf("Config file '%s' missing (Production/Preprod). Generating Skeleton...\n", filePath)
+		config.Logger.Info("Config file '%s' missing (Production/Preprod). Generating Skeleton...", filePath)
 
 		skeleton := models.NewSkeletonConfig()
 		data, _ := yaml.Marshal(skeleton)

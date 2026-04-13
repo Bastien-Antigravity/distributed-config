@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 )
 
 // Common Config
@@ -21,8 +22,9 @@ type Config struct {
 	Capabilities map[string]interface{} `yaml:"capabilities" json:"capabilities"`
 
 	// Internal state
-	COMMON_FILE_PATH string
-	MemConfigPath    string
+	COMMON_FILE_PATH string       `yaml:"-"`
+	MemConfigPath    string       `yaml:"-"`
+	Logger           utils.Logger `yaml:"-"`
 
 	// Data storage for MemConfig
 	MemConfig map[string]map[string]string `yaml:"-"`

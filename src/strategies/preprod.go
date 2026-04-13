@@ -33,7 +33,7 @@ func (s *PreprodStrategy) Name() string { return "preprod" }
 // -----------------------------------------------------------------------------
 
 func (s *PreprodStrategy) Load(cfg *core.Config) error {
-	fmt.Println("Strategy: Preprod")
+	cfg.Logger.Info("Strategy: Preprod")
 
 	// 1. Env Load
 	loader.LoadCommonFromEnv(cfg)
@@ -52,7 +52,7 @@ func (s *PreprodStrategy) Load(cfg *core.Config) error {
 			serverConfig, err := client.GetConfig()
 			if err == nil {
 				// Merge... (Stubbed)
-				fmt.Println("Preprod: Loaded from Server")
+				cfg.Logger.Info("Preprod: Loaded from Server")
 				if serverConfig.Common.Name != "" {
 					cfg.Common.Name = serverConfig.Common.Name
 				}
@@ -68,7 +68,7 @@ func (s *PreprodStrategy) Load(cfg *core.Config) error {
 // -----------------------------------------------------------------------------
 
 func (s *PreprodStrategy) Sync(cfg *core.Config) error {
-	fmt.Println("Preprod: Sync disabled (Read-Only Mode)")
+	cfg.Logger.Info("Preprod: Sync disabled (Read-Only Mode)")
 	return nil
 }
 

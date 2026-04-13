@@ -1,8 +1,6 @@
 package network
 
 import (
-	"fmt"
-
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
 
@@ -41,7 +39,7 @@ func (c *Client) connect() error {
 	// TODO: Determine correct Client IP dynamically if needed.
 	client, err := safesocket.Create("tcp-hello", c.addr, "127.0.0.1", "client", false)
 	if err != nil {
-		fmt.Printf("Mock: Failed to connect to %s (using safe-socket)\n", c.addr)
+		c.Handler.parentConfig.Logger.Error("Mock: Failed to connect to %s (using safe-socket)", c.addr)
 		return err
 	}
 	c.sock = client
@@ -85,7 +83,7 @@ func (c *Client) GetConfig() (*core.Config, error) {
 		}
 	} else {
 		// Mock behavior
-		fmt.Println("Mock: Client.GetConfig() simulated")
+		c.Handler.parentConfig.Logger.Info("Mock: Client.GetConfig() simulated")
 	}
 
 	return &core.Config{}, nil

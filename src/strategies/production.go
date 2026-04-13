@@ -34,7 +34,7 @@ func (s *ProductionStrategy) Name() string { return "production" }
 // -----------------------------------------------------------------------------
 
 func (s *ProductionStrategy) Load(cfg *core.Config) error {
-	fmt.Println("Strategy: Production")
+	cfg.Logger.Info("Strategy: Production")
 
 	// 1. Env Load
 	loader.LoadCommonFromEnv(cfg)
@@ -53,7 +53,7 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 			serverConfig, err := client.GetConfig()
 			if err == nil {
 				// Merge...
-				fmt.Println("Production: Loaded from Server")
+				cfg.Logger.Info("Production: Loaded from Server")
 				if serverConfig.Common.Name != "" {
 					cfg.Common.Name = serverConfig.Common.Name
 				}
@@ -79,7 +79,7 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 
 func (s *ProductionStrategy) Sync(cfg *core.Config) error {
 	if s.Client != nil {
-		fmt.Println("Production: Syncing updates to Server...")
+		cfg.Logger.Info("Production: Syncing updates to Server...")
 		return s.Client.UpdateConfig(cfg)
 	}
 	return nil

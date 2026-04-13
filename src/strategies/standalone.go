@@ -1,7 +1,6 @@
 package strategies
 
 import (
-	"fmt"
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
@@ -30,7 +29,7 @@ func (s *StandaloneStrategy) Name() string { return "standalone" }
 // -----------------------------------------------------------------------------
 
 func (s *StandaloneStrategy) Load(cfg *core.Config) error {
-	fmt.Println("Strategy: Standalone")
+	cfg.Logger.Info("Strategy: Standalone")
 
 	// 1. Resolve Path (Exe name or config/ fallback)
 	fullPath := loader.ResolveConfigPath("standalone")

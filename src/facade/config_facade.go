@@ -2,10 +2,12 @@ package facade
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/factory"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
+	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 )
 
 // Facade Config Struct
@@ -28,19 +30,24 @@ func NewConfig(profile string) *Config {
 	cfgData := &core.Config{
 		MemConfig: make(map[string]map[string]string),
 	}
+	cfgData.Logger = utils.EnsureSafeLogger(nil) // Default to no-op if not explicitly set later
+
 	configWrapper := &Config{
 		Config: cfgData,
 	}
 
-	fmt.Printf("Initializing Config with Profile: %s\n", profile)
+	cfgData.Logger.Info("Initializing Config with Profile: %s", profile)
 
 	// 1. Get Strategy
+	profile = strings.TrimSpace(profile)
 	strategy, err := factory.NewStrategy(profile)
 	if err != nil {
 		fmt.Printf("Critical Error: %v\n", err)
-		// Return empty wrapper or panic?
-		// For now, let's print huge error and return, caller will likely fail or see empty config.
 		return configWrapper
+	}
+
+	if strategy == nil {
+		panic(fmt.Sprintf("distributed-config: Factory returned nil strategy for profile '%s'", profile))
 	}
 
 	// 2. Load

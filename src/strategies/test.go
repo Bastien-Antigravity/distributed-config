@@ -35,7 +35,7 @@ func (s *TestStrategy) Name() string { return "test" }
 // -----------------------------------------------------------------------------
 
 func (s *TestStrategy) Load(cfg *core.Config) error {
-	fmt.Println("Strategy: Test (Production-Like Logic)")
+	cfg.Logger.Info("Strategy: Test (Production-Like Logic)")
 
 	// 1. Bootstrap: Resolve Path and Load Default File
 	fullPath := loader.ResolveConfigPath("test")
@@ -60,7 +60,7 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 			serverConfig, err := client.GetConfig()
 			if err == nil {
 				// Merge Server Config into current Config
-				fmt.Println("Test: Loaded from Server")
+				cfg.Logger.Info("Test: Loaded from Server")
 				// Simple Manual Merge (Server Wins)
 				if serverConfig.Common.Name != "" {
 					cfg.Common.Name = serverConfig.Common.Name
@@ -68,7 +68,7 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 				// (In real impl, deep merge capabilities here)
 			}
 		} else {
-			fmt.Printf("Test: Warning - Could not connect to Config Server at %s (Mock/Dev?)\n", addr)
+			cfg.Logger.Warning("Test: Warning - Could not connect to Config Server at %s (Mock/Dev?)", addr)
 		}
 	}
 
@@ -87,7 +87,7 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 
 func (s *TestStrategy) Sync(cfg *core.Config) error {
 	if s.Client != nil {
-		fmt.Println("Test: Syncing updates to Server...")
+		cfg.Logger.Info("Test: Syncing updates to Server...")
 		return s.Client.UpdateConfig(cfg)
 	}
 	return nil
