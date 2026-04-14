@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
+	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 )
 
 type MockTS struct {
@@ -29,7 +30,7 @@ capabilities:
 			t.Fatal(err)
 		}
 
-		cfg := &core.Config{}
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
 		if err := LoadConfigFromFile(cfg, configPath); err != nil {
 			t.Errorf("Expected success, got error: %v", err)
 		}
@@ -62,7 +63,7 @@ capabilities:
 			t.Fatal(err)
 		}
 
-		cfg := &core.Config{}
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
 		if err := LoadConfigFromFile(cfg, configPath); err != nil {
 			t.Errorf("Expected success, got error: %v", err)
 		}
@@ -96,7 +97,7 @@ capabilities:
 			t.Fatal(err)
 		}
 
-		cfg := &core.Config{}
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
 		if err := LoadConfigFromFile(cfg, configPath); err != nil {
 			t.Errorf("Expected success, got error: %v", err)
 		}
@@ -127,7 +128,7 @@ capabilities:
 			t.Fatal(err)
 		}
 
-		cfg := &core.Config{}
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
 		if err := LoadConfigFromFile(cfg, configPath); err != nil {
 			t.Fatal(err)
 		}
@@ -160,7 +161,7 @@ capabilities:
 			t.Fatal(err)
 		}
 
-		cfg := &core.Config{}
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
 		if err := LoadConfigFromFile(cfg, configPath); err != nil {
 			t.Fatal(err)
 		}
@@ -190,7 +191,7 @@ capabilities:
 
 	t.Run("TestDefaultGeneration", func(t *testing.T) {
 		configPath := filepath.Join(tempDir, "missing.yaml")
-		cfg := &core.Config{}
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
 		if err := LoadConfigFromFile(cfg, configPath); err != nil {
 			t.Errorf("LoadConfigFromFile should handle missing files: %v", err)
 		}
