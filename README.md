@@ -1,3 +1,13 @@
+---
+microservice: distributed-config
+type: repository
+status: active
+language: go
+tags:
+  - domain/configuration
+  - domain/networking
+---
+
 # Distributed Config
 
 A robust, strategy-based configuration management library for distributed systems in Go.

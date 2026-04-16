@@ -1,3 +1,12 @@
+---
+microservice: distributed-config
+type: architecture
+status: active
+tags:
+  - domain/configuration
+  - domain/networking
+---
+
 # Architecture
 
 This document describes the internal design of the Distributed Config library.
