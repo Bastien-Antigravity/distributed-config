@@ -17,3 +17,4 @@ clean:
 
 test:
 	$(GOTEST) -v ./...
+
