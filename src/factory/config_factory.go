@@ -16,11 +16,11 @@ func NewStrategy(profile string) (interfaces.ConfigStrategy, error) {
 		return &strategies.StandaloneStrategy{}, nil
 	case "test":
 		return &strategies.TestStrategy{}, nil
-	case "preprod":
-		return &strategies.PreprodStrategy{}, nil
+	case "staging":
+		return &strategies.StagingStrategy{}, nil
 	case "production":
 		return &strategies.ProductionStrategy{}, nil
 	default:
-		return nil, fmt.Errorf("unknown profile: '%s'. Available: standalone, test, preprod, production", profile)
+		return nil, fmt.Errorf("unknown profile: '%s'. Available: standalone, test, staging, production", profile)
 	}
 }

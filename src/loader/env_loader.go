@@ -26,6 +26,9 @@ func LoadCommonFromEnv(config *core.Config) {
 
 	// Wait: generic approach for ConfigServer bootstrapping if missing YAML
 	if val, exists := os.LookupEnv("CF_IP"); exists {
+		if config.Capabilities == nil {
+			config.Capabilities = make(map[string]interface{})
+		}
 		if config.Capabilities["config_server"] == nil {
 			config.Capabilities["config_server"] = make(map[string]interface{})
 		}
@@ -35,6 +38,9 @@ func LoadCommonFromEnv(config *core.Config) {
 		}
 	}
 	if val, exists := os.LookupEnv("CF_PORT"); exists {
+		if config.Capabilities == nil {
+			config.Capabilities = make(map[string]interface{})
+		}
 		if config.Capabilities["config_server"] == nil {
 			config.Capabilities["config_server"] = make(map[string]interface{})
 		}

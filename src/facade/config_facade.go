@@ -19,16 +19,16 @@ type Config struct {
 	client  *network.Client
 
 	// Callbacks
-	ParentOnMemConfUpdate func(map[string]map[string]string)
+	ParentOnLiveConfUpdate func(map[string]map[string]string)
 }
 
 // NewConfig initializes the configuration based on the requested Profile logic.
-// profile: standalone | test | preprod | production
+// profile: standalone | test | staging | production
 // -----------------------------------------------------------------------------
 
 func NewConfig(profile string) *Config {
 	cfgData := &core.Config{
-		MemConfig: make(map[string]map[string]string),
+		LiveConfig: make(map[string]map[string]string),
 	}
 	cfgData.Logger = utils.EnsureSafeLogger(nil) // Default to no-op if not explicitly set later
 
@@ -71,9 +71,9 @@ func NewConfig(profile string) *Config {
 // Callbacks & Helpers
 // -----------------------------------------------------------------------------
 
-func (config *Config) OnMemConfUpdate(onMemConfUpdateFn func(map[string]map[string]string)) {
-	config.ParentOnMemConfUpdate = onMemConfUpdateFn
+func (config *Config) OnLiveConfUpdate(onLiveConfUpdateFn func(map[string]map[string]string)) {
+	config.ParentOnLiveConfUpdate = onLiveConfUpdateFn
 	if config.handler != nil {
-		config.handler.SetOnMemConfUpdate(onMemConfUpdateFn)
+		config.handler.SetOnLiveConfUpdate(onLiveConfUpdateFn)
 	}
 }

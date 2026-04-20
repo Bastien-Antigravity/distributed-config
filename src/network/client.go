@@ -102,7 +102,7 @@ func (c *Client) GetConfig() (*core.Config, error) {
 
 // UpdateConfig sends configuration updates to the server
 func (c *Client) UpdateConfig(cfg *core.Config) error {
-	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_PUT_SYNC, cfg.MemConfig)
+	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_PUT_SYNC, cfg.LiveConfig)
 	if err != nil {
 		return err
 	}

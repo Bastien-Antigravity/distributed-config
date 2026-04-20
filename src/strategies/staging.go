@@ -9,42 +9,41 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 )
 
-// ProductionStrategy: Connects to Config Server (GET & PUT). Full Sync.
+// StagingStrategy: Connects to Config Server (GET only). No Update.
 //
 // 1. Common Config:
 //   - Source: Environment -> Server -> File.
-//   - Logic: Local File is the authoritative source (overrides Server).
-//   - Integrity: PANICS if any IP IS 127.0.0.2 (Safety Check).
+//   - Logic: Local File is the authoritative source.
 //
 // 2. Live Config:
 //   - Behavior: Fetched from Server (GET).
 //
 // 3. Persistence / Dump:
-//   - On Missing File: Optional. proceeds with Environment/Server data.
-//   - Sync: ACTIVE. Pushes local changes to the Server (PUT).
+//   - On Missing File: Optional. Proceeds with Environment/Server data.
+//   - Sync: DISABLED (Read-Only). No updates sent to Server.
 // -----------------------------------------------------------------------------
 
-type ProductionStrategy struct {
+type StagingStrategy struct {
 	Client *network.Client
 }
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) Name() string { return "production" }
+func (s *StagingStrategy) Name() string { return "staging" }
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) Load(cfg *core.Config) error {
-	cfg.Logger.Info("Strategy: Production")
+func (s *StagingStrategy) Load(cfg *core.Config) error {
+	cfg.Logger.Info("Strategy: Staging")
 
 	// 1. Initial File Load (Gets Capabilities & config_server IP)
-	fullPath := loader.ResolveConfigPath("config")
+	fullPath := loader.ResolveConfigPath("staging")
 	_ = loader.LoadConfigFromFileSafe(cfg, fullPath)
 
 	// 2. Env Load (Overrides IP or NAME if provided dynamically)
 	loader.LoadCommonFromEnv(cfg)
 
-	// 3. Server Load
+	// 3. Server Load (GET)
 	type ConfigServerCap struct {
 		IP   string `json:"ip"`
 		Port string `json:"port"`
@@ -57,12 +56,12 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 			s.Client = client
 			serverConfig, err := client.GetConfig()
 			if err == nil {
-				cfg.Logger.Info("Production: Loaded configuration from Server")
+				cfg.Logger.Info("Staging: Loaded configuration from Server")
 				// Deep Merge: Name
 				if serverConfig.Common.Name != "" {
 					cfg.Common.Name = serverConfig.Common.Name
 				}
-				// Deep Merge: Capabilities (Server provides the baseline)
+				// Deep Merge: Capabilities
 				if cfg.Capabilities == nil {
 					cfg.Capabilities = make(map[string]interface{})
 				}
@@ -74,7 +73,7 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 			}
 		}
 	} else {
-		cfg.Logger.Error("Production: Required capability 'config_server' is missing!")
+		cfg.Logger.Error("Staging: Required capability 'config_server' is missing!")
 	}
 
 	// 4. File Load Override (File Wins)
@@ -85,14 +84,9 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 		}
 	}
 
-	// 5. Integrity Check
-	if err := loader.CheckProductionIPs(cfg); err != nil {
-		return err
-	}
-
-	// 6. Mandatory Service Validation
+	// 5. Mandatory Service Validation
 	if err := cfg.ValidateMandatoryServices(); err != nil {
-		return fmt.Errorf("production: validation failed: %w", err)
+		return fmt.Errorf("staging: validation failed: %w", err)
 	}
 
 	return nil
@@ -100,17 +94,14 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) Sync(cfg *core.Config) error {
-	if s.Client != nil {
-		cfg.Logger.Info("Production: Syncing updates to Server...")
-		return s.Client.UpdateConfig(cfg)
-	}
+func (s *StagingStrategy) Sync(cfg *core.Config) error {
+	cfg.Logger.Info("Staging: Sync disabled (Read-Only Mode)")
 	return nil
 }
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) GetHandler() *network.ConfigProtoHandler {
+func (s *StagingStrategy) GetHandler() *network.ConfigProtoHandler {
 	if s.Client != nil {
 		return s.Client.Handler
 	}

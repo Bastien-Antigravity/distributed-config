@@ -3,11 +3,12 @@ package loader
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func TestResolveConfigPath(t *testing.T) {
-	// 1. Create a dummy test environment in a temp directory
+	// Create a dummy test environment in a temp directory
 	tempDir_raw, _ := os.MkdirTemp("", "distconf-test-*")
 	tempDir, _ := filepath.EvalSymlinks(tempDir_raw)
 	defer os.RemoveAll(tempDir)
@@ -16,18 +17,32 @@ func TestResolveConfigPath(t *testing.T) {
 	os.Chdir(tempDir)
 	defer os.Chdir(oldCwd)
 
-	t.Run("Priority-CWD-Config-Specific", func(t *testing.T) {
-		configDir := filepath.Join(tempDir, "config")
+	exePath, _ := os.Executable()
+	exePathAbs, _ := filepath.Abs(exePath)
+	exeName := filepath.Base(exePathAbs)
+	exeName = strings.TrimSuffix(exeName, filepath.Ext(exeName))
+
+	t.Run("Priority-1-ConfigSubfolder-Target", func(t *testing.T) {
+		tempRun, _ := os.MkdirTemp(tempDir, "run-*")
+		os.Chdir(tempRun)
+		defer os.Chdir(tempDir)
+
+		configDir := filepath.Join(tempRun, "config")
 		os.MkdirAll(configDir, 0755)
 
-		specificPath := filepath.Join(configDir, "myapp.yaml")
-		os.WriteFile(specificPath, []byte("name: specific"), 0644)
+		// Create target file
+		targetPath := filepath.Join(configDir, "staging.yaml")
+		os.WriteFile(targetPath, []byte("name: staging"), 0644)
 
-		path := ResolveConfigPath("myapp")
+		// Create inferior priority file to ensure it's bypassed
+		exePathLocal := filepath.Join(configDir, exeName+".yaml")
+		os.WriteFile(exePathLocal, []byte("name: wrong"), 0644)
+
+		path := ResolveConfigPath("staging")
 		
 		path, _ = filepath.Abs(path)
 		path, _ = filepath.EvalSymlinks(path)
-		expected, _ := filepath.Abs(specificPath)
+		expected, _ := filepath.Abs(targetPath)
 		expected, _ = filepath.EvalSymlinks(expected)
 		
 		if path != expected {
@@ -35,54 +50,63 @@ func TestResolveConfigPath(t *testing.T) {
 		}
 	})
 
-	t.Run("Priority-CWD-Config-Default", func(t *testing.T) {
-		tempDir2_raw, _ := os.MkdirTemp("", "distconf-test-default-*")
-		tempDir2, _ := filepath.EvalSymlinks(tempDir2_raw)
-		defer os.RemoveAll(tempDir2)
-		
-		os.Chdir(tempDir2)
-		// No defer os.Chdir(tempDir) here as it's shared by other tests? 
-		// Actually best to re-set CWD at end of subtest.
+	t.Run("Priority-3-ConfigSubfolder-ExeFallback", func(t *testing.T) {
+		tempRun, _ := os.MkdirTemp(tempDir, "run-*")
+		os.Chdir(tempRun)
 		defer os.Chdir(tempDir)
 
-		configDir := filepath.Join(tempDir2, "config")
+		configDir := filepath.Join(tempRun, "config")
 		os.MkdirAll(configDir, 0755)
 
-		defaultPath := filepath.Join(configDir, "default.yaml")
-		os.WriteFile(defaultPath, []byte("name: default"), 0644)
-
-		path := ResolveConfigPath("nonexistent")
+		// Create specific file based on exeName
+		exePathLocal := filepath.Join(configDir, exeName+".yaml")
+		os.WriteFile(exePathLocal, []byte("name: exefallback"), 0644)
+		
+		// Target 'production' is missing, fallback should catch exeName in config/
+		path := ResolveConfigPath("production")
 		
 		path, _ = filepath.Abs(path)
 		path, _ = filepath.EvalSymlinks(path)
-		expected, _ := filepath.Abs(defaultPath)
+		expected, _ := filepath.Abs(exePathLocal)
 		expected, _ = filepath.EvalSymlinks(expected)
 
 		if path != expected {
-			t.Errorf("Expected default path %s, got %s", expected, path)
+			t.Errorf("Expected config/[exe].yaml path %s, got %s", expected, path)
 		}
 	})
 
-	t.Run("Priority-CWD-Local", func(t *testing.T) {
-		tempDir3_raw, _ := os.MkdirTemp("", "distconf-test-local-*")
-		tempDir3, _ := filepath.EvalSymlinks(tempDir3_raw)
-		defer os.RemoveAll(tempDir3)
-		
-		os.Chdir(tempDir3)
+	t.Run("Priority-5-CWD-ExeFallback", func(t *testing.T) {
+		tempRun, _ := os.MkdirTemp(tempDir, "run-*")
+		os.Chdir(tempRun)
 		defer os.Chdir(tempDir)
 
-		localPath := filepath.Join(tempDir3, "myapp.yaml")
-		os.WriteFile(localPath, []byte("name: local"), 0644)
-
-		path := ResolveConfigPath("myapp")
+		// Create specific file based on exeName in CWD
+		exePathLocal := filepath.Join(tempRun, exeName+".yaml")
+		os.WriteFile(exePathLocal, []byte("name: exefallback_cwd"), 0644)
+		
+		// Target 'production' is missing, fallback should catch exeName in CWD
+		path := ResolveConfigPath("production")
 		
 		path, _ = filepath.Abs(path)
 		path, _ = filepath.EvalSymlinks(path)
-		expected, _ := filepath.Abs(localPath)
+		expected, _ := filepath.Abs(exePathLocal)
 		expected, _ = filepath.EvalSymlinks(expected)
 
 		if path != expected {
-			t.Errorf("Expected local path %s, got %s", expected, path)
+			t.Errorf("Expected [exe].yaml path %s, got %s", expected, path)
+		}
+	})
+	
+	t.Run("Priority-7-CompleteFallback", func(t *testing.T) {
+		tempRun, _ := os.MkdirTemp(tempDir, "run-*")
+		os.Chdir(tempRun)
+		defer os.Chdir(tempDir)
+
+		// Nothing created
+		path := ResolveConfigPath("production")
+		// Should just default to [exeName].yaml strings
+		if path != exeName+".yaml" {
+			t.Errorf("Expected fallback %s.yaml, got %s", exeName, path)
 		}
 	})
 }

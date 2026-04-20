@@ -21,27 +21,28 @@ A robust, strategy-based configuration management library for distributed system
 The library uses a layered approach to build the final configuration:
 
 1.  **Code Defaults**: The application initializes with a hardcoded set of "safe" defaults (defined in `src/core/defaults.go`). This ensures the application can always start, even without a config file.
-2.  **Configuration Discovery**: The library automatically searches for a YAML file in multiple locations. The order of priority is:
-    *   **Current Working Directory** (for development):
-        1. `config/[executable_name].yaml`
-        2. `config/default.yaml`
-        3. `[executable_name].yaml`
-    *   **Binary Directory** (for installed environments):
-        1. `config/[executable_name].yaml`
-        2. `config/default.yaml`
-        3. `[executable_name].yaml`
+2.  **Configuration Discovery**: The library automatically searches for a YAML file in multiple locations with strict priority.
+    *   **Profile-Based Search** (Target provided):
+        1. `config/[profile].yaml` (Current Working Directory)
+        2. `config/[profile].yaml` (Executable Directory)
+    *   **Default Fallbacks** (In order):
+        3. `config/[executable_name].yaml` (Current Working Directory)
+        4. `config/[executable_name].yaml` (Executable Directory)
+        5. `[executable_name].yaml` (Current Working Directory)
+        6. `[executable_name].yaml` (Executable Directory)
     
-    This flexible approach allows you to place your configuration in a standardized `config/` folder or keep it alongside the executable.
+    If a profile is specified, it **must** reside in a `config/` subdirectory. The binary name acts as the final global fallback.
 3.  **Environment Variables**: Values in the YAML file can use `${VAR_NAME}` syntax. These are expanded using the system's environment variables at runtime.
-4.  **Remote Sync**: Finally, if the selected profile supports it (like `production`), the library connects to the Config Server to fetch the latest "MemConfig" updates.
+4.  **Remote Sync**: Finally, if the selected profile supports it (like `production`), the library connects to the Config Server to fetch the latest "LiveConfig" updates.
 
 ## Features
 
-- **Multi-Profile Strategy**: Built-in support for `production`, `preprod`, `test`, and `standalone` environments.
+- **Multi-Profile Strategy**: Built-in support for `production`, `staging`, `test`, and `standalone` environments.
 - **Remote Synchronization**: Automatically fetches and updates configuration from a central server using [safe-socket](https://github.com/Bastien-Antigravity/safe-socket).
 - **Secrets Management**: Native support for environment variable expansion (e.g., `${TS_PASSWORD}`).
-- **Fail-Safe Defaults**: Robust fallback mechanisms and skeleton generation for missing configurations.
-- **Dynamic Updates**: Support for memory configuration updates via callbacks.
+- **Environment-First Flexibility**: Supports "Pure-Environment" deployments where a local config file is optional. If missing, the system uses `CF_IP`/`CF_PORT` to connect to the central server and hydrate required capabilities.
+- **Fail-Safe & Strict**: Enforces "Mandatory Service Validation" (Fail-Fast logic) to ensure critical infrastructure like `log_server` is correctly configured (via any source) before boot.
+- **Live Updates**: Support for dynamic configuration updates via callbacks.
 
 ## Installation
 
@@ -64,7 +65,7 @@ import (
 
 func main() {
 	// Initialize configuration for "production" environment
-	// Options: "production", "preprod", "test", "standalone"
+	// Options: "production", "staging", "test", "standalone"
 	cfg := distributed_config.New("production")
 
 	// Access static configuration values using typed unmarshaling helpers
@@ -79,15 +80,15 @@ func main() {
 		fmt.Printf("DB Host: %s\n", tsDb.IP)
 	}
 
-    // Access dynamic (Memory) configuration
+    // Access dynamic (Live) configuration
     // Updates are automatically synchronized if the profile supports it.
-    for key, value := range cfg.MemConfig {
-        fmt.Printf("MemConfig section %s exists\n", key)
+    for key, value := range cfg.LiveConfig {
+        fmt.Printf("LiveConfig section %s exists\n", key)
     }
 
     // Register a callback for when remote configuration is updated
-    cfg.OnMemConfUpdate(func(updates map[string]map[string]string) {
-        fmt.Println("Memory Configuration updated remotely!")
+    cfg.OnLiveConfUpdate(func(updates map[string]map[string]string) {
+        fmt.Println("Live Configuration updated remotely!")
     })
 
     // Register a callback for when the Service Registry shifts (nodes join/leave)
@@ -103,8 +104,8 @@ func main() {
 |---|---|
 | **standalone** | Loads from local YAML file only. No network connection. |
 | **test**       | Uses hardcoded "safe" defaults (127.0.0.2). Connects to server to mimic production. |
-| **preprod**    | Connects to Config Server (GET only). Local file is authoritative. |
-| **production** | Full synchronization with Config Server (GET & PUT). Enforces safety checks. |
+| **staging**    | Connects to Config Server (Read-only). Mandatory local configuration file. |
+| **production** | Full synchronization with Config Server (GET & PUT). Enforces strict safety checks. |
 
 ## Secrets
 

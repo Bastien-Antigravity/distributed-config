@@ -1,6 +1,6 @@
 # Configuration Behavior & Priority
 
-This document explains how `distributed-config` discovers, loads, and prioritizes configuration data across different environments and profiles.
+This document explains how `distributed-config` discovers, loads, and prioritizes configuration data across different environments and profiles. It acts as the definitive guide to understanding system state behaviors during cold-starts, network synchronizations, and hot-swaps.
 
 ## 1. The Strategy Profiles
 
@@ -8,115 +8,115 @@ The library uses **Strategies** to determine how to bootstrap and synchronize da
 
 | Profile | Purpose | Data Source | Sync Mode | File Discovery |
 | :--- | :--- | :--- | :--- | :--- |
-| **Standalone** | Local Development | Local YAML only - No server connection | Disabled | `standalone.yaml` |
-| **Test** | CI/CD / Testing | Server (Full Sync) default 127.0.0.2 + Local YAML | GET & PUT | `test.yaml` |
-| **Preprod** | Staging / QA | Prod Server (Read-only) + Local YAML | GET Only | `config_preprod.yaml` |
-| **Production** | Live Deployment | Prod Server (Full Sync) + Local YAML | GET & PUT | `config.yaml` |
+| **Standalone** | Local Dev / Isolated Apps | Local YAML only - No server connection | Disabled | `standalone.yaml` |
+| **Test** | CI/CD / Automated Testing | Network Server + Local YAML (`127.0.0.2` enforced) | GET & PUT | `test.yaml` |
+| **Staging** | Staging / QA | Network Server (Read-only) + Local YAML | GET Only | `staging.yaml` |
+| **Production** | Live Deployment | Network Server (Full Sync) + Local YAML | GET & PUT | `production.yaml` |
+
+> [!IMPORTANT]
+> **Missing File Behavior (Prod/Staging)**: The configuration file is **optional**. If missing, the system proceeds using Environment variables (`CF_IP`, `CF_PORT`) to discover the Config Server. It **DOES NOT** generate skeletons or new files for these profiles. However, final validation still enforces that all mandatory parameters are eventually satisfied via the network.
 
 ---
 
-## 2. Parameter Integrity & Update Map
+## 2. Parameter Integrity & Memory Map
 
-This table shows exactly which configuration sections are modified during each phase of the initialization.
+This table denotes the state of specific internal nodes throughout the initialization sequence.
 
-| Phase | Source | **Common** | **Capabilities** | **MemConfig** |
-| :--- | :--- | :---: | :---: | :---: |
-| **1. Bootstrap** | Code Defaults | [x] | [x] | [ ] |
-| **2. Environment** | `os.Getenv` | [x] | [x] | [ ] |
-| **3. Handshake** | Server `GET_SYNC` | [x] | [ ] | [x] |
-| **4. Local File** | authoritative YAML | [x] | [x] | [x] |
-| **5. Runtime** | Server Broadcasts | [ ] | [ ] | [x] |
-
----
-
-## 3. Detailed Strategy Flow
-
-The search and initialization order differs slightly between strategies to balance automation vs. strictness.
-
-### Standalone (Dev/Offline)
-1. **Resolve**: `standalone.yaml`
-2. **Bootstrap**: code defaults used only if file missing.
-3. **Load**: reads file once.
-4. **Expansion**: `os.Expand` resolves `${}` from env.
-
-### Production (Authoritative)
-1. **Env Load**: NAME, RESET, CF_IP, CF_PORT pulled from OS.
-2. **Server Sync**: Handshake connects to CF_IP:CF_PORT and merges `Common.Name`.
-3. **File Sync**: `config/config.yaml` is loaded. It **MUST** exist (skeleton generated if missing). **Always overwrites Step 2.**
-4. **Runtime**: Background goroutine listens for `BROADCAST_SYNC` to update `MemConfig`.
-
-### Test (CI/Automation)
-1. **Resolve**: `test.yaml`
-2. **Bootstrap**: code defaults (127.0.0.2) used if file missing.
-3. **Env Override**: NAME, RESET, etc. override defaults.
-4. **Server Sync**: Handshake merges `Common.Name`.
-5. **Re-Load**: **CRITICAL** - The local file is re-read to ensure manual `test.yaml` settings override server data.
-6. **Safety**: Integrity check fails if any IP != 127.0.0.2.
+| Phase | Action | Source | `Common` | `Capabilities` | `LiveConfig` |
+| :--- | :--- | :--- | :---: | :---: | :---: |
+| **1. File Bootstrap**| Loading local properties via `PathResolver` | Local YAML | [x] | [x] | [x] |
+| **2. Environment** | Dynamic process variables parsing | `os.Getenv` | [x] | [x] | [ ] |
+| **3. Server Baseline**| Initial HTTP/TCP TCP-Hello payload merge | Server `GET_SYNC` | [x] | [ ] | [x] |
+| **4. File Override** | Re-parsing to assert `File > Server` hierarchy | Local YAML | [x] | [x] | [ ] |
+| **5. Runtime** | Ephemeral updates / Service Registry | `BROADCAST_SYNC`| [ ] | [ ] | [x] |
 
 ---
 
-## 4. Static vs. Dynamic Parameters (Technical Breakdown)
+## 3. Strict Service Schemas & Validation
 
-There is a fundamental architectural difference between parameters that are fixed at startup and those that can change while the application is running.
+To ensure ecosystem robustness, `distributed-config` enforces **Strict Schema Validation** for all core services. The system will fail-fast and reject any configuration that lacks "Minimal Required Parameters" for foundational infrastructure.
 
-### Static Parameters (`Common` & `Capabilities`)
-- **Location**: Defined in the `common:` and `capabilities:` root sections of the YAML.
-- **Behavior**: Loaded **once** during application startup (`New()`).
-- **Authority**: The **Local File** is the absolute authority.
-- **Updates**: These sections **cannot** be updated at runtime via the network. A restart is required to apply changes from the server or local file.
+### Mandatory Core Services
 
-### Dynamic Parameters (`MemConfig`)
-- **Location**: All other keys in the YAML file (outside of common/capabilities) or data pushed purely via the network.
-- **Behavior**: Initially loaded from the file, but then kept in sync via a persistent socket connection.
-- **Authority**: The **Config Server** is the authority at runtime.
-- **Updates**: Updated **live** via `BROADCAST_SYNC` messages. Applications can register callbacks (`OnMemConfUpdate`) to react to these changes instantly without restarting.
+The following services are considered **Mandatory**. If they are missing from your `Capabilities` map or lack the required keys, the application will fail to start:
+
+| Service | Required Parameters |
+| :--- | :--- |
+| **`log_server`** | `ip`, `port` |
+| **`config_server`** | `ip`, `port` |
+
+> [!IMPORTANT]
+> The system strictly enforces these schemas. For instance, attempting to define a `log_server` without a `port` will trigger a startup panic: `log_server: ip and port are mandatory`.
+
+### Extended Service Schemas
+
+While not always mandatory for boot, the following schemas are pre-defined for consistent usage across the ecosystem:
+
+- **`tele_remote`**: `token`, `chat_id`, `ip`, `port`
+- **`timescale_db`**: `ip`, `port`, `db_name`, `user`, `password`
+- **`file_system`**: `temp_path`, `data_path`
+- **`web_interface`**, **`scheduler`**, **`jupyter`**: `ip`, `port`
 
 ---
 
-## 4. Environment Variable Reference
+## 4. Parameter Segregation & Permissions
 
-### Reserved Variables
-The following environment variables are explicitly checked during the `LoadCommonFromEnv` phase.
+Configuration arguments are partitioned into strict domains controlling how network layers are allowed to observe them.
 
-| Variable | Target Config Field | Description |
-| :--- | :--- | :--- |
-| `NAME` | `Common.Name` | Overrides the application name (used for Safe-Socket identity). |
-| `RESET` | `Common.Reset` | If "true", signals the strategy to potentially reset local state. |
-| `CF_IP` | `Capabilities["config_server"]["ip"]` | The IP address of the remote Config Server. |
-| `CF_PORT` | `Capabilities["config_server"]["port"]` | The Port of the remote Config Server. |
+### `Common` & `Capabilities` (Static Application State)
+- **State**: Root maps (`common:`, `capabilities:`).
+- **Behavior**: Single-pass loaded.
+- **Authority**: Local file takes unconditional precedence over network values.
+- **Updates**: Cannot be altered dynamically during runtime securely without specific `LiveConfig` hot-swap mappings!
 
-### YAML Variable Expansion
-You can use any environment variable inside your YAML files using the `${VAR:default}` syntax. These are expanded **after** the file is read but **before** it is decoded into the Go struct.
+### `LiveConfig` (Dynamic Remote State)
+- **State**: Root keys outside reserved maps dynamically constructed.
+- **Behavior**: Inherently transient. Live streaming capable.
+- **Authority**: Pushed dynamically from `config-server`.
+- **Updates**: Injects live parameters triggering arbitrary `OnLiveConfUpdate()` callbacks.
+
+### Private & External Configurations
+The `Config` system strictly enforces separation by detaching private structs off the core structural schemas.
+Use `PrivateConfig` to define the **Identity and Local Requirements** of your specific microservice:
 
 ```yaml
-capabilities:
-  log_server:
-    ip: "${LS_IP:127.0.0.1}"
-    port: "${LS_PORT:9020}"
+name: "my-service"
+private_file_path: "config/private.yaml"
+private:
+  local_buffer_size: "1024"
+```
+
+To load these isolation layers, use `loader.LoadYAML`:
+```go
+import "github.com/Bastien-Antigravity/distributed-config/src/loader"
+
+var myLocal core.PrivateConfig
+err := loader.LoadYAML("config/private.yaml", &myLocal)
 ```
 
 ---
 
-## 5. File Resolution (Search Order)
+## 5. Environment Variable Reference
 
-When looking for a configuration file for a profile (e.g., "production"), the `PathResolver` searches in this order:
-
-1.  `config/config.yaml` (CWD)
-2.  `config/config.yaml` (Executable Directory)
-3.  `config/default.yaml` (CWD)
-4.  `config/default.yaml` (Executable Directory)
-5.  `config.yaml` (CWD)
-6.  `config.yaml` (Executable Directory)
-7.  `[ExecutableName].yaml` (Fallback)
+### Reserved Variables
+| Variable | Target Config Field | Description |
+| :--- | :--- | :--- |
+| `NAME` | `Common.Name` | Evaluates identically to the System Distributed Identity; effectively acts as network identity identifier inside safe-sockets. |
+| `RESET` | `Common.Reset` | If "true", signals the strategy to potentially reset local state. |
+| `CF_IP` | `Capabilities["config_server"]["ip"]` | The IP address of the remote Config Server fallback. |
+| `CF_PORT` | `Capabilities["config_server"]["port"]` | The Port of the remote Config Server fallback. |
 
 ---
 
-## 6. Initialization Lifecycle
+## 7. File Resolution Sequence
 
-1.  **Instantiation**: `distributed_config.New("my-app", "production")` is called.
-2.  **Bootstrap**: `core.NewDefaultConfig()` populates initial hardcoded defaults.
-3.  **Environment Check**: `NAME`, `RESET`, etc., are pulled from the OS environment.
-4.  **Handshake**: The client connects to the server and performs a `GET_SYNC`.
-5.  **Local Override**: The resolver finds the best YAML file and decodes it, resolving `${}` variables.
-6.  **Startup**: The application starts with the final merged state.
-7.  **Sync**: A background goroutine maintains the socket connection for dynamic `MemConfig` updates.
+When searching for target config files (example target: "staging"), the PathResolver strictly falls back utilizing these paths ensuring no wildcard ambiguity:
+
+1. `config/staging.yaml` (CWD)
+2. `config/staging.yaml` (Executable Directory)
+3. `config/[ExecutableName].yaml` (CWD)
+4. `config/[ExecutableName].yaml` (Executable Directory)
+5. `[ExecutableName].yaml` (CWD)
+6. `[ExecutableName].yaml` (Executable Directory)
+
+*Note: Steps 1 & 2 are skipped if no profile (targetName) is provided.*

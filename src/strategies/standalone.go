@@ -12,7 +12,7 @@ import (
 //   - Source: Generated Defaults -> File -> Environment Overrides.
 //   - Logic: Local file authoritative.
 //
-// 2. Mem Config:
+// 2. Live Config:
 //   - Behavior: Remains empty (No Server connection).
 //
 // 3. Persistence / Dump:

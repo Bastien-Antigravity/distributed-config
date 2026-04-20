@@ -35,7 +35,7 @@ flowchart TD
     subgraph Strategies [Configuration Strategies]
         direction TB
         StratInterface --> Prod[Production]:::strategy
-        StratInterface --> Pre[Preprod]:::strategy
+        StratInterface --> Stag[Staging]:::strategy
         StratInterface --> Test[Test]:::strategy
         StratInterface --> Stand[Standalone]:::strategy
     end
@@ -43,20 +43,20 @@ flowchart TD
 
     subgraph Discovery [Loader & Discovery]
         direction TB
-        Prod & Pre & Test & Stand --> Loader[Path Resolver]:::loader
-        Loader -->|Checks| CWD[Current Working Dir]:::file
-        Loader -->|Checks| BinDir[Binary Dir]:::file
-        CWD & BinDir -->|Priority| ConfigFolder[config/ folder]:::file
-        ConfigFolder --> YAML[YAML File]:::file
+        Prod & Stag & Test & Stand --> Loader[Path Resolver]:::loader
+        Loader -->|1 & 2| ConfigSub[config/profile.yaml]:::file
+        Loader -->|3 & 4| ConfigDef[config/exe.yaml]:::file
+        Loader -->|5 & 6| RootDef[exe.yaml]:::file
+        ConfigSub & ConfigDef & RootDef --> YAML[YAML File]:::file
     end
     style Discovery fill:#fce4ec,stroke:#f06292,stroke-width:2px,color:#880e4f
 
     subgraph Sync [Dynamic Sync]
         direction TB
-        Prod & Pre & Test -->|Propagate| Net[Network Config Server]:::net
-        Net -.->|BROADCAST_SYNC| MemConfig[MemConfig Map]:::core
+        Prod & Stag & Test -->|Propagate| Net[Network Config Server]:::net
+        Net -.->|BROADCAST_SYNC| LiveConfig[LiveConfig Map]:::core
         Net -.->|BROADCAST_REGISTRY| Registry[Service Registry JSON]:::core
-        MemConfig -.->|Trigger| Callback[User Callback]:::core
+        LiveConfig -.->|Trigger| Callback[User Callback]:::core
     end
     style Sync fill:#fffde7,stroke:#fff176,stroke-width:2px,color:#f57f17
 ```
@@ -66,30 +66,30 @@ flowchart TD
 ### 1. Facade (`src/facade`)
 The primary entry point (`distributed_config.New(profile)`). It acts as a wrapper around the core data, providing:
 *   **Static Access**: Direct access to YAML-loaded fields (e.g., `cfg.Common.Name`).
-*   **Dynamic Access**: Access to the `MemConfig` map for runtime updates.
+*   **Dynamic Access**: Access to the `LiveConfig` map for runtime updates.
 *   **Callbacks**: Mechanism to register listeners (`OnMemConfUpdate`) for remote configuration changes.
 
 ### 2. Loader & Discovery (`src/loader`)
 Handles the complex logic of finding and parsing configuration files.
-*   **Path Resolver**: Automatically searches for YAML files in multiple locations (CWD, Binary Directory, and their respective `config/` subfolders).
-*   **Precedence**: Explicitly prioritized to allow `config/default.yaml` or project-specific files to override generated skeletons.
+*   **Path Resolver**: Automatically searches for YAML files in a strict 6-step sequence (CWD then Binary Directory, prioritizing `config/` profile files then binary-name fallbacks).
+*   **Fail-Fast Logic**: Automatically validates critical services (Log Server, Config Server) during the load phase to prevent boot on misconfiguration.
 *   **Env Expansion**: Processes `${VAR_NAME}` syntax during YAML parsing.
 
 ### 3. Strategies (`src/strategies`)
 Implements the core logic for retrieving and synchronizing configuration based on the requested profile.
-*   **Production**: Full bidirectional sync (GET/PUT) with the Config Server. authoritative local file.
-*   **Preprod**: Read-only sync (GET) with the Config Server.
+*   **Production**: Full bidirectional sync (GET/PUT) with the Config Server. Local file is optional if core ENVs are provided.
+*   **Staging**: Read-only sync (GET) with the Config Server. Local file is optional if core ENVs are provided.
 *   **Test**: Bootstraps with local defaults (e.g., `127.0.0.2`) then mimics Production behavior.
 *   **Standalone**: Offline mode. Only uses local file discovery via the Loader.
 
 ### 4. Network & Protocol (`src/network`)
 Manages communication with the remote Config Server using a slimmed-down Protobuf protocol wrapping unstructured JSON arrays/maps.
 *   **Safe Socket**: High-performance TCP communication via `github.com/Bastien-Antigravity/safe-socket`.
-*   **Proto Handler**: Parses generic `GET_SYNC`, `PUT_SYNC`, `BROADCAST_SYNC`, and `BROADCAST_REGISTRY` commands. Routes unstructured JSON blobs to `MemConfig` or Registry callbacks without needing rigidly coupled structs.
+*   **Proto Handler**: Parses generic `GET_SYNC`, `PUT_SYNC`, `BROADCAST_SYNC`, and `BROADCAST_REGISTRY` commands. Routes unstructured JSON blobs to `LiveConfig` or Registry callbacks without needing rigidly coupled structs.
 
 ## Configuration Precedence
 
 1.  **Code Defaults**: Hardcoded values in `NewDefaultConfig()`.
-2.  **Remote Sync** (Dynamic): Merged into `MemConfig` at runtime.
+2.  **Remote Sync** (Dynamic): Merged into `LiveConfig` at runtime.
 3.  **Local YAML**: Discovered via the Loader. **Value in YAML always overrides Server/Default values.**
 4.  **Environment Variables**: Overwrite corresponding YAML values via expansion.

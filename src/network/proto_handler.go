@@ -18,7 +18,7 @@ type ConfigProtoHandler struct {
 	parentConfig *core.Config
 
 	// Callbacks
-	onMemConfUpdate   func(map[string]map[string]string)
+	onLiveConfUpdate  func(map[string]map[string]string)
 	onRegistryUpdate  func(map[string][]string)
 }
 
@@ -37,8 +37,8 @@ func NewConfigHandler(name string, config *core.Config) *ConfigProtoHandler {
 // Setters for callbacks
 // -----------------------------------------------------------------------------
 
-func (h *ConfigProtoHandler) SetOnMemConfUpdate(cb func(map[string]map[string]string)) {
-	h.onMemConfUpdate = cb
+func (h *ConfigProtoHandler) SetOnLiveConfUpdate(cb func(map[string]map[string]string)) {
+	h.onLiveConfUpdate = cb
 }
 
 func (h *ConfigProtoHandler) SetOnRegistryUpdate(cb func(map[string][]string)) {
@@ -57,9 +57,9 @@ func (h *ConfigProtoHandler) HandleOutgoing(cmd pb.ConfigMsg_Cmd, payload interf
 		if err != nil {
 			return nil, fmt.Errorf("json marshal error: %w", err)
 		}
-	} else if cmd == pb.ConfigMsg_PUT_SYNC && h.parentConfig.MemConfig != nil {
-		// Default to sending current MemConfig
-		payloadBytes, err = json.Marshal(h.parentConfig.MemConfig)
+	} else if cmd == pb.ConfigMsg_PUT_SYNC && h.parentConfig.LiveConfig != nil {
+		// Default to sending current LiveConfig
+		payloadBytes, err = json.Marshal(h.parentConfig.LiveConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +87,7 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 		if err := json.Unmarshal(msg.Payload, &parsed); err != nil {
 			return fmt.Errorf("failed to decode JSON payload: %w", err)
 		}
-		h.updateMemConfig(parsed)
+		h.updateLiveConfig(parsed)
 
 	case pb.ConfigMsg_BROADCAST_REGISTRY:
 		var parsed map[string][]string
@@ -106,7 +106,7 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 		if err := json.Unmarshal(msg.Payload, &parsed); err != nil {
 			return fmt.Errorf("failed to decode GET_SYNC JSON payload: %w", err)
 		}
-		h.updateMemConfig(parsed)
+		h.updateLiveConfig(parsed)
 
 	case pb.ConfigMsg_ERROR:
 		return errors.New("server reported an error: " + string(msg.Payload))
@@ -119,16 +119,16 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 
 // -----------------------------------------------------------------------------
 
-func (h *ConfigProtoHandler) updateMemConfig(sections map[string]map[string]string) {
-	if h.parentConfig.MemConfig == nil {
-		h.parentConfig.MemConfig = make(map[string]map[string]string)
+func (h *ConfigProtoHandler) updateLiveConfig(sections map[string]map[string]string) {
+	if h.parentConfig.LiveConfig == nil {
+		h.parentConfig.LiveConfig = make(map[string]map[string]string)
 	}
 	
 	for sectKey, kv := range sections {
-		h.parentConfig.MemConfig[sectKey] = kv
+		h.parentConfig.LiveConfig[sectKey] = kv
 	}
 
-	if h.onMemConfUpdate != nil {
-		h.onMemConfUpdate(sections)
+	if h.onLiveConfUpdate != nil {
+		h.onLiveConfUpdate(sections)
 	}
 }

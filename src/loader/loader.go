@@ -11,16 +11,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// LoadConfigFromFile loads the YAML configuration from the specified path.
-// If the file does not exist, it creates it using the values from NewDefaultConfig.
+
 // -----------------------------------------------------------------------------
 
-func LoadConfigFromFile(config *models.Config, filePath string) error {
-	// Check if file exists
+// EnsureFileExists checks if a file exists. If it doesn't, it creates it using the provided payload.
+func EnsureFileExists(filePath string, payload interface{}) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		config.Logger.Info("Config file '%s' does not exist, creating from default models...", filePath)
-
-		// Ensure directory exists
 		configDir := filepath.Dir(filePath)
 		if _, err := os.Stat(configDir); os.IsNotExist(err) {
 			if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -28,69 +24,55 @@ func LoadConfigFromFile(config *models.Config, filePath string) error {
 			}
 		}
 
-		// Generate Default Config
-		defaultConfig := models.NewDefaultConfig()
-
-		// Marshal to YAML
-		data, err := yaml.Marshal(defaultConfig)
+		data, err := yaml.Marshal(payload)
 		if err != nil {
 			return fmt.Errorf("failed to marshal default config: %w", err)
 		}
 
-		// Write File
 		if err := os.WriteFile(filePath, data, 0644); err != nil {
 			return fmt.Errorf("failed to write config file: %w", err)
 		}
 	}
-
-	// Read File
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to read config file '%s': %w", filePath, err)
-	}
-
-	// Parse into a Node tree to allow type control during expansion
-	var root yaml.Node
-	if err := yaml.Unmarshal(data, &root); err != nil {
-		return fmt.Errorf("failed to parse config file '%s' into nodes: %w", filePath, err)
-	}
-
-	// Expand Environment Variables and force types
-	// This forces type to !!str for all values EXCEPT true/false (!!bool)
-	ProcessNode(&root)
-
-	// Decode Node tree into config struct
-	if err := root.Decode(config); err != nil {
-		return fmt.Errorf("failed to decode config file '%s': %w", filePath, err)
-	}
-
-	config.Logger.Info("Config Loaded from File: %s", filePath)
 	return nil
 }
 
-// LoadConfigFromFileSafe loads the YAML configuration.
-// If the file does not exist, it generates a SKELETON (empty) file and returns an error.
-// It does NOT use the Test Defaults.
 // -----------------------------------------------------------------------------
 
+// LoadConfigFromFile loads the core configuration.
+// Behavior: If the file is missing, it automatically creates it using standard
+// ecosystem Defaults (from NewDefaultConfig). This is intended for Standalone
+// and Test profiles to allow instant "Zero-Config" local bootstrap.
+func LoadConfigFromFile(config *models.Config, filePath string) error {
+	if err := EnsureFileExists(filePath, models.NewDefaultConfig()); err != nil {
+		return err
+	}
+	err := LoadYAML(filePath, config)
+	if err == nil {
+		config.Logger.Info("Config Loaded from File: %s", filePath)
+	}
+	return err
+}
+
+// -----------------------------------------------------------------------------
+
+// LoadConfigFromFileSafe loads the YAML configuration with safety checks.
+// Behavior: If the file is missing, it returns nil (no error). It DOES NOT
+// generate skeletons. This allows for Environment-First bootstrapping where
+// config tags like CF_IP/CF_PORT are provided via ENV variables.
 func LoadConfigFromFileSafe(config *models.Config, filePath string) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		config.Logger.Info("Config file '%s' missing (Production/Preprod). Generating Skeleton...", filePath)
-
-		skeleton := models.NewSkeletonConfig()
-		data, _ := yaml.Marshal(skeleton)
-		_ = os.WriteFile(filePath, data, 0644)
-
-		return fmt.Errorf("config file was missing. Generated skeleton at '%s'. Please fill it", filePath)
+		config.Logger.Info("Config file missing at '%s'. Proceeding with Environment/Server discovery...", filePath)
+		return nil
 	}
 
-	return LoadConfigFromFile(config, filePath)
+	return LoadYAML(filePath, config)
 }
+
+
+// -----------------------------------------------------------------------------
 
 // ProcessNode recursively traverses the YAML node tree.
 // It expands env variables and forces all scalars to strings, except for booleans.
-// -----------------------------------------------------------------------------
-
 func ProcessNode(n *yaml.Node) {
 	if n.Kind == yaml.ScalarNode {
 		// Expand Environment Variables
@@ -118,4 +100,29 @@ func ProcessNode(n *yaml.Node) {
 	for _, child := range n.Content {
 		ProcessNode(child)
 	}
+}
+
+// -----------------------------------------------------------------------------
+
+// LoadYAML is the generic low-level utility to load and parse any YAML file.
+// It applies Environment Variable Expansion (${VAR:default}) and enforces
+// consistent string-typing (except for booleans) natively on the node tree.
+func LoadYAML(filePath string, target interface{}) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file '%s': %w", filePath, err)
+	}
+
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return fmt.Errorf("failed to parse yaml file '%s' into nodes: %w", filePath, err)
+	}
+
+	ProcessNode(&root)
+
+	if err := root.Decode(target); err != nil {
+		return fmt.Errorf("failed to decode yaml file '%s': %w", filePath, err)
+	}
+
+	return nil
 }

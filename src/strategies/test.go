@@ -16,7 +16,7 @@ import (
 //   - Logic: Local File is the authoritative source (overrides Server).
 //   - Integrity: PANICS if any IP is NOT 127.0.0.2.
 //
-// 2. Mem Config:
+// 2. Live Config:
 //   - Behavior: Fetched from Server (GET).
 //
 // 3. Persistence / Dump:
@@ -52,7 +52,7 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 		Port string `json:"port"`
 	}
 	var cs ConfigServerCap
-	if err := cfg.GetCapability("config_server", &cs); err == nil && cs.IP != "" {
+	if err := cfg.GetCapability("config_server", &cs); err == nil {
 		addr := fmt.Sprintf("%s:%s", cs.IP, cs.Port)
 		client, err := network.NewClient(addr, cfg)
 		if err == nil {
@@ -70,6 +70,8 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 		} else {
 			cfg.Logger.Warning("Test: Warning - Could not connect to Config Server at %s (Mock/Dev?)", addr)
 		}
+	} else {
+		cfg.Logger.Warning("Test: Required capability 'config_server' is missing! proceeding locally.")
 	}
 
 	// 4. File Load Override (File Wins)
@@ -81,6 +83,11 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 	// 5. Integrity Check
 	if err := loader.CheckTestIPs(cfg); err != nil {
 		return err
+	}
+
+	// 6. Mandatory Service Validation
+	if err := cfg.ValidateMandatoryServices(); err != nil {
+		return fmt.Errorf("test: validation failed: %w", err)
 	}
 
 	return nil

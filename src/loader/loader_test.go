@@ -199,4 +199,19 @@ capabilities:
 			t.Errorf("Expected file %s to be created", configPath)
 		}
 	})
+
+	t.Run("TestEnvironmentFirstBoot-SafeLoader", func(t *testing.T) {
+		configPath := filepath.Join(tempDir, "missing_safe.yaml")
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
+		
+		// LoadConfigFromFileSafe should NOT create a file and should NOT return an error
+		err := LoadConfigFromFileSafe(cfg, configPath)
+		if err != nil {
+			t.Errorf("Expected nil error for missing file in safe mode, got: %v", err)
+		}
+
+		if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+			t.Errorf("Expected file %s to NOT be created in safe mode", configPath)
+		}
+	})
 }
