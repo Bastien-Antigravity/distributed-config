@@ -19,7 +19,7 @@ func TestNewConfig(t *testing.T) {
 
 			// Test callback registration
 			triggered := false
-			cfg.OnMemConfUpdate(func(updates map[string]map[string]string) {
+			cfg.OnLiveConfUpdate(func(updates map[string]map[string]string) {
 				triggered = true
 			})
 

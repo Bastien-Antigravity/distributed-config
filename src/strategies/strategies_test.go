@@ -2,7 +2,6 @@ package strategies
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
