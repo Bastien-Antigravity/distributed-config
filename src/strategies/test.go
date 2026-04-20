@@ -75,6 +75,9 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 	// 4. File Load Override (File Wins)
 	// We reload the file to ensure local file edits override whatever the server sent.
 	// This matches Production precedence (File > Server).
+	if err := loader.LoadConfigFromFile(cfg, fullPath); err != nil {
+		return err
+	}
 	// 5. Integrity Check
 	if err := loader.CheckTestIPs(cfg); err != nil {
 		return err

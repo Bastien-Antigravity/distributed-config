@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
 
@@ -36,8 +37,16 @@ func NewClient(addr string, config *core.Config) (*Client, error) {
 
 // connect establishes the connection and acts the handshake.
 func (c *Client) connect() error {
-	// TODO: Determine correct Client IP dynamically if needed.
-	client, err := safesocket.Create("tcp-hello", c.addr, "127.0.0.1", "client", false)
+	// 1. Determine Identity from Config
+	identity := c.Handler.parentConfig.Common.Name
+	if identity == "" {
+		identity = "distributed-config-client"
+	}
+
+	// 2. Build Profile String (syntax: profile:identity)
+	profile := fmt.Sprintf("tcp-hello:%s", identity)
+
+	client, err := safesocket.Create(profile, c.addr, "127.0.0.1", "client", false)
 	if err != nil {
 		c.Handler.parentConfig.Logger.Error("Mock: Failed to connect to %s (using safe-socket)", c.addr)
 		return err
