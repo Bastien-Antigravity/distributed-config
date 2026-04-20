@@ -24,7 +24,7 @@ func main() {
 	printConfig(config)
 
 	// Setup update listener
-	config.OnMemConfUpdate(func(updates map[string]map[string]string) {
+	config.OnLiveConfUpdate(func(updates map[string]map[string]string) {
 		fmt.Println("\n[Update Received] Configuration changed:")
 		for section, kv := range updates {
 			fmt.Printf("  [%s]\n", section)
@@ -45,12 +45,12 @@ func main() {
 
 func printConfig(config *distconf.Config) {
 	fmt.Println("\nCurrent Configuration:")
-	if config.MemConfig == nil || len(config.MemConfig) == 0 {
+	if config.LiveConfig == nil || len(config.LiveConfig) == 0 {
 		fmt.Println("  (Empty)")
 		return
 	}
 
-	for section, kv := range config.MemConfig {
+	for section, kv := range config.LiveConfig {
 		fmt.Printf("  [%s]\n", section)
 		for k, v := range kv {
 			fmt.Printf("    %s = %s\n", k, v)

@@ -60,7 +60,7 @@ func testTestProfile() error {
 
 	// Verify we can attach a listener without panic
 	attached := false
-	config.OnMemConfUpdate(func(updates map[string]map[string]string) {
+	config.OnLiveConfUpdate(func(updates map[string]map[string]string) {
 		attached = true
 	})
 
