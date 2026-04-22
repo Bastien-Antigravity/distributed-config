@@ -11,8 +11,8 @@ import (
 func TestStandaloneStrategy(t *testing.T) {
 	tempDir := t.TempDir()
 	oldCwd, _ := os.Getwd()
-	os.Chdir(tempDir)
-	defer os.Chdir(oldCwd)
+	_ = os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(oldCwd) }()
 
 	t.Run("TestStandalone_GeneratesFileAndLoads", func(t *testing.T) {
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
@@ -37,8 +37,8 @@ func TestStandaloneStrategy(t *testing.T) {
 func TestProductionStrategy(t *testing.T) {
 	tempDir := t.TempDir()
 	oldCwd, _ := os.Getwd()
-	os.Chdir(tempDir)
-	defer os.Chdir(oldCwd)
+	_ = os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(oldCwd) }()
 
 	t.Run("TestProduction_FailsOnMissingEnvData", func(t *testing.T) {
 		// In Production, missing files are ignored (returns nil).
@@ -59,7 +59,7 @@ func TestProductionStrategy(t *testing.T) {
 
 	t.Run("TestProduction_IPSanityFailure", func(t *testing.T) {
 		// Mock out a bad production file containing a test IP.
-		os.MkdirAll("config", 0755)
+		_ = os.MkdirAll("config", 0755)
 		badProdYaml := `
 capabilities:
   log_server:
@@ -69,7 +69,7 @@ capabilities:
     ip: "192.168.1.100"
     port: "3306"
 `
-		os.WriteFile("config/production.yaml", []byte(badProdYaml), 0644)
+		_ = os.WriteFile("config/production.yaml", []byte(badProdYaml), 0644)
 
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
 		strategy := &ProductionStrategy{}
@@ -84,8 +84,8 @@ capabilities:
 func TestStagingStrategy(t *testing.T) {
 	tempDir := t.TempDir()
 	oldCwd, _ := os.Getwd()
-	os.Chdir(tempDir)
-	defer os.Chdir(oldCwd)
+	_ = os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(oldCwd) }()
 
 	t.Run("TestStaging_EnvironmentFirst_MissingDataFails", func(t *testing.T) {
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}

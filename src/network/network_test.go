@@ -94,7 +94,9 @@ func TestNetworkProtoHandler(t *testing.T) {
 		}
 
 		var decoded map[string]map[string]string
-		json.Unmarshal(msg.Payload, &decoded)
+		if err := json.Unmarshal(msg.Payload, &decoded); err != nil {
+			t.Fatalf("Failed to unmarshal payload: %v", err)
+		}
 
 		if decoded["OUTGOING"]["STATUS"] != "OK" {
 			t.Errorf("Expected update payload to contain STATUS=OK")

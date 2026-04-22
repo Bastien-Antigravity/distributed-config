@@ -45,7 +45,7 @@ func main() {
 
 func printConfig(config *distconf.Config) {
 	fmt.Println("\nCurrent Configuration:")
-	if config.LiveConfig == nil || len(config.LiveConfig) == 0 {
+	if len(config.LiveConfig) == 0 {
 		fmt.Println("  (Empty)")
 		return
 	}

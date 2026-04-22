@@ -16,7 +16,6 @@ import (
 type Config struct {
 	*core.Config
 	handler *network.ConfigProtoHandler
-	client  *network.Client
 
 	// Callbacks
 	ParentOnLiveConfUpdate func(map[string]map[string]string)
