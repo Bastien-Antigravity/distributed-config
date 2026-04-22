@@ -40,7 +40,9 @@ capabilities:
 		}
 		
 		var ts MockTS
-		cfg.GetCapability("timescale_db", &ts)
+		if err := cfg.GetCapability("timescale_db", &ts); err != nil {
+			t.Fatalf("Failed to get capability: %v", err)
+		}
 		if ts.DBName != "prod_db" {
 			t.Errorf("Expected db_name 'prod_db', got '%s'", ts.DBName)
 		}
@@ -73,7 +75,9 @@ capabilities:
 		}
 		
 		var ts MockTS
-		cfg.GetCapability("timescale_db", &ts)
+		if err := cfg.GetCapability("timescale_db", &ts); err != nil {
+			t.Fatalf("Failed to get capability: %v", err)
+		}
 		if ts.Password != "TopSecret123!" {
 			t.Errorf("Expected expansion to 'TopSecret123!', got '%s'", ts.Password)
 		}
@@ -107,7 +111,9 @@ capabilities:
 		}
 		
 		var ts MockTS
-		cfg.GetCapability("timescale_db", &ts)
+		if err := cfg.GetCapability("timescale_db", &ts); err != nil {
+			t.Fatalf("Failed to get capability: %v", err)
+		}
 		if ts.DBName != "DefaultDB" {
 			t.Errorf("Expected 'DefaultDB', got '%s'", ts.DBName)
 		}
