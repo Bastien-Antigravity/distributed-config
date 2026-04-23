@@ -42,7 +42,7 @@ The library uses a layered approach to build the final configuration:
 - **Secrets Management**: Native support for environment variable expansion (e.g., `${TS_PASSWORD}`).
 - **Environment-First Flexibility**: Supports "Pure-Environment" deployments where a local config file is optional. If missing, the system uses `CF_IP`/`CF_PORT` to connect to the central server and hydrate required capabilities.
 - **Fail-Safe & Strict**: Enforces "Mandatory Service Validation" (Fail-Fast logic) to ensure critical infrastructure like `log_server` is correctly configured (via any source) before boot.
-- **Live Updates**: Support for dynamic configuration updates via callbacks.
+- **Live Updates**: Support for dynamic configuration updates via callbacks. Manually calling `Set()` on the facade now correctly triggers local observers, ensuring system-wide synchronization even for local state changes.
 
 ## Installation
 

@@ -76,3 +76,18 @@ func (config *Config) OnLiveConfUpdate(onLiveConfUpdateFn func(map[string]map[st
 		config.handler.SetOnLiveConfUpdate(onLiveConfUpdateFn)
 	}
 }
+
+// Set overrides the core.Config.Set to trigger local callbacks.
+// -----------------------------------------------------------------------------
+func (config *Config) Set(section, key, value string) {
+	config.Config.Set(section, key, value)
+	if config.ParentOnLiveConfUpdate != nil {
+		// Create a single-entry update map for the callback
+		update := map[string]map[string]string{
+			section: {
+				key: value,
+			},
+		}
+		config.ParentOnLiveConfUpdate(update)
+	}
+}
