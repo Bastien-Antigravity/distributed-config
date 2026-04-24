@@ -3,7 +3,7 @@ module github.com/Bastien-Antigravity/distributed-config
 go 1.25.4
 
 require (
-	github.com/Bastien-Antigravity/safe-socket v1.7.8
+	github.com/Bastien-Antigravity/safe-socket v1.8.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
