@@ -5,7 +5,7 @@ import (
 )
 
 func TestNewConfig(t *testing.T) {
-	profiles := []string{"standalone", "test", "preprod", "production"}
+	profiles := []string{"standalone", "test", "staging", "production"}
 
 	for _, profile := range profiles {
 		t.Run("Profile-"+profile, func(t *testing.T) {

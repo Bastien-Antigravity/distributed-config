@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// Parse command line flags
-	profile := flag.String("profile", "standalone", "Configuration profile (standalone, test, preprod, production)")
+	profile := flag.String("profile", "standalone", "Configuration profile (standalone, test, staging, production)")
 	flag.Parse()
 
 	fmt.Printf("Starting Config CLI with profile: %s\n", *profile)
