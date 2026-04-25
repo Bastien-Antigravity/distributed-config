@@ -60,7 +60,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/Bastien-Antigravity/distributed-config"
+	distributed_config "github.com/Bastien-Antigravity/distributed-config"
 )
 
 func main() {
