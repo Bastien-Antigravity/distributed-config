@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	models "github.com/Bastien-Antigravity/distributed-config/src/core"
+	"github.com/Bastien-Antigravity/distributed-config/src/secret"
 
 	"gopkg.in/yaml.v3"
 )
@@ -114,7 +115,13 @@ func LoadYAML(filePath string, target interface{}) error {
 	}
 
 	var root yaml.Node
-	if err := yaml.Unmarshal(data, &root); err != nil {
+	// Process encrypted secrets in the raw bytes before unmarshaling to nodes
+	processedData, err := secret.ProcessConfigSecrets(data)
+	if err != nil {
+		return fmt.Errorf("failed to process secrets in '%s': %w", filePath, err)
+	}
+
+	if err := yaml.Unmarshal(processedData, &root); err != nil {
 		return fmt.Errorf("failed to parse yaml file '%s' into nodes: %w", filePath, err)
 	}
 
