@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	models "github.com/Bastien-Antigravity/distributed-config/src/core"
-	"github.com/Bastien-Antigravity/distributed-config/src/secret"
-
 	"gopkg.in/yaml.v3"
 )
 
