@@ -75,25 +75,6 @@ Configuration arguments are partitioned into strict domains controlling how netw
 - **Authority**: Pushed dynamically from `config-server`.
 - **Updates**: Injects live parameters triggering arbitrary `OnLiveConfUpdate()` callbacks.
 
-### Private & External Configurations
-The `Config` system strictly enforces separation by detaching private structs off the core structural schemas.
-Use `PrivateConfig` to define the **Identity and Local Requirements** of your specific microservice:
-
-```yaml
-name: "my-service"
-private_file_path: "config/private.yaml"
-private:
-  local_buffer_size: "1024"
-```
-
-To load these isolation layers, use `loader.LoadYAML`:
-```go
-import "github.com/Bastien-Antigravity/distributed-config/src/loader"
-
-var myLocal core.PrivateConfig
-err := loader.LoadYAML("config/private.yaml", &myLocal)
-```
-
 ---
 
 ## 5. Environment Variable Reference

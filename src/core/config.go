@@ -16,19 +16,8 @@ type CommonConfig struct {
 	Reset          bool   `yaml:"reset" json:"reset"`
 }
 
-// Private Config
-// -----------------------------------------------------------------------------
-
-type PrivateConfig struct {
-	Name            string                 `yaml:"name" json:"name"`
-	PrivateFilePath string                 `yaml:"private_file_path" json:"private_file_path"`
-	Private         map[string]interface{} `yaml:"private" json:"private"`
-}
-
 // Config Data Struct (Pure Data)
 // -----------------------------------------------------------------------------
-
-
 
 type Config struct {
 	// Distributed system name
@@ -38,7 +27,6 @@ type Config struct {
 	// main config 
 	Capabilities map[string]interface{} `yaml:"capabilities" json:"capabilities"`
 	LiveConfig map[string]map[string]string `yaml:"-"`
-	PrivateConfig	      map[string]interface{} `yaml:"private" json:"private"`
 
 	// Internal state
 	ConfigPath string       `yaml:"-"`
