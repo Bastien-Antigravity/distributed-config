@@ -16,12 +16,14 @@ import (
 // ENC_REGEX matches ENC(base64_blob)
 var ENC_REGEX = regexp.MustCompile(`ENC\(([^)]+)\)`)
 
-// getPrivateKey attempts to retrieve the RSA Private Key from a standard file path.
 func getPrivateKey() (*rsa.PrivateKey, error) {
-	keyPath := "/etc/bastien/private.pem"
-	// Fallback for local sandbox testing
-	if _, err := os.Stat("./private.pem"); err == nil {
-		keyPath = "./private.pem"
+	keyPath := os.Getenv("BASTIEN_PRIVATE_KEY_PATH")
+	if keyPath == "" {
+		keyPath = "/etc/bastien/private.pem"
+		// Fallback for local sandbox testing
+		if _, err := os.Stat("./private.pem"); err == nil {
+			keyPath = "./private.pem"
+		}
 	}
 
 	data, err := os.ReadFile(keyPath)

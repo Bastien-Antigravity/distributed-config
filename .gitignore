@@ -89,3 +89,7 @@ zzz_memo
 # Binary / Data
 *.exe
 *.pkl
+
+# Release Artifacts
+!release/
+!release/config-tool-*
