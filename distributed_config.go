@@ -3,6 +3,7 @@ package distributed_config
 import (
 	"github.com/Bastien-Antigravity/distributed-config/src/facade"
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
+	"github.com/Bastien-Antigravity/distributed-config/src/secret"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,4 +27,14 @@ func New(profile string) *Config {
 // ProcessNode is a helper that expands environment variables in a YAML node.
 func ProcessNode(n *yaml.Node) {
 	loader.ProcessNode(n)
+}
+
+// Decrypt decrypts a single ENC(...) ciphertext string.
+func Decrypt(ciphertext string) (string, error) {
+	return secret.Decrypt(ciphertext)
+}
+
+// ProcessConfigSecrets is a helper that decrypts all ENC(...) blocks in a raw byte slice.
+func ProcessConfigSecrets(content []byte) ([]byte, error) {
+	return secret.ProcessConfigSecrets(content)
 }

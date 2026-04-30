@@ -12,6 +12,7 @@ import (
 type CommonConfig struct {
 	Name           string `yaml:"name" json:"name"`
 	CommonFilePath string `yaml:"common_file_path" json:"common_file_path"`
+	PublicKey      string `yaml:"public_key" json:"public_key"`
 	Reset          bool   `yaml:"reset" json:"reset"`
 }
 

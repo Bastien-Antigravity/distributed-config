@@ -50,9 +50,36 @@ func LoadConfigFromFile(config *models.Config, filePath string) error {
 	err := LoadYAML(filePath, config)
 	if err == nil {
 		config.Logger.Info("Config Loaded from File: %s", filePath)
+		loadPublicKey(config)
 	}
 	return err
 }
+
+// -----------------------------------------------------------------------------
+
+// loadPublicKey attempts to find and load public.pem into Common.PublicKey
+func loadPublicKey(config *models.Config) {
+	// 1. Check ENV
+	path := os.Getenv("BASTIEN_PUBLIC_KEY_PATH")
+	if path == "" {
+		// 2. Check standard production path
+		path = "/etc/bastien/public.pem"
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			// 3. Local fallback
+			path = "./public.pem"
+		}
+	}
+
+	if _, err := os.Stat(path); err == nil {
+		content, err := os.ReadFile(path)
+		if err == nil {
+			config.Common.PublicKey = strings.TrimSpace(string(content))
+			config.Logger.Info("Public Key Loaded from %s", path)
+		}
+	}
+}
+
+// -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
 
@@ -66,7 +93,11 @@ func LoadConfigFromFileSafe(config *models.Config, filePath string) error {
 		return nil
 	}
 
-	return LoadYAML(filePath, config)
+	err := LoadYAML(filePath, config)
+	if err == nil {
+		loadPublicKey(config)
+	}
+	return err
 }
 
 
@@ -115,13 +146,7 @@ func LoadYAML(filePath string, target interface{}) error {
 	}
 
 	var root yaml.Node
-	// Process encrypted secrets in the raw bytes before unmarshaling to nodes
-	processedData, err := secret.ProcessConfigSecrets(data)
-	if err != nil {
-		return fmt.Errorf("failed to process secrets in '%s': %w", filePath, err)
-	}
-
-	if err := yaml.Unmarshal(processedData, &root); err != nil {
+	if err := yaml.Unmarshal(data, &root); err != nil {
 		return fmt.Errorf("failed to parse yaml file '%s' into nodes: %w", filePath, err)
 	}
 
