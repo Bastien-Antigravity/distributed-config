@@ -117,3 +117,33 @@ capabilities:
     token: "${TR_TOKEN}"
     chat_id: "${TR_CHATID}"
 ```
+
+## Security & Encryption (v1.9.1+)
+
+`distributed-config` supports native RSA encryption for sensitive fields. If a string is wrapped in `ENC(...)`, it will be automatically decrypted at runtime using a private key.
+
+### **Key Distribution Policy**
+- **Public Key (`public.pem`)**: Non-sensitive. Used by developers to encrypt secrets. Distribute via secure internal channels; **DO NOT** commit to Git.
+- **Private Key (`private.pem`)**: Critical secret. **MUST NOT** be committed to Git. In production, mount it at `/etc/bastien/private.pem`.
+
+### **Utilities**
+The unified **`config-tool`** is provided in the `cmd/` directory:
+
+1.  **Generate Keys**:
+    ```bash
+    go run ./cmd/config-tool keygen --dir .
+    ```
+
+2.  **Encrypt a Secret**:
+    ```bash
+    go run ./cmd/config-tool encrypt --key public.pem --token "your-secret-here"
+    ```
+
+---
+
+## Testing
+
+Run the full test suite (including the new RSA round-trip tests):
+```bash
+go test -v ./...
+```

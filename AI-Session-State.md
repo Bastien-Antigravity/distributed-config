@@ -1,4 +1,4 @@
-﻿---
+---
 microservice: distributed-config
 type: session-state
 status: active
@@ -16,10 +16,14 @@ directives:
 ## 🚀 Progress Tracking
 - [x] Initialized session state tracking for this repository.
 - [x] Synchronized with the Global Obsidian Brain.
+- [x] **v1.9.1 Upgrade**: Integrated `safe-socket v1.8.2` for Infinite Wait support.
+- [x] **Security Hardening**: Replaced manual scratch scripts with formal unit tests in `src/secret/`.
+- [x] **Tool Promotion**: Promoted keygen and encryption utilities to `cmd/config-keygen` and `cmd/config-encrypt`.
 
 ## 🐛 Local Issues / Bugs
 - None identified.
 
 ## ⏭ Next Actions
-- [ ] Maintain this state file during development sprints!
+- [ ] Propagate `distributed-config v1.9.1` to downstream dependencies (`microservice-toolbox`, `flexible-logger`, etc.).
+- [ ] Monitor CI/CD for cross-package side effects.
 

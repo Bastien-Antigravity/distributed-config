@@ -43,6 +43,12 @@ Critical fail-safe tests to prevent configuration errors in production.
 *   **IP Sanity**: Verifies that "Test" IPs (127.0.0.2) are strictly blocked in Production profiles.
 *   **Required Fields**: Ensures that the library fails fast if mandatory services are not satisfied by any source (File or Env). Specifically checks `log_server` and `config_server`.
 
+### 5. Security & Secret Encryption (`src/secret/crypto_test.go`)
+Tests the RSA-based secret protection layer (v1.9.1+).
+*   **Encryption Round-Trip**: Verifies that tokens encrypted with a public key are correctly decrypted using the private key fallback logic.
+*   **Regex Engine**: Ensures that `ENC(...)` blocks within YAML strings are identified and decrypted correctly without corrupting the surrounding YAML structure.
+*   **Volatility Check**: Verifies that decryption happens strictly in-memory and handles missing private keys gracefully (returning the raw ENC block).
+
 ## Writing New Tests
 
 When adding new features, please follow these guidelines:
