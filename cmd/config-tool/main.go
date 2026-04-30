@@ -46,7 +46,10 @@ func printUsage() {
 func handleKeygen() {
 	flags := pflag.NewFlagSet("keygen", pflag.ExitOnError)
 	outputDir := flags.String("dir", ".", "Directory to save the generated .pem keys")
-	flags.Parse(os.Args[2:])
+	if err := flags.Parse(os.Args[2:]); err != nil {
+		fmt.Printf("Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
 
 	if err := os.MkdirAll(*outputDir, 0755); err != nil {
 		fmt.Printf("Error creating directory: %v\n", err)
@@ -71,7 +74,10 @@ func handleKeygen() {
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
 	}
-	pem.Encode(privFile, privPEM)
+	if err := pem.Encode(privFile, privPEM); err != nil {
+		fmt.Printf("Error encoding private key: %v\n", err)
+		os.Exit(1)
+	}
 
 	pubPath := filepath.Join(*outputDir, "public.pem")
 	pubFile, err := os.Create(pubPath)
@@ -86,7 +92,10 @@ func handleKeygen() {
 		Type:  "PUBLIC KEY",
 		Bytes: pubBytes,
 	}
-	pem.Encode(pubFile, pubPEM)
+	if err := pem.Encode(pubFile, pubPEM); err != nil {
+		fmt.Printf("Error encoding public key: %v\n", err)
+		os.Exit(1)
+	}
 
 	fmt.Println("----------------------------------------------------------------")
 	fmt.Println("RSA Key Pair Generated Successfully!")
@@ -99,7 +108,10 @@ func handleEncrypt() {
 	flags := pflag.NewFlagSet("encrypt", pflag.ExitOnError)
 	keyPath := flags.String("key", "", "Path to the RSA public key")
 	token := flags.String("token", "", "The plaintext token to encrypt")
-	flags.Parse(os.Args[2:])
+	if err := flags.Parse(os.Args[2:]); err != nil {
+		fmt.Printf("Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
 
 	if *keyPath == "" || *token == "" {
 		fmt.Println("Error: --key and --token are mandatory.")
