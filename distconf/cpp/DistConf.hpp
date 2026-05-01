@@ -121,8 +121,8 @@ public:
     void OnLiveConfUpdate(std::function<void(const std::string&)> callback) {
         callback_ = callback;
         
-        std::lock_guard<std::mutex> lock(registry_mutex_);
-        registry_[handle_] = this;
+        std::lock_guard<std::mutex> lock(GetRegistryMutex());
+        GetRegistry()[handle_] = this;
 
         DistConf_OnLiveConfUpdate(handle_, StaticCallbackBridge);
     }
@@ -131,25 +131,25 @@ public:
     void OnRegistryUpdate(std::function<void(const std::string&)> callback) {
         registry_callback_ = callback;
         
-        std::lock_guard<std::mutex> lock(registry_mutex_);
-        registry_[handle_] = this;
+        std::lock_guard<std::mutex> lock(GetRegistryMutex());
+        GetRegistry()[handle_] = this;
 
         DistConf_OnRegistryUpdate(handle_, StaticRegistryBridge);
     }
 
 private:
     static void StaticCallbackBridge(uintptr_t handle, const char* json_data) {
-        std::lock_guard<std::mutex> lock(registry_mutex_);
-        auto it = registry_.find(handle);
-        if (it != registry_.end() && it->second->callback_) {
+        std::lock_guard<std::mutex> lock(GetRegistryMutex());
+        auto it = GetRegistry().find(handle);
+        if (it != GetRegistry().end() && it->second->callback_) {
             it->second->callback_(std::string(json_data));
         }
     }
 
     static void StaticRegistryBridge(uintptr_t handle, const char* json_data) {
-        std::lock_guard<std::mutex> lock(registry_mutex_);
-        auto it = registry_.find(handle);
-        if (it != registry_.end() && it->second->registry_callback_) {
+        std::lock_guard<std::mutex> lock(GetRegistryMutex());
+        auto it = GetRegistry().find(handle);
+        if (it != GetRegistry().end() && it->second->registry_callback_) {
             it->second->registry_callback_(std::string(json_data));
         }
     }
@@ -158,14 +158,17 @@ private:
     std::function<void(const std::string&)> callback_;
     std::function<void(const std::string&)> registry_callback_;
 
-    // Static registry to route C callbacks to the correct DistConfig instance
-    static std::map<uintptr_t, DistConfig*> registry_;
-    static std::mutex registry_mutex_;
-};
+    // Meyer's Singleton for header-only static registry without C++17 inline variables
+    static std::map<uintptr_t, DistConfig*>& GetRegistry() {
+        static std::map<uintptr_t, DistConfig*> registry;
+        return registry;
+    }
 
-// Initialize static members
-inline std::map<uintptr_t, DistConfig*> DistConfig::registry_;
-inline std::mutex DistConfig::registry_mutex_;
+    static std::mutex& GetRegistryMutex() {
+        static std::mutex registry_mutex;
+        return registry_mutex;
+    }
+};
 
 } // namespace distconf
 

@@ -48,16 +48,16 @@ void test_capabilities() {
 }
 
 void test_ecosystem_sharing() {
-    std::cout << "Testing Ecosystem Sharing (ShareObject)..." << std::endl;
+    std::cout << "Testing Ecosystem Sharing (ShareConfig)..." << std::endl;
     DistConfig cfg("standalone");
     
     // Go's json.Marshal produces compact JSON by default
-    std::string payload = "{\"status\":\"online\",\"version\":\"2.0\"}";
-    bool success = cfg.ShareObject("cpp_service", payload);
+    std::string payload = "{\"cpp_service\": {\"status\":\"online\",\"version\":\"2.0\"}}";
+    bool success = cfg.ShareConfig(payload);
     assert(success == true);
     
     // Verify it reached LiveConfig
-    std::string shared = cfg.Get("cpp_service", "shared_data");
+    std::string shared = cfg.Get("shared", "cpp_service");
     assert(shared.find("\"status\":\"online\"") != std::string::npos);
     
     std::cout << "  Passed." << std::endl;
