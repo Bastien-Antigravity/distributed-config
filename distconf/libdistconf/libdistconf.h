@@ -24,6 +24,7 @@ extern const char *_GoStringPtr(_GoString_ s);
 #line 3 "config.go"
 
 #include <stdlib.h>
+#include <stdint.h>
 
 // Define the callback type for C
 typedef void (*config_update_cb)(uintptr_t handle, const char* json_data);
