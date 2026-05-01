@@ -51,14 +51,14 @@ void test_ecosystem_sharing() {
     std::cout << "Testing Ecosystem Sharing (ShareConfig)..." << std::endl;
     DistConfig cfg("standalone");
     
-    // Go's json.Marshal produces compact JSON by default
+    // ShareConfig merges top-level keys as sections into LiveConfig
     std::string payload = "{\"cpp_service\": {\"status\":\"online\",\"version\":\"2.0\"}}";
     bool success = cfg.ShareConfig(payload);
     assert(success == true);
     
-    // Verify it reached LiveConfig
-    std::string shared = cfg.Get("shared", "cpp_service");
-    assert(shared.find("\"status\":\"online\"") != std::string::npos);
+    // After ShareConfig, data is accessible via Get(section, key)
+    std::string status = cfg.Get("cpp_service", "status");
+    assert(status == "online");
     
     std::cout << "  Passed." << std::endl;
 }

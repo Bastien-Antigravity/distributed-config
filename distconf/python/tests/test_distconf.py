@@ -1,11 +1,13 @@
+#!/usr/bin/env python
+# coding:utf-8
+
 import unittest
-import os
-import sys
-import json
-import time
+from os.path import abspath as osPathAbspath, dirname as osPathDirname, exists as osPathExists
+from sys import path as sysPath
+from time import sleep as timeSleep
 
 # Add parent dir to path to import distconf
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sysPath.append(osPathDirname(osPathDirname(osPathAbspath(__file__))))
 
 from distconf import DistConfig
 
@@ -13,16 +15,20 @@ class TestDistConfigFull(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Path to the library built by the Makefile
-        cls.lib_path = os.path.abspath("../../distconf/libdistconf/libdistconf.so")
-        if not os.path.exists(cls.lib_path):
+        cls.lib_path = osPathAbspath("../../distconf/libdistconf/libdistconf.so")
+        if not osPathExists(cls.lib_path):
             # Try dylib for macOS
             cls.lib_path = cls.lib_path.replace(".so", ".dylib")
-            
+
+    # -----------------------------------------------------------------------------------------------
+
     def test_01_lifecycle(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
         self.assertIsNotNone(cfg._handle)
         cfg.close()
         self.assertIsNone(cfg._handle)
+
+    # -----------------------------------------------------------------------------------------------
 
     def test_02_data_access(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
@@ -38,6 +44,8 @@ class TestDistConfigFull(unittest.TestCase):
         
         cfg.close()
 
+    # -----------------------------------------------------------------------------------------------
+
     def test_03_capabilities(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
         
@@ -52,6 +60,8 @@ class TestDistConfigFull(unittest.TestCase):
         
         cfg.close()
 
+    # -----------------------------------------------------------------------------------------------
+
     def test_04_sharing(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
         
@@ -65,6 +75,8 @@ class TestDistConfigFull(unittest.TestCase):
         
         cfg.close()
 
+    # -----------------------------------------------------------------------------------------------
+
     def test_05_security(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
         
@@ -74,10 +86,14 @@ class TestDistConfigFull(unittest.TestCase):
         
         cfg.close()
 
+    # -----------------------------------------------------------------------------------------------
+
     def test_06_validation(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
         self.assertTrue(cfg.validate_mandatory_services())
         cfg.close()
+
+    # -----------------------------------------------------------------------------------------------
 
     def test_07_callbacks(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
@@ -92,12 +108,14 @@ class TestDistConfigFull(unittest.TestCase):
         cfg.set("callback_test", "trigger", "now")
         
         # Wait for callback dispatch (Go -> C -> Python)
-        time.sleep(0.1)
+        timeSleep(0.1)
         
         self.assertTrue(len(updated_data) > 0)
         self.assertIn("callback_test", updated_data[0])
         
         cfg.close()
+
+    # -----------------------------------------------------------------------------------------------
 
     def test_08_registry_callbacks(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
