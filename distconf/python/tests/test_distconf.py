@@ -55,14 +55,13 @@ class TestDistConfigFull(unittest.TestCase):
     def test_04_sharing(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
         
-        payload = {"status": "ok", "items": [1, 2, 3]}
-        success = cfg.share_object("py_service", payload)
+        payload = {"py_service": {"status": "ok", "items": "1,2,3"}}
+        success = cfg.share_config(payload)
         self.assertTrue(success)
         
         # Verify it reflected in LiveConfig
-        shared = cfg.get("py_service", "shared_data")
-        shared_parsed = json.loads(shared)
-        self.assertEqual(shared_parsed["status"], "ok")
+        status = cfg.get("py_service", "status")
+        self.assertEqual(status, "ok")
         
         cfg.close()
 
@@ -97,6 +96,22 @@ class TestDistConfigFull(unittest.TestCase):
         
         self.assertTrue(len(updated_data) > 0)
         self.assertIn("callback_test", updated_data[0])
+        
+        cfg.close()
+
+    def test_08_registry_callbacks(self):
+        cfg = DistConfig("standalone", lib_path=self.lib_path)
+        
+        registry_events = []
+        def on_registry(data):
+            registry_events.append(data)
+            
+        cfg.on_registry_update(on_registry)
+        
+        # Test that we can register it without crashing. 
+        # (Actually triggering it requires injecting network packets or using internal Go hooks, 
+        # but registering it ensures the CGO bridge bindings and ctypes wrappers are fully functional).
+        self.assertEqual(len(registry_events), 0)
         
         cfg.close()
 

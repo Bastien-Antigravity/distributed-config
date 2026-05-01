@@ -27,7 +27,7 @@ This table denotes the state of specific internal nodes throughout the initializ
 | **1. File Bootstrap**| Loading local properties via `PathResolver` | Local YAML | [x] | [x] | [x] |
 | **2. Environment** | Dynamic process variables parsing | `os.Getenv` | [x] | [x] | [ ] |
 | **3. Server Baseline**| Initial HTTP/TCP TCP-Hello payload merge | Server `GET_SYNC` | [x] | [ ] | [x] |
-| **4. File Override** | Re-parsing to assert `File > Server` hierarchy | Local YAML | [x] | [x] | [ ] |
+| **4. File Override** | Re-parsing to assert `File > Env > Server` hierarchy | Local YAML | [x] | [x] | [ ] |
 | **5. Runtime** | Ephemeral updates / Service Registry | `BROADCAST_SYNC`| [ ] | [ ] | [x] |
 
 ---

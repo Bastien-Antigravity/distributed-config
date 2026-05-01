@@ -120,7 +120,7 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 // -----------------------------------------------------------------------------
 
 func (h *ConfigProtoHandler) updateLiveConfig(sections map[string]map[string]string) {
-	// Atomically swap the entire config map pointer (Full Update)
+	// Atomically swap the entire config map pointer (Full Update from Server)
 	h.parentConfig.LiveConfig.Store(&sections)
 
 	if h.onLiveConfUpdate != nil {

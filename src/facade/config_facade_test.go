@@ -17,15 +17,34 @@ func TestNewConfig(t *testing.T) {
 				t.Fatalf("NewConfig(%s).Config is nil", profile)
 			}
 
-			// Test callback registration
+			// Test callback registration & local trigger via SetSingle
 			triggered := false
+			var capturedUpdates map[string]map[string]string
 			cfg.OnLiveConfUpdate(func(updates map[string]map[string]string) {
 				triggered = true
+				capturedUpdates = updates
 			})
 
-			// Non-blocking check for triggered (it won't be triggered here but we check registration)
-			if triggered {
-				t.Log("Callback triggered unexpectedly in sync test")
+			cfg.SetSingle("TEST_SECTION", "TEST_KEY", "TEST_VAL")
+
+			if cfg.strategy != nil {
+				expectTrigger := profile == "standalone" || profile == "staging"
+
+				if expectTrigger && !triggered {
+					t.Errorf("NewConfig(%s): SetSingle should have triggered the local callback", profile)
+				} else if !expectTrigger && triggered {
+					t.Errorf("NewConfig(%s): SetSingle should NOT have triggered the local callback (Strict Eventing)", profile)
+				}
+
+				if expectTrigger {
+					if capturedUpdates["TEST_SECTION"]["TEST_KEY"] != "TEST_VAL" {
+						t.Errorf("NewConfig(%s): Callback captured wrong value: %v", profile, capturedUpdates["TEST_SECTION"]["TEST_KEY"])
+					}
+				}
+			}
+
+			if cfg.Get("TEST_SECTION", "TEST_KEY") != "TEST_VAL" {
+				t.Errorf("NewConfig(%s): Get should return values set via SetSingle", profile)
 			}
 		})
 	}

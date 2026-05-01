@@ -19,9 +19,11 @@ All wrappers follow the same naming convention and provide the following core me
 | `Get(section, key)` | Retrieves a configuration value. |
 | `Set(section, key, val)` | Updates a value locally (triggers callbacks). |
 | `Sync()` | Forces a refresh from the Config Server. |
-| `ShareObject(section, obj)` | Broadcasts state to the entire ecosystem. |
+| `ShareConfig(payload)` | Broadcasts state to the entire ecosystem. |
 | `ValidateMandatoryServices()` | Ensures connectivity environment is valid. |
 | `Decrypt(ciphertext)` | Decrypts RSA-protected secrets. |
+| `OnLiveConfUpdate(cb)` | Registers a listener for real-time config updates. |
+| `OnRegistryUpdate(cb)` | Registers a listener for service registry updates. |
 
 ## Build Instructions
 
@@ -32,7 +34,7 @@ cd ..
 make build-lib
 ```
 
-This generates the necessary binaries in `release/libdistconf.so` (or `.dylib`).
+This generates the necessary binaries in `distconf/libdistconf/libdistconf.so` (or `.dylib`).
 
 ## Testing
 

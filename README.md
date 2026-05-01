@@ -42,8 +42,8 @@ The library uses a layered approach to build the final configuration:
 - **Secrets Management**: Native support for environment variable expansion (e.g., `${TS_PASSWORD}`).
 - **Environment-First Flexibility**: Supports "Pure-Environment" deployments where a local config file is optional. If missing, the system uses `CF_IP`/`CF_PORT` to connect to the central server and hydrate required capabilities.
 - **Fail-Safe & Strict**: Enforces "Mandatory Service Validation" (Fail-Fast logic) to ensure critical infrastructure like `log_server` is correctly configured (via any source) before boot.
-- **Live Updates**: Support for dynamic configuration updates via callbacks. Manually calling `Set()` on the facade now correctly triggers local observers and automatically synchronizes with the fleet.
-- **High Performance & Lock-Free**: Uses an **Atomic Pointer Swap (RCU)** architecture. Configuration reads (`Get`) are 100% lock-free and non-blocking, ensuring zero-latency configuration access for high-frequency microservices.
+- **Live Updates**: Support for dynamic configuration updates via callbacks. Manually calling `Set()` (bulk) or `SetSingle()` (convenience) on the facade now correctly triggers local observers and automatically synchronizes with the fleet.
+- **High Performance & Lock-Free**: Uses an **Atomic Pointer Swap (RCU)** architecture. Configuration reads (`Get`) are 100% lock-free and non-blocking, ensuring zero-latency configuration access for high-frequency microservices. Even during bulk updates, readers always see a consistent snapshot.
 - **Polyglot Ecosystem (v1.9.6+)**: Native support for **Python, Rust, C/C++, and VBA** via a centralized CGO-based shared library (`libdistconf`). Achieve 100% architectural parity across your entire microservice fleet.
 
 ## Installation
@@ -107,6 +107,14 @@ func main() {
     cfg.OnRegistryUpdate(func(registry map[string][]string) {
         fmt.Printf("Active nodes tracking %d services\n", len(registry["active_services"]))
     })
+
+    // Update configuration (Bulk)
+    cfg.Set(map[string]map[string]string{
+        "custom_section": {"status": "active"},
+    })
+
+    // Update configuration (Single - Helper)
+    cfg.SetSingle("custom_section", "mode", "optimized")
 }
 ```
 
@@ -161,7 +169,7 @@ The `distributed-config` core is exposed via a stable C ABI.
 - `DistConf_Set(handle, section, key, val)`: Update a value locally (triggers callbacks).
 - `DistConf_OnLiveConfUpdate(handle, callback)`: Register a live update listener.
 - `DistConf_Sync(handle)`: Force a manual refresh from the Config Server.
-- `DistConf_ShareObject(handle, section, json)`: Broadcast state to the ecosystem.
+- `DistConf_ShareConfig(handle, json)`: Broadcast state (flat or nested map) to the ecosystem.
 - `DistConf_ValidateMandatoryServices(handle)`: Ensure the environment satisfies mandatory services.
 - `DistConf_Decrypt(handle, ciphertext)`: Decrypt a secret.
 

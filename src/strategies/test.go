@@ -58,6 +58,7 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 		if err == nil {
 			s.Client = client
 			serverConfig, err := client.GetConfig()
+			s.Client.Watch() // Start background hot-reloading AFTER initial sync
 			if err == nil {
 				// Merge Server Config into current Config
 				cfg.Logger.Info("Test: Loaded from Server")
@@ -109,5 +110,24 @@ func (s *TestStrategy) GetHandler() *network.ConfigProtoHandler {
 	if s.Client != nil {
 		return s.Client.Handler
 	}
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *TestStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
+	// 1. Prepare next state (Preview)
+	nextState := cfg.PreviewSet(updates)
+
+	// 2. Push to server if client is available
+	if s.Client != nil {
+		cfg.Logger.Info("Test: Pushing update request to Server...")
+		if err := s.Client.UpdateConfigMap(nextState); err != nil {
+			return fmt.Errorf("test: server rejected update: %w", err)
+		}
+	}
+
+	// 3. Apply locally (Direct apply)
+	cfg.Apply(nextState)
 	return nil
 }

@@ -80,28 +80,47 @@ func (config *Config) OnLiveConfUpdate(onLiveConfUpdateFn func(map[string]map[st
 	}
 }
 
-// Set overrides the core.Config.Set to trigger local callbacks and global synchronization.
-// -----------------------------------------------------------------------------
-func (config *Config) Set(section, key, value string) {
-	config.Config.Set(section, key, value)
-
-	// Automatically trigger global synchronization
-	if config.strategy != nil {
-		if err := config.strategy.Sync(config.Config); err != nil {
-			config.Config.Logger.Error("Auto-Sync failed after Set: %v", err)
-		}
-	}
-
-	if config.ParentOnLiveConfUpdate != nil {
-		// Create a single-entry update map for the callback
-		update := map[string]map[string]string{
-			section: {
-				key: value,
-			},
-		}
-		config.ParentOnLiveConfUpdate(update)
+func (config *Config) OnRegistryUpdate(onRegistryUpdateFn func(map[string][]string)) {
+	if config.handler != nil {
+		config.handler.SetOnRegistryUpdate(onRegistryUpdateFn)
 	}
 }
+
+// Set overrides the core.Config.Set to trigger local callbacks and global synchronization.
+// -----------------------------------------------------------------------------
+func (config *Config) Set(updates map[string]map[string]string) error {
+	if config.strategy != nil {
+		if err := config.strategy.Set(config.Config, updates); err != nil {
+			config.Config.Logger.Error("Strategy.Set failed: %v", err)
+			return err // Abort local callback on failure and return error
+		}
+		
+		// Single Source of Truth Eventing: 
+		// If pushing to a central server, we rely on the Watch() listener to 
+		// catch the server's BROADCAST_SYNC to trigger observers safely.
+		name := config.strategy.Name()
+		if name == "production" || name == "test" {
+			return nil
+		}
+	} else {
+		// Fallback for cases where strategy is missing (should not happen in normal usage)
+		config.Config.Set(updates)
+	}
+
+	// Trigger local callback for UI consistency (Standalone & Staging)
+	if config.ParentOnLiveConfUpdate != nil {
+		config.ParentOnLiveConfUpdate(*config.Config.LiveConfig.Load())
+	}
+	return nil
+}
+
+// SetSingle is a helper for updating a single configuration value.
+func (config *Config) SetSingle(section, key, value string) error {
+	return config.Set(map[string]map[string]string{
+		section: {key: value},
+	})
+}
+
 // Sync manually triggers a refresh from the underlying strategy (e.g. Config Server).
 // -----------------------------------------------------------------------------
 func (config *Config) Sync() error {

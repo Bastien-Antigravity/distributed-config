@@ -19,6 +19,9 @@ type ConfigStrategy interface {
 	// Sync performs any necessary synchronization (e.g., pushing updates to server).
 	Sync(cfg *core.Config) error
 
+	// Set handles local configuration updates according to the strategy's consistency model.
+	Set(cfg *core.Config, updates map[string]map[string]string) error
+
 	// GetHandler returns the network handler if the strategy supports it.
 	GetHandler() *network.ConfigProtoHandler
 }

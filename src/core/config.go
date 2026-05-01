@@ -32,7 +32,7 @@ type Config struct {
 
 	// Internal state
 	ConfigPath string       `yaml:"-"`
-	Logger         utils.Logger `yaml:"-"`
+	Logger     utils.Logger `yaml:"-"`
 }	
 
 // -----------------------------------------------------------------------------
@@ -55,9 +55,36 @@ func (c *Config) Get(section, key string) string {
 
 // -----------------------------------------------------------------------------
 
-// Set sets a value for a specified section and key.
+// Set merges multiple configuration updates into the live configuration.
 // Performs a thread-safe atomic swap (Read-Copy-Update).
-func (c *Config) Set(section, key, value string) {
+func (c *Config) Set(updates map[string]map[string]string) {
+	if updates == nil {
+		return
+	}
+
+	// 1. Calculate new state
+	newMap := c.PreviewSet(updates)
+
+	// 2. Atomically swap the pointer
+	c.LiveConfig.Store(newMap)
+}
+
+// Apply replaces the current live configuration with a pre-calculated map.
+// Use this in conjunction with PreviewSet to avoid redundant calculations.
+func (c *Config) Apply(newMap *map[string]map[string]string) {
+	if newMap != nil {
+		c.LiveConfig.Store(newMap)
+	}
+}
+
+// PreviewSet calculates the resulting configuration map after applying updates
+// but DOES NOT store it. Useful for strategies that need to push to a server
+// before committing locally.
+func (c *Config) PreviewSet(updates map[string]map[string]string) *map[string]map[string]string {
+	if updates == nil {
+		return c.LiveConfig.Load()
+	}
+
 	// 1. Create a deep copy of the current state
 	newMap := make(map[string]map[string]string)
 	oldPtr := c.LiveConfig.Load()
@@ -70,14 +97,17 @@ func (c *Config) Set(section, key, value string) {
 		}
 	}
 
-	// 2. Apply the change
-	if _, ok := newMap[section]; !ok {
-		newMap[section] = make(map[string]string)
+	// 2. Apply the changes (Merge)
+	for section, kv := range updates {
+		if _, ok := newMap[section]; !ok {
+			newMap[section] = make(map[string]string)
+		}
+		for k, v := range kv {
+			newMap[section][k] = v
+		}
 	}
-	newMap[section][key] = value
 
-	// 3. Atomically swap the pointer
-	c.LiveConfig.Store(&newMap)
+	return &newMap
 }
 
 // -----------------------------------------------------------------------------
@@ -125,20 +155,51 @@ func (c *Config) ValidateMandatoryServices() error {
 	return nil
 }
 
+// ShareConfig merges the provided configuration updates into the LiveConfig.
+// It accepts either map[string]map[string]string (multi-section) 
+// or map[string]string (single section, using "shared" as default).
 // -----------------------------------------------------------------------------
 
-// ShareObject serializes any arbitrary struct/payload into the target section
-// of LiveConfig so it can be broadcasted globally.
-func (c *Config) ShareObject(sectionKey string, payload interface{}) error {
+func (c *Config) ShareConfig(payload interface{}) error {
 	if payload == nil {
 		return nil
 	}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
+
+	var updates map[string]map[string]string
+
+	switch p := payload.(type) {
+	case map[string]map[string]string:
+		updates = p
+	case map[string]string:
+		updates = map[string]map[string]string{
+			"shared": p,
+		}
+	case map[string]interface{}:
+		updates = make(map[string]map[string]string)
+		for k, v := range p {
+			if nestedMap, ok := v.(map[string]interface{}); ok {
+				// Nested map becomes its own section
+				section := make(map[string]string)
+				for nk, nv := range nestedMap {
+					section[nk] = fmt.Sprintf("%v", nv)
+				}
+				updates[k] = section
+			} else if nestedMap, ok := v.(map[string]string); ok {
+				// Pre-cast nested map
+				updates[k] = nestedMap
+			} else {
+				// Flat key, goes to 'shared' section
+				if updates["shared"] == nil {
+					updates["shared"] = make(map[string]string)
+				}
+				updates["shared"][k] = fmt.Sprintf("%v", v)
+			}
+		}
+	default:
+		return fmt.Errorf("unsupported payload type for ShareConfig: %T", payload)
 	}
 
-	c.Set(sectionKey, "shared_data", string(data))
+	c.Set(updates)
 	return nil
 }
 

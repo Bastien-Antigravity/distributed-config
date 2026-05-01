@@ -2,6 +2,9 @@ package core
 
 import "fmt"
 
+
+// -----------------------------------------------------------------------------
+
 // LogServerCap defines the mandatory capabilities for the centralized logging server.
 type LogServerCap struct {
 	IP   string `json:"ip"`
@@ -15,6 +18,8 @@ func (l *LogServerCap) Validate() error {
 	}
 	return nil
 }
+
+// -----------------------------------------------------------------------------
 
 // ConfigServerCap defines the mandatory capabilities for the centralized configuration registry.
 type ConfigServerCap struct {

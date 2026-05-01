@@ -55,6 +55,7 @@ func (s *StagingStrategy) Load(cfg *core.Config) error {
 		if err == nil {
 			s.Client = client
 			serverConfig, err := client.GetConfig()
+			s.Client.Watch() // Start background hot-reloading AFTER initial sync
 			if err == nil {
 				cfg.Logger.Info("Staging: Loaded configuration from Server")
 				// Deep Merge: Name
@@ -105,5 +106,12 @@ func (s *StagingStrategy) GetHandler() *network.ConfigProtoHandler {
 	if s.Client != nil {
 		return s.Client.Handler
 	}
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *StagingStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
+	cfg.Set(updates)
 	return nil
 }

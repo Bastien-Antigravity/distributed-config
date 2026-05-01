@@ -38,7 +38,7 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 	cfg.Logger.Info("Strategy: Production")
 
 	// 1. Initial File Load (Gets Capabilities & config_server IP)
-	fullPath := loader.ResolveConfigPath("config")
+	fullPath := loader.ResolveConfigPath("production")
 	_ = loader.LoadConfigFromFileSafe(cfg, fullPath)
 
 	// 2. Env Load (Overrides IP or NAME if provided dynamically)
@@ -56,6 +56,7 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 		if err == nil {
 			s.Client = client
 			serverConfig, err := client.GetConfig()
+			s.Client.Watch() // Start background hot-reloading AFTER initial sync
 			if err == nil {
 				cfg.Logger.Info("Production: Loaded configuration from Server")
 				// Deep Merge: Name
@@ -80,7 +81,7 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 	// 4. File Load Override (File Wins)
 	// We reload the file to ensure local file edits strictly override whatever the server sent.
 	if _, err := os.Stat(fullPath); err == nil {
-		if err := loader.LoadConfigFromFile(cfg, fullPath); err != nil {
+		if err := loader.LoadYAML(fullPath, cfg); err != nil {
 			return err
 		}
 	}
@@ -105,6 +106,31 @@ func (s *ProductionStrategy) Sync(cfg *core.Config) error {
 		cfg.Logger.Info("Production: Syncing updates to Server...")
 		return s.Client.UpdateConfig(cfg)
 	}
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *ProductionStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
+	if s.Client == nil {
+		return fmt.Errorf("production: config server client not initialized")
+	}
+
+	// 1. Prepare the full state we WANT to reach (Preview)
+	// We don't call cfg.Set yet to maintain server authority.
+	nextState := cfg.PreviewSet(updates)
+	if nextState == nil {
+		return fmt.Errorf("production: failed to calculate next configuration state")
+	}
+
+	// 2. Push to server (Authoritative Check)
+	cfg.Logger.Info("Production: Pushing authoritative update request to Server...")
+	if err := s.Client.UpdateConfigMap(nextState); err != nil {
+		return fmt.Errorf("production: server rejected update: %w", err)
+	}
+
+	// 3. Success! Now apply locally (Direct apply, no redundant calculation)
+	cfg.Apply(nextState)
 	return nil
 }
 

@@ -24,12 +24,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 4. Share object (Using serde_json macro)
     let payload = json!({
-        "service": "rust-node",
-        "uptime": 3600,
-        "features": ["async", "safe"]
+        "node_info": {
+            "service": "rust-node",
+            "uptime": 3600,
+            "features": ["async", "safe"]
+        }
     });
     
-    if cfg.share_object("node_info", &payload) {
+    if cfg.share_config(&payload) {
         println!("Successfully shared node info.");
     }
 

@@ -19,7 +19,14 @@ cfg = DistConfig("standalone")
 
 # Get/Set
 val = cfg.get("common", "name")
-cfg.set("local", "status", "ready")
+success = cfg.set("local", "status", "ready")
+
+# Event Callbacks
+cfg.on_live_conf_update(lambda updates: print("Config changed:", updates))
+cfg.on_registry_update(lambda registry: print("Registry changed:", registry))
+
+# Broadcast state
+cfg.share_config({"status": "healthy", "metrics": {"cpu": 45}})
 
 # Sync and Validate
 if cfg.validate_mandatory_services():

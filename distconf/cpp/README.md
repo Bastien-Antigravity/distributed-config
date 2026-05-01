@@ -17,6 +17,10 @@ int main() {
         cfg.OnLiveConfUpdate([](const std::string& json) {
             std::cout << "Update received: " << json << std::endl;
         });
+        
+        cfg.OnRegistryUpdate([](const std::string& json) {
+            std::cout << "Registry changed: " << json << std::endl;
+        });
 
         std::string name = cfg.Get("common", "name");
         cfg.Set("local", "status", "active");
@@ -35,5 +39,5 @@ int main() {
 
 Link against `libdistconf.so`:
 ```bash
-g++ main.cpp -L../../release -ldistconf -o app
+g++ main.cpp -L../libdistconf -ldistconf -o app
 ```

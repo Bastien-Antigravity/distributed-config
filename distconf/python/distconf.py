@@ -4,8 +4,8 @@ from ctypes import c_char_p, c_void_p, CFUNCTYPE, c_int
 import json
 from typing import Any, Callable, Dict, Optional
 
-# Callback type: void (*config_update_cb)(const char* json_data)
-CALLBACK_TYPE = CFUNCTYPE(None, c_char_p)
+# Callback type: void (*config_update_cb)(uintptr_t handle, const char* json_data)
+CALLBACK_TYPE = CFUNCTYPE(None, c_void_p, c_char_p)
 
 class DistConfig:
     """
@@ -49,9 +49,12 @@ class DistConfig:
             
             lib.DistConf_OnLiveConfUpdate.argtypes = [c_void_p, CALLBACK_TYPE]
             lib.DistConf_OnLiveConfUpdate.restype = None
+
+            lib.DistConf_OnRegistryUpdate.argtypes = [c_void_p, CALLBACK_TYPE]
+            lib.DistConf_OnRegistryUpdate.restype = None
             
-            lib.DistConf_ShareObject.argtypes = [c_void_p, c_char_p, c_char_p]
-            lib.DistConf_ShareObject.restype = c_int
+            lib.DistConf_ShareConfig.argtypes = [c_void_p, c_char_p]
+            lib.DistConf_ShareConfig.restype = c_int
             
             lib.DistConf_ValidateMandatoryServices.argtypes = [c_void_p]
             lib.DistConf_ValidateMandatoryServices.restype = c_int
@@ -93,9 +96,9 @@ class DistConfig:
     def sync(self) -> bool:
         return self._lib.DistConf_Sync(self._handle) == 1
 
-    def share_object(self, section: str, payload: Any) -> bool:
+    def share_config(self, payload: Any) -> bool:
         json_data = json.dumps(payload)
-        return self._lib.DistConf_ShareObject(self._handle, section.encode('utf-8'), json_data.encode('utf-8')) == 1
+        return self._lib.DistConf_ShareConfig(self._handle, json_data.encode('utf-8')) == 1
 
     def validate_mandatory_services(self) -> bool:
         return self._lib.DistConf_ValidateMandatoryServices(self._handle) == 1
@@ -141,12 +144,20 @@ class DistConfig:
         return val
 
     def on_live_conf_update(self, callback: Callable[[Dict[str, Any]], None]):
-        def _wrapper(json_data: bytes):
+        def _wrapper(handle: int, json_data: bytes):
             data = json.loads(json_data.decode('utf-8'))
             callback(data)
             
         self._callback_ref = CALLBACK_TYPE(_wrapper)
         self._lib.DistConf_OnLiveConfUpdate(self._handle, self._callback_ref)
+
+    def on_registry_update(self, callback: Callable[[Dict[str, list]], None]):
+        def _wrapper(handle: int, json_data: bytes):
+            data = json.loads(json_data.decode('utf-8'))
+            callback(data)
+            
+        self._registry_callback_ref = CALLBACK_TYPE(_wrapper)
+        self._lib.DistConf_OnRegistryUpdate(self._handle, self._registry_callback_ref)
 
     def close(self):
         if hasattr(self, '_handle') and self._handle:

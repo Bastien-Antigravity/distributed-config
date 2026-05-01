@@ -24,7 +24,6 @@ extern const char *_GoStringPtr(_GoString_ s);
 #line 3 "config.go"
 
 #include <stdlib.h>
-#include <stdint.h>
 
 // Define the callback type for C
 typedef void (*config_update_cb)(uintptr_t handle, const char* json_data);
@@ -129,10 +128,11 @@ extern "C" {
 #endif
 
 extern char* DistConf_Get(GoUintptr handle, char* section, char* key);
-extern void DistConf_Set(GoUintptr handle, char* section, char* key, char* value);
+extern GoInt DistConf_Set(GoUintptr handle, char* section, char* key, char* value);
 extern GoInt DistConf_Sync(GoUintptr handle);
 extern void DistConf_OnLiveConfUpdate(GoUintptr handle, config_update_cb cb);
-extern GoInt DistConf_ShareObject(GoUintptr handle, char* section, char* json_data);
+extern void DistConf_OnRegistryUpdate(GoUintptr handle, config_update_cb cb);
+extern GoInt DistConf_ShareConfig(GoUintptr handle, char* json_data);
 extern GoUintptr DistConf_New(char* profile);
 extern void DistConf_Close(GoUintptr handle);
 extern char* DistConf_GetAddress(GoUintptr handle, char* capability);

@@ -47,6 +47,13 @@ func (s *StandaloneStrategy) Sync(cfg *core.Config) error {
 
 // -----------------------------------------------------------------------------
 
+func (s *StandaloneStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
+	cfg.Set(updates)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
 func (s *StandaloneStrategy) GetHandler() *network.ConfigProtoHandler {
 	return nil
 }

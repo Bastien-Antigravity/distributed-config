@@ -45,12 +45,14 @@ func main() {
 
 func printConfig(config *distconf.Config) {
 	fmt.Println("\nCurrent Configuration:")
-	if len(config.LiveConfig) == 0 {
+	
+	livePtr := config.LiveConfig.Load()
+	if livePtr == nil || len(*livePtr) == 0 {
 		fmt.Println("  (Empty)")
 		return
 	}
 
-	for section, kv := range config.LiveConfig {
+	for section, kv := range *livePtr {
 		fmt.Printf("  [%s]\n", section)
 		for k, v := range kv {
 			fmt.Printf("    %s = %s\n", k, v)

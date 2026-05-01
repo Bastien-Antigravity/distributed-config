@@ -15,6 +15,7 @@ type Client struct {
 	addr    string
 	sock    safesocket.Socket
 	Handler *ConfigProtoHandler
+	quit    chan struct{}
 }
 
 // -----------------------------------------------------------------------------
@@ -26,6 +27,7 @@ func NewClient(addr string, config *core.Config) (*Client, error) {
 	c := &Client{
 		addr:    addr,
 		Handler: h,
+		quit:    make(chan struct{}),
 	}
 	if err := c.connect(); err != nil {
 		return nil, err
@@ -57,12 +59,39 @@ func (c *Client) connect() error {
 
 // -----------------------------------------------------------------------------
 
-// Close closes the connection.
+// Close closes the connection and stops the background listener.
 func (c *Client) Close() error {
+	close(c.quit)
 	if c.sock != nil {
 		return c.sock.Close()
 	}
 	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// Watch starts a background goroutine to handle asynchronous updates (BROADCASTs).
+func (c *Client) Watch() {
+	go func() {
+		for {
+			select {
+			case <-c.quit:
+				return
+			default:
+				if c.sock == nil {
+					return
+				}
+				data, err := c.sock.Receive()
+				if err != nil {
+					// Connection likely closed
+					return
+				}
+				if len(data) > 0 {
+					_ = c.Handler.HandleIncoming(data)
+				}
+			}
+		}
+	}()
 }
 
 // -----------------------------------------------------------------------------
@@ -95,14 +124,22 @@ func (c *Client) GetConfig() (*core.Config, error) {
 		c.Handler.parentConfig.Logger.Info("Mock: Client.GetConfig() simulated")
 	}
 
-	return &core.Config{}, nil
+	return c.Handler.parentConfig, nil
 }
 
 // -----------------------------------------------------------------------------
 
-// UpdateConfig sends configuration updates to the server
+// UpdateConfig sends the entire current live configuration to the server.
 func (c *Client) UpdateConfig(cfg *core.Config) error {
-	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_PUT_SYNC, cfg.LiveConfig)
+	return c.UpdateConfigMap(cfg.LiveConfig.Load())
+}
+
+// UpdateConfigMap sends a specific configuration map to the server.
+func (c *Client) UpdateConfigMap(m *map[string]map[string]string) error {
+	if m == nil {
+		return nil
+	}
+	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_PUT_SYNC, m)
 	if err != nil {
 		return err
 	}

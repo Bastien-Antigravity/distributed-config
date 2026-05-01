@@ -7,8 +7,10 @@ package core
 func NewSkeletonConfig() *Config {
 	return &Config{
 		Common: CommonConfig{
-			Name:  "CHANGE_ME",
-			Reset: false,
+			Name:           "CHANGE_ME",
+			CommonFilePath: "CHANGE_ME",
+			PublicKey:      "CHANGE_ME",
+			Reset:          false,
 		},
 		Capabilities: make(map[string]interface{}),
 	}

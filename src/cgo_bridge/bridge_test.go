@@ -86,7 +86,7 @@ common:
 			}
 		})
 
-		session.Config.Set("common", "name", "updated-via-bridge")
+		session.Config.SetSingle("common", "name", "updated-via-bridge")
 
 		select {
 		case <-updated:
@@ -115,16 +115,16 @@ common:
 			t.Error("Sync failed")
 		}
 
-		// Test ShareObject
+		// Test ShareConfig
 		payload := `{"status": "online"}`
-		if res := DistConf_ShareObject_Internal(handle, "my_service", payload); res != 1 {
-			t.Error("ShareObject failed")
+		if res := DistConf_ShareConfig_Internal(handle, payload); res != 1 {
+			t.Error("ShareConfig failed")
 		}
 
-		// Verify
-		val := session.Config.Get("my_service", "shared_data")
-		if val == "" {
-			t.Fatal("Shared data not found")
+		// Verify (ShareConfig with flat map uses "shared" section by default)
+		val := session.Config.Get("shared", "status")
+		if val != "online" {
+			t.Fatalf("Shared data not found or incorrect: %s", val)
 		}
 	})
 
@@ -171,7 +171,7 @@ func DistConf_Sync_Internal(handle uintptr) int {
 	return 1
 }
 
-func DistConf_ShareObject_Internal(handle uintptr, section, jsonData string) int {
+func DistConf_ShareConfig_Internal(handle uintptr, jsonData string) int {
 	facadeMu.Lock()
 	session, ok := facadeStore[handle]
 	facadeMu.Unlock()
@@ -180,7 +180,7 @@ func DistConf_ShareObject_Internal(handle uintptr, section, jsonData string) int
 	}
 	var payload interface{}
 	json.Unmarshal([]byte(jsonData), &payload)
-	if err := session.Config.ShareObject(section, payload); err != nil {
+	if err := session.Config.ShareConfig(payload); err != nil {
 		return 0
 	}
 	return 1

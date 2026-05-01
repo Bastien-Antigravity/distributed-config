@@ -5,7 +5,7 @@ use std::sync::Arc;
 use libloading::{Library, Symbol};
 use serde_json::Value;
 
-pub type ConfigUpdateCb = extern "C" fn(json_data: *const c_char);
+pub type ConfigUpdateCb = extern "C" fn(handle: uintptr_t, json_data: *const c_char);
 
 pub struct DistConfig {
     lib: Arc<Library>,
@@ -45,14 +45,14 @@ impl DistConfig {
         }
     }
 
-    pub fn set(&self, section: &str, key: &str, value: &str) {
+    pub fn set(&self, section: &str, key: &str, value: &str) -> bool {
         unsafe {
-            let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char, *const c_char, *const c_char)> = 
+            let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char, *const c_char, *const c_char) -> c_int> = 
                 self.lib.get(b"DistConf_Set").unwrap();
             let section_c = CString::new(section).unwrap();
             let key_c = CString::new(key).unwrap();
             let value_c = CString::new(value).unwrap();
-            func(self.handle, section_c.as_ptr(), key_c.as_ptr(), value_c.as_ptr());
+            func(self.handle, section_c.as_ptr(), key_c.as_ptr(), value_c.as_ptr()) == 1
         }
     }
 
@@ -63,13 +63,28 @@ impl DistConfig {
         }
     }
 
-    pub fn share_object(&self, section: &str, payload: &Value) -> bool {
+    pub fn share_config(&self, payload: &Value) -> bool {
         unsafe {
-            let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char, *const c_char) -> c_int> = 
-                self.lib.get(b"DistConf_ShareObject").unwrap();
-            let section_c = CString::new(section).unwrap();
+            let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char) -> c_int> = 
+                self.lib.get(b"DistConf_ShareConfig").unwrap();
             let json_data = CString::new(payload.to_string()).unwrap();
-            func(self.handle, section_c.as_ptr(), json_data.as_ptr()) == 1
+            func(self.handle, json_data.as_ptr()) == 1
+        }
+    }
+
+    pub fn on_live_conf_update(&self, cb: ConfigUpdateCb) {
+        unsafe {
+            let func: Symbol<unsafe extern "C" fn(uintptr_t, ConfigUpdateCb)> = 
+                self.lib.get(b"DistConf_OnLiveConfUpdate").unwrap();
+            func(self.handle, cb);
+        }
+    }
+
+    pub fn on_registry_update(&self, cb: ConfigUpdateCb) {
+        unsafe {
+            let func: Symbol<unsafe extern "C" fn(uintptr_t, ConfigUpdateCb)> = 
+                self.lib.get(b"DistConf_OnRegistryUpdate").unwrap();
+            func(self.handle, cb);
         }
     }
 
@@ -135,7 +150,7 @@ mod tests {
     use std::path::Path;
 
     fn get_lib_path() -> String {
-        let mut path = "../../release/libdistconf.so".to_string();
+        let mut path = "../libdistconf/libdistconf.so".to_string();
         if !Path::new(&path).exists() {
             path = path.replace(".so", ".dylib");
         }
@@ -151,9 +166,15 @@ mod tests {
 
     #[test]
     fn test_get_set() {
+        println!("Starting test_get_set");
         let lib_path = get_lib_path();
+        println!("Loading DistConfig...");
         let cfg = DistConfig::new("standalone", &lib_path).unwrap();
+        println!("DistConfig loaded. Calling set()...");
         cfg.set("rust_test", "key", "val");
-        assert_eq!(cfg.get("rust_test", "key"), "val");
+        println!("set() returned. Calling get()...");
+        let val = cfg.get("rust_test", "key");
+        println!("get() returned: {}", val);
+        assert_eq!(val, "val");
     }
 }

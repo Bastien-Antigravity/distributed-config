@@ -49,11 +49,11 @@ public:
     }
 
     // Set a configuration value
-    void Set(const std::string& section, const std::string& key, const std::string& value) {
-        DistConf_Set(handle_, 
+    bool Set(const std::string& section, const std::string& key, const std::string& value) {
+        return DistConf_Set(handle_, 
                      const_cast<char*>(section.c_str()), 
                      const_cast<char*>(key.c_str()), 
-                     const_cast<char*>(value.c_str()));
+                     const_cast<char*>(value.c_str())) != 0;
     }
 
     // Synchronize with the Config Server
@@ -62,9 +62,8 @@ public:
     }
 
     // Broadcast state to the ecosystem
-    bool ShareObject(const std::string& section, const std::string& json_data) {
-        return DistConf_ShareObject(handle_, 
-                                  const_cast<char*>(section.c_str()), 
+    bool ShareConfig(const std::string& json_data) {
+        return DistConf_ShareConfig(handle_, 
                                   const_cast<char*>(json_data.c_str())) != 0;
     }
 
@@ -122,16 +121,24 @@ public:
     void OnLiveConfUpdate(std::function<void(const std::string&)> callback) {
         callback_ = callback;
         
-        // Register this instance in the global registry
         std::lock_guard<std::mutex> lock(registry_mutex_);
         registry_[handle_] = this;
 
-        // Register the static bridge with libdistconf
         DistConf_OnLiveConfUpdate(handle_, StaticCallbackBridge);
     }
 
+    // Register a registry update listener
+    void OnRegistryUpdate(std::function<void(const std::string&)> callback) {
+        registry_callback_ = callback;
+        
+        std::lock_guard<std::mutex> lock(registry_mutex_);
+        registry_[handle_] = this;
+
+        DistConf_OnRegistryUpdate(handle_, StaticRegistryBridge);
+    }
+
 private:
-    static void StaticCallbackBridge(GoUintptr handle, const char* json_data) {
+    static void StaticCallbackBridge(uintptr_t handle, const char* json_data) {
         std::lock_guard<std::mutex> lock(registry_mutex_);
         auto it = registry_.find(handle);
         if (it != registry_.end() && it->second->callback_) {
@@ -139,8 +146,17 @@ private:
         }
     }
 
+    static void StaticRegistryBridge(uintptr_t handle, const char* json_data) {
+        std::lock_guard<std::mutex> lock(registry_mutex_);
+        auto it = registry_.find(handle);
+        if (it != registry_.end() && it->second->registry_callback_) {
+            it->second->registry_callback_(std::string(json_data));
+        }
+    }
+
     uintptr_t handle_;
     std::function<void(const std::string&)> callback_;
+    std::function<void(const std::string&)> registry_callback_;
 
     // Static registry to route C callbacks to the correct DistConfig instance
     static std::map<uintptr_t, DistConfig*> registry_;

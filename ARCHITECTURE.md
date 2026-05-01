@@ -77,7 +77,7 @@ flowchart TD
 The primary entry point (`distributed_config.New(profile)`). It acts as a wrapper around the core data, providing:
 *   **Static Access**: Direct access to YAML-loaded fields (e.g., `cfg.Common.Name`).
 *   **Dynamic Access**: Access to the `LiveConfig` map for runtime updates.
-*   **Callbacks**: Mechanism to register listeners (`OnMemConfUpdate`) for remote configuration changes.
+*   **Callbacks**: Mechanism to register listeners (`OnLiveConfUpdate`) for remote configuration changes.
 
 ### 2. Loader & Discovery (`src/loader`)
 Handles the complex logic of finding and parsing configuration files.
@@ -117,5 +117,5 @@ To avoid unnecessary locks and mutex contention, the `LiveConfig` storage utiliz
 
 1.  **Code Defaults**: Hardcoded values in `NewDefaultConfig()`.
 2.  **Remote Sync** (Dynamic): Merged into `LiveConfig` at runtime.
-3.  **Local YAML**: Discovered via the Loader. **Value in YAML always overrides Server/Default values.**
-4.  **Environment Variables**: Overwrite corresponding YAML values via expansion.
+3.  **Local YAML**: Discovered via the Loader. **Hardcoded values in YAML always override Server/Default/Environment values.**
+4.  **Environment Variables**: Only overwrite corresponding YAML values if the YAML specifically uses the `${VAR}` expansion syntax or if the field is empty.
