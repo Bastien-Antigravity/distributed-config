@@ -3,6 +3,7 @@ package main
 /*
 #include <stdlib.h>
 #include <stdint.h>
+#include "helpers.h"
 
 // Define the callback type for C
 typedef void (*config_update_cb)(uintptr_t handle, const char* json_data);
@@ -35,8 +36,10 @@ func DistConf_Get(handle uintptr, section, key *C.char) *C.char {
 
 	val := session.Config.Get(sanitizeString(C.GoString(section)), sanitizeString(C.GoString(key)))
 	if val == "" {
+		C.set_last_error(C.CString("key not found"))
 		return nil
 	}
+	C.set_last_error(nil)
 	return C.CString(val)
 }
 
@@ -59,8 +62,10 @@ func DistConf_Set(handle uintptr, section, key, value *C.char) int {
 	}
 	
 	if err := session.Config.Set(updates); err != nil {
+		C.set_last_error(C.CString(err.Error()))
 		return 0
 	}
+	C.set_last_error(nil)
 	return 1
 }
 
@@ -77,8 +82,10 @@ func DistConf_Sync(handle uintptr) int {
 	}
 
 	if err := session.Config.Sync(); err != nil {
+		C.set_last_error(C.CString(err.Error()))
 		return 0
 	}
+	C.set_last_error(nil)
 	return 1
 }
 

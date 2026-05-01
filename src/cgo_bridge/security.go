@@ -1,13 +1,18 @@
 package main
 
 /*
-#include <stdlib.h>
+#include "helpers.h"
 */
 import "C"
 
 import (
 	"github.com/Bastien-Antigravity/distributed-config"
 )
+
+//export DistConf_GetLastError
+func DistConf_GetLastError() *C.char {
+	return C.last_error
+}
 
 // -------------------------------------------------------------------------
 
@@ -18,7 +23,9 @@ func DistConf_Decrypt(handle uintptr, ciphertext *C.char) *C.char {
 	
 	decrypted, err := distributed_config.Decrypt(sanitizeString(C.GoString(ciphertext)))
 	if err != nil {
+		C.set_last_error(C.CString(err.Error()))
 		return nil
 	}
+	C.set_last_error(nil)
 	return C.CString(decrypted)
 }

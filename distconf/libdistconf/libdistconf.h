@@ -25,6 +25,7 @@ extern const char *_GoStringPtr(_GoString_ s);
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "helpers.h"
 
 // Define the callback type for C
 typedef void (*config_update_cb)(uintptr_t handle, const char* json_data);
@@ -58,7 +59,7 @@ static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const c
 
 #line 3 "security.go"
 
-#include <stdlib.h>
+#include "helpers.h"
 
 #line 1 "cgo-generated-wrapper"
 
@@ -141,6 +142,7 @@ extern char* DistConf_GetGRPCAddress(GoUintptr handle, char* capability);
 extern char* DistConf_GetCapability(GoUintptr handle, char* capability);
 extern char* DistConf_GetFullConfig(GoUintptr handle);
 extern void DistConf_FreeString(char* ptr);
+extern char* DistConf_GetLastError(void);
 extern char* DistConf_Decrypt(GoUintptr handle, char* ciphertext);
 extern GoInt DistConf_ValidateMandatoryServices(GoUintptr handle);
 

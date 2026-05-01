@@ -111,10 +111,21 @@ public:
     // Decrypt a secret
     std::string Decrypt(const std::string& ciphertext) const {
         char* val = DistConf_Decrypt(handle_, const_cast<char*>(ciphertext.c_str()));
-        if (!val) return ciphertext;
+        if (!val) {
+            std::string err = GetLastError();
+            if (err.empty()) err = "Decryption failed (bridge error)";
+            throw std::runtime_error(err);
+        }
         std::string result(val);
         DistConf_FreeString(val);
         return result;
+    }
+
+    // Get the last error from the underlying engine
+    std::string GetLastError() const {
+        char* err = DistConf_GetLastError();
+        if (!err) return "";
+        return std::string(err);
     }
 
     // Register a live update listener
