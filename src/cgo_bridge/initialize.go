@@ -52,7 +52,5 @@ func DistConf_New(profile *C.char) uintptr {
 func DistConf_Close(handle uintptr) {
 	facadeMu.Lock()
 	defer facadeMu.Unlock()
-	if _, ok := facadeStore[handle]; ok {
-		delete(facadeStore, handle)
-	}
+	delete(facadeStore, handle)
 }

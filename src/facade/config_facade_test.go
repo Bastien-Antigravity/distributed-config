@@ -25,7 +25,7 @@ func TestNewConfig(t *testing.T) {
 				capturedUpdates = updates
 			})
 
-			cfg.SetSingle("TEST_SECTION", "TEST_KEY", "TEST_VAL")
+			_ = cfg.SetSingle("TEST_SECTION", "TEST_KEY", "TEST_VAL")
 
 			if cfg.strategy != nil {
 				expectTrigger := profile == "standalone" || profile == "staging"

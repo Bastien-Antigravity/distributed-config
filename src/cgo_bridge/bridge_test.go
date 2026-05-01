@@ -18,16 +18,16 @@ func TestBridgeStandardScenarios(t *testing.T) {
 	t.Run("EnvironmentExpansion", func(t *testing.T) {
 		tempDir := t.TempDir()
 		oldCwd, _ := os.Getwd()
-		os.Chdir(tempDir)
-		defer os.Chdir(oldCwd)
+		_ = os.Chdir(tempDir)
+		defer func() { _ = os.Chdir(oldCwd) }()
 
 		t.Setenv("TEST_APP_NAME", "dynamic-bridge-app")
 		yamlContent := `
 common:
   name: "${TEST_APP_NAME:fallback}"
 `
-		os.MkdirAll("config", 0755)
-		os.WriteFile("config/standalone.yaml", []byte(yamlContent), 0644)
+		_ = os.MkdirAll("config", 0755)
+		_ = os.WriteFile("config/standalone.yaml", []byte(yamlContent), 0644)
 
 		handle := testInit("standalone")
 		defer DistConf_Close(handle)
@@ -45,15 +45,15 @@ common:
 	t.Run("AutoGeneration", func(t *testing.T) {
 		tempDir := t.TempDir()
 		oldCwd, _ := os.Getwd()
-		os.Chdir(tempDir)
-		defer os.Chdir(oldCwd)
+		_ = os.Chdir(tempDir)
+		defer func() { _ = os.Chdir(oldCwd) }()
 
 		handle := testInit("standalone")
 		defer DistConf_Close(handle)
 
 		// Check for generated file
 		found := false
-		filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
+		_ = filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
 			if !info.IsDir() && (filepath.Base(path) == "standalone.yaml" || filepath.Base(path) == "cgo_bridge.yaml") {
 				found = true
 			}
@@ -69,8 +69,8 @@ common:
 	t.Run("CallbackIntegrity", func(t *testing.T) {
 		tempDir := t.TempDir()
 		oldCwd, _ := os.Getwd()
-		os.Chdir(tempDir)
-		defer os.Chdir(oldCwd)
+		_ = os.Chdir(tempDir)
+		defer func() { _ = os.Chdir(oldCwd) }()
 
 		handle := testInit("standalone")
 		defer DistConf_Close(handle)
@@ -86,7 +86,7 @@ common:
 			}
 		})
 
-		session.Config.SetSingle("common", "name", "updated-via-bridge")
+		_ = session.Config.SetSingle("common", "name", "updated-via-bridge")
 
 		select {
 		case <-updated:
@@ -100,8 +100,8 @@ common:
 	t.Run("SyncAndShare", func(t *testing.T) {
 		tempDir := t.TempDir()
 		oldCwd, _ := os.Getwd()
-		os.Chdir(tempDir)
-		defer os.Chdir(oldCwd)
+		_ = os.Chdir(tempDir)
+		defer func() { _ = os.Chdir(oldCwd) }()
 
 		handle := testInit("standalone")
 		defer DistConf_Close(handle)
@@ -132,8 +132,8 @@ common:
 	t.Run("Validation", func(t *testing.T) {
 		tempDir := t.TempDir()
 		oldCwd, _ := os.Getwd()
-		os.Chdir(tempDir)
-		defer os.Chdir(oldCwd)
+		_ = os.Chdir(tempDir)
+		defer func() { _ = os.Chdir(oldCwd) }()
 
 		handle := testInit("standalone")
 		defer DistConf_Close(handle)
@@ -179,7 +179,7 @@ func DistConf_ShareConfig_Internal(handle uintptr, jsonData string) int {
 		return 0
 	}
 	var payload interface{}
-	json.Unmarshal([]byte(jsonData), &payload)
+	_ = json.Unmarshal([]byte(jsonData), &payload)
 	if err := session.Config.ShareConfig(payload); err != nil {
 		return 0
 	}
