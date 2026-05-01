@@ -44,6 +44,27 @@ jobs:
           file: coverage.out
         if: success()
 
+      - name: Build CGO Shared Library
+        run: make build-lib
+
+      - name: Run Python SDK Tests
+        run: |
+          cd distconf/python
+          python3 -m unittest tests/test_distconf.py
+
+      - name: Run C++ SDK Tests
+        run: |
+          cd distconf/cpp
+          g++ tests/test_distconf.cpp -I. -L../libdistconf -ldistconf -o test_app
+          LD_LIBRARY_PATH=../libdistconf ./test_app
+
+      - name: Run Rust SDK Tests
+        run: |
+          cd distconf/rust
+          # We need to tell the linker where to find libdistconf for tests
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/../libdistconf
+          cargo test
+
       - name: Build integration test binary
         run: go build -o /tmp/integration-test ./cmd/test
 

@@ -51,6 +51,16 @@ flowchart TD
     end
     style Discovery fill:#fce4ec,stroke:#f06292,stroke-width:2px,color:#880e4f
 
+    subgraph Polyglot [Polyglot Ecosystem]
+        direction TB
+        CGO[CGO Bridge libdistconf]:::loader
+        Py[Python AppConfig]:::loader
+        Rs[Rust AppConfig]:::loader
+        CGO --> Py & Rs
+        Facade -->|Export| CGO
+    end
+    style Polyglot fill:#e0f7fa,stroke:#00acc1,stroke-width:2px,color:#006064
+
     subgraph Sync [Dynamic Sync]
         direction TB
         Prod & Stag & Test -->|Propagate| Net[Network Config Server]:::net
@@ -86,6 +96,22 @@ Implements the core logic for retrieving and synchronizing configuration based o
 Manages communication with the remote Config Server using a slimmed-down Protobuf protocol wrapping unstructured JSON arrays/maps.
 *   **Safe Socket**: High-performance TCP communication via `github.com/Bastien-Antigravity/safe-socket`.
 *   **Proto Handler**: Parses generic `GET_SYNC`, `PUT_SYNC`, `BROADCAST_SYNC`, and `BROADCAST_REGISTRY` commands. Routes unstructured JSON blobs to `LiveConfig` or Registry callbacks without needing rigidly coupled structs.
+
+### 5. CGO Bridge (`src/cgo_bridge`)
+Exposes the core Go library to non-Go languages via a stable C ABI.
+*   **Handle-based Lifecycle**: Manages multiple concurrent configuration sessions via opaque handles, preventing memory leaks in FFI layers.
+*   **JSON Pass-through**: Uses JSON as the primary data exchange format for complex capabilities, ensuring forward compatibility without breaking FFI signatures.
+*   **Behavioral Parity**: Strictly reuses the Go core logic for environment expansion, path discovery, and validation, ensuring "identical-by-design" behavior across Python, Rust, and C++.
+
+## High Performance & Concurrency
+
+The library is designed for high-frequency microservices where configuration reads must be non-blocking.
+
+### Atomic Pointer Swap (RCU)
+To avoid unnecessary locks and mutex contention, the `LiveConfig` storage utilizes an `atomic.Pointer` to the configuration map.
+*   **Lock-Free Reads**: The `Get()` operation performs a lock-free load of the pointer. This ensures that application threads never block, even during a massive network update.
+*   **Snapshot Isolation**: Readers always see a consistent, immutable snapshot of the configuration.
+*   **Atomic Updates**: Both local `Set()` calls and remote `BROADCAST_SYNC` updates follow the Read-Copy-Update (RCU) pattern. A new map is prepared and then atomically swapped into place, ensuring 100% snapshot integrity for all concurrent readers.
 
 ## Configuration Precedence
 

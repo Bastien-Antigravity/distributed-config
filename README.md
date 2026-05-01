@@ -42,13 +42,22 @@ The library uses a layered approach to build the final configuration:
 - **Secrets Management**: Native support for environment variable expansion (e.g., `${TS_PASSWORD}`).
 - **Environment-First Flexibility**: Supports "Pure-Environment" deployments where a local config file is optional. If missing, the system uses `CF_IP`/`CF_PORT` to connect to the central server and hydrate required capabilities.
 - **Fail-Safe & Strict**: Enforces "Mandatory Service Validation" (Fail-Fast logic) to ensure critical infrastructure like `log_server` is correctly configured (via any source) before boot.
-- **Live Updates**: Support for dynamic configuration updates via callbacks. Manually calling `Set()` on the facade now correctly triggers local observers, ensuring system-wide synchronization even for local state changes.
+- **Live Updates**: Support for dynamic configuration updates via callbacks. Manually calling `Set()` on the facade now correctly triggers local observers and automatically synchronizes with the fleet.
+- **High Performance & Lock-Free**: Uses an **Atomic Pointer Swap (RCU)** architecture. Configuration reads (`Get`) are 100% lock-free and non-blocking, ensuring zero-latency configuration access for high-frequency microservices.
+- **Polyglot Ecosystem (v1.9.6+)**: Native support for **Python, Rust, C/C++, and VBA** via a centralized CGO-based shared library (`libdistconf`). Achieve 100% architectural parity across your entire microservice fleet.
 
 ## Installation
 
 ```bash
 go get github.com/Bastien-Antigravity/distributed-config
 ```
+
+### **Shared Library (Polyglot Support)**
+For Python, Rust, or C++ integration, build the centralized shared library:
+```bash
+make build-lib
+```
+This generates `release/libdistconf.so` (or `.dylib` on macOS), which is used by the `microservice-toolbox` facades.
 
 ## Usage
 
@@ -81,9 +90,12 @@ func main() {
 	}
 
     // Access dynamic (Live) configuration
-    // Updates are automatically synchronized if the profile supports it.
-    for key, value := range cfg.LiveConfig {
-        fmt.Printf("LiveConfig section %s exists\n", key)
+    // Updates are automatically synchronized and use Atomic Pointer Swaps.
+    // For iterating over all values, load the current snapshot:
+    if snapshot := cfg.LiveConfig.Load(); snapshot != nil {
+        for section, kv := range *snapshot {
+            fmt.Printf("LiveConfig section %s has %d keys\n", section, len(kv))
+        }
     }
 
     // Register a callback for when remote configuration is updated
@@ -138,6 +150,22 @@ The unified **`config-tool`** is provided in the `cmd/` directory:
     ```bash
     go run ./cmd/config-tool encrypt --key public.pem --token "your-secret-here"
     ```
+
+## **Polyglot Usage (Python/Rust/C++/VBA)**
+
+The `distributed-config` core is exposed via a stable C ABI. 
+
+### **Key Bridge API:**
+- `DistConf_New(profile)`: Initialize a new session.
+- `DistConf_Get(handle, section, key)`: Retrieve a value.
+- `DistConf_Set(handle, section, key, val)`: Update a value locally (triggers callbacks).
+- `DistConf_OnLiveConfUpdate(handle, callback)`: Register a live update listener.
+- `DistConf_Sync(handle)`: Force a manual refresh from the Config Server.
+- `DistConf_ShareObject(handle, section, json)`: Broadcast state to the ecosystem.
+- `DistConf_ValidateMandatoryServices(handle)`: Ensure the environment satisfies mandatory services.
+- `DistConf_Decrypt(handle, ciphertext)`: Decrypt a secret.
+
+For high-level usage, refer to the **`distconf/`** directory or the **`microservice-toolbox`** implementations.
 
 ---
 

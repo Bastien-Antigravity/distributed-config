@@ -49,6 +49,12 @@ Tests the RSA-based secret protection layer (v1.9.1+).
 *   **Regex Engine**: Ensures that `ENC(...)` blocks within YAML strings are identified and decrypted correctly without corrupting the surrounding YAML structure.
 *   **Volatility Check**: Verifies that decryption happens strictly in-memory and handles missing private keys gracefully (returning the raw ENC block).
 
+### 6. CGO Bridge Parity (`src/cgo_bridge/bridge_test.go`)
+Ensures that the shared library (`libdistconf`) provides identical behavior to the Go core.
+*   **Ecosystem Scenarios**: Re-validates environment variable expansion and auto-generation logic via the C ABI.
+*   **Safety Parity**: Confirms that strict IP blocking and mandatory service validation are enforced across the FFI layer.
+*   **Callback Dispatch**: Verifies that live updates are correctly propagated through C-style callbacks without memory corruption or deadlocks.
+
 ## Writing New Tests
 
 When adding new features, please follow these guidelines:

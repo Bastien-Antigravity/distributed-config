@@ -3,6 +3,8 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
+
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 )
 
@@ -26,7 +28,7 @@ type Config struct {
 	// Data storage for Config params 
 	// main config 
 	Capabilities map[string]interface{} `yaml:"capabilities" json:"capabilities"`
-	LiveConfig map[string]map[string]string `yaml:"-"`
+	LiveConfig   atomic.Pointer[map[string]map[string]string] `yaml:"-"`
 
 	// Internal state
 	ConfigPath string       `yaml:"-"`
@@ -38,7 +40,12 @@ type Config struct {
 // Get returns a value from a specified section and key.
 // Returns an empty string if not found.
 func (c *Config) Get(section, key string) string {
-	if s, ok := c.LiveConfig[section]; ok {
+	ptr := c.LiveConfig.Load()
+	if ptr == nil {
+		return ""
+	}
+	live := *ptr
+	if s, ok := live[section]; ok {
 		if val, ok := s[key]; ok {
 			return val
 		}
@@ -49,15 +56,28 @@ func (c *Config) Get(section, key string) string {
 // -----------------------------------------------------------------------------
 
 // Set sets a value for a specified section and key.
-// Initializes LiveConfig and section maps if they are nil.
+// Performs a thread-safe atomic swap (Read-Copy-Update).
 func (c *Config) Set(section, key, value string) {
-	if c.LiveConfig == nil {
-		c.LiveConfig = make(map[string]map[string]string)
+	// 1. Create a deep copy of the current state
+	newMap := make(map[string]map[string]string)
+	oldPtr := c.LiveConfig.Load()
+	if oldPtr != nil {
+		for s, kv := range *oldPtr {
+			newMap[s] = make(map[string]string)
+			for k, v := range kv {
+				newMap[s][k] = v
+			}
+		}
 	}
-	if _, ok := c.LiveConfig[section]; !ok {
-		c.LiveConfig[section] = make(map[string]string)
+
+	// 2. Apply the change
+	if _, ok := newMap[section]; !ok {
+		newMap[section] = make(map[string]string)
 	}
-	c.LiveConfig[section][key] = value
+	newMap[section][key] = value
+
+	// 3. Atomically swap the pointer
+	c.LiveConfig.Store(&newMap)
 }
 
 // -----------------------------------------------------------------------------
@@ -137,6 +157,8 @@ func (c *Config) GetAddress(capability string) (string, error) {
 func (c *Config) GetGRPCAddress(capability string) (string, error) {
 	return c.getAddr(capability, "grpc_ip", "grpc_port")
 }
+
+// -----------------------------------------------------------------------------
 
 func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
 	if c.Capabilities == nil {

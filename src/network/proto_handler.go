@@ -57,9 +57,9 @@ func (h *ConfigProtoHandler) HandleOutgoing(cmd pb.ConfigMsg_Cmd, payload interf
 		if err != nil {
 			return nil, fmt.Errorf("json marshal error: %w", err)
 		}
-	} else if cmd == pb.ConfigMsg_PUT_SYNC && h.parentConfig.LiveConfig != nil {
-		// Default to sending current LiveConfig
-		payloadBytes, err = json.Marshal(h.parentConfig.LiveConfig)
+	} else if cmd == pb.ConfigMsg_PUT_SYNC && h.parentConfig.LiveConfig.Load() != nil {
+		// Default to sending current LiveConfig snapshot
+		payloadBytes, err = json.Marshal(h.parentConfig.LiveConfig.Load())
 		if err != nil {
 			return nil, err
 		}
@@ -120,13 +120,8 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 // -----------------------------------------------------------------------------
 
 func (h *ConfigProtoHandler) updateLiveConfig(sections map[string]map[string]string) {
-	if h.parentConfig.LiveConfig == nil {
-		h.parentConfig.LiveConfig = make(map[string]map[string]string)
-	}
-	
-	for sectKey, kv := range sections {
-		h.parentConfig.LiveConfig[sectKey] = kv
-	}
+	// Atomically swap the entire config map pointer (Full Update)
+	h.parentConfig.LiveConfig.Store(&sections)
 
 	if h.onLiveConfUpdate != nil {
 		h.onLiveConfUpdate(sections)

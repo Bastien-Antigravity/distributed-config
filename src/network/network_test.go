@@ -10,9 +10,10 @@ import (
 )
 
 func TestNetworkProtoHandler(t *testing.T) {
-	config := &core.Config{
-		LiveConfig: make(map[string]map[string]string),
-	}
+	config := &core.Config{}
+	emptyMap := make(map[string]map[string]string)
+	config.LiveConfig.Store(&emptyMap)
+
 	handler := NewConfigHandler("TestHandler", config)
 
 	t.Run("TestIncomingLiveConfigUpdate", func(t *testing.T) {
@@ -54,8 +55,8 @@ func TestNetworkProtoHandler(t *testing.T) {
 			t.Error("Expected callback to be triggered upon live config propagation")
 		}
 
-		if config.LiveConfig["SECTION1"]["KEY1"] != "VAL1" {
-			t.Errorf("Expected LiveConfig to be updated, got %v", config.LiveConfig["SECTION1"])
+		if config.Get("SECTION1", "KEY1") != "VAL1" {
+			t.Errorf("Expected LiveConfig to be updated, got %v", config.Get("SECTION1", "KEY1"))
 		}
 	})
 
@@ -77,7 +78,7 @@ func TestNetworkProtoHandler(t *testing.T) {
 
 	t.Run("TestOutgoingUpdates", func(t *testing.T) {
 		// Populate some live config to send
-		config.LiveConfig["OUTGOING"] = map[string]string{"STATUS": "OK"}
+		config.Set("OUTGOING", "STATUS", "OK")
 
 		data, err := handler.HandleOutgoing(pb.ConfigMsg_PUT_SYNC, nil) // passing nil defaults to LiveConfig
 		if err != nil {

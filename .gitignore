@@ -91,5 +91,5 @@ zzz_memo
 *.pkl
 
 # Release Artifacts
-!release/
 !release/config-tool-*
+!distconf/libdistconf-*

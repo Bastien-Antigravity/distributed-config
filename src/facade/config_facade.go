@@ -6,6 +6,7 @@ import (
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/factory"
+	"github.com/Bastien-Antigravity/distributed-config/src/interfaces"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 )
@@ -15,7 +16,8 @@ import (
 
 type Config struct {
 	*core.Config
-	handler *network.ConfigProtoHandler
+	strategy interfaces.ConfigStrategy
+	handler  *network.ConfigProtoHandler
 
 	// Callbacks
 	ParentOnLiveConfUpdate func(map[string]map[string]string)
@@ -26,9 +28,9 @@ type Config struct {
 // -----------------------------------------------------------------------------
 
 func NewConfig(profile string) *Config {
-	cfgData := &core.Config{
-		LiveConfig: make(map[string]map[string]string),
-	}
+	cfgData := &core.Config{}
+	initialMap := make(map[string]map[string]string)
+	cfgData.LiveConfig.Store(&initialMap)
 	cfgData.Logger = utils.EnsureSafeLogger(nil) // Default to no-op if not explicitly set later
 
 	configWrapper := &Config{
@@ -61,8 +63,9 @@ func NewConfig(profile string) *Config {
 		fmt.Printf("Config Sync Warning: %v\n", err)
 	}
 
-	// 4. Store Handler for Callback wiring
+	// 4. Store Handler and Strategy for manual sync/wiring
 	configWrapper.handler = strategy.GetHandler()
+	configWrapper.strategy = strategy
 
 	return configWrapper
 }
@@ -77,10 +80,18 @@ func (config *Config) OnLiveConfUpdate(onLiveConfUpdateFn func(map[string]map[st
 	}
 }
 
-// Set overrides the core.Config.Set to trigger local callbacks.
+// Set overrides the core.Config.Set to trigger local callbacks and global synchronization.
 // -----------------------------------------------------------------------------
 func (config *Config) Set(section, key, value string) {
 	config.Config.Set(section, key, value)
+
+	// Automatically trigger global synchronization
+	if config.strategy != nil {
+		if err := config.strategy.Sync(config.Config); err != nil {
+			config.Config.Logger.Error("Auto-Sync failed after Set: %v", err)
+		}
+	}
+
 	if config.ParentOnLiveConfUpdate != nil {
 		// Create a single-entry update map for the callback
 		update := map[string]map[string]string{
@@ -90,4 +101,12 @@ func (config *Config) Set(section, key, value string) {
 		}
 		config.ParentOnLiveConfUpdate(update)
 	}
+}
+// Sync manually triggers a refresh from the underlying strategy (e.g. Config Server).
+// -----------------------------------------------------------------------------
+func (config *Config) Sync() error {
+	if config.strategy == nil {
+		return fmt.Errorf("no strategy associated with this configuration")
+	}
+	return config.strategy.Sync(config.Config)
 }
