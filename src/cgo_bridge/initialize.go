@@ -7,6 +7,7 @@ import "C"
 
 import (
 	"sync"
+	"unsafe"
 
 	"github.com/Bastien-Antigravity/distributed-config"
 )
@@ -25,8 +26,8 @@ var (
 // -------------------------------------------------------------------------
 
 //export DistConf_New
-func DistConf_New(profile *C.char) uintptr {
-	prof := sanitizeString(C.GoString(profile))
+func DistConf_New(profile unsafe.Pointer) uintptr {
+	prof := sanitizeString(C.GoString((*C.char)(profile)))
 	
 	cfg := distributed_config.New(prof)
 	if cfg == nil {

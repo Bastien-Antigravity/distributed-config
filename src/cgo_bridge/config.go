@@ -25,7 +25,7 @@ import (
 // -------------------------------------------------------------------------
 
 //export DistConf_Get
-func DistConf_Get(handle uintptr, section, key *C.char) *C.char {
+func DistConf_Get(handle uintptr, section, key unsafe.Pointer) unsafe.Pointer {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -34,39 +34,39 @@ func DistConf_Get(handle uintptr, section, key *C.char) *C.char {
 		return nil
 	}
 
-	val := session.Config.Get(sanitizeString(C.GoString(section)), sanitizeString(C.GoString(key)))
+	sec := C.GoString((*C.char)(section))
+	k := C.GoString((*C.char)(key))
+
+	val := session.Config.Get(sanitizeString(sec), sanitizeString(k))
 	if val == "" {
-		C.set_last_error(C.CString("key not found"))
 		return nil
 	}
-	C.set_last_error(nil)
-	return C.CString(val)
+	return unsafe.Pointer(C.CString(val))
 }
 
 // -------------------------------------------------------------------------
 
 //export DistConf_Set
-func DistConf_Set(handle uintptr, section, key, value *C.char) int {
+func DistConf_Set(handle uintptr, section, key, value unsafe.Pointer) {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
-		return 0
+		return
 	}
 
+	sec := C.GoString((*C.char)(section))
+	k := C.GoString((*C.char)(key))
+	v := C.GoString((*C.char)(value))
+
 	updates := map[string]map[string]string{
-		sanitizeString(C.GoString(section)): {
-			sanitizeString(C.GoString(key)): sanitizeString(C.GoString(value)),
+		sanitizeString(sec): {
+			sanitizeString(k): sanitizeString(v),
 		},
 	}
 	
-	if err := session.Config.Set(updates); err != nil {
-		C.set_last_error(C.CString(err.Error()))
-		return 0
-	}
-	C.set_last_error(nil)
-	return 1
+	session.Config.Set(updates)
 }
 
 // -------------------------------------------------------------------------
