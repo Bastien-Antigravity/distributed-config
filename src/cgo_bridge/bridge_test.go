@@ -73,7 +73,9 @@ func TestBridge_LiveUpdate(t *testing.T) {
 		updates := map[string]map[string]string{
 			"live": {"key": "new-value"},
 		}
-		session.Config.Set(updates)
+		if err := session.Config.Set(updates); err != nil {
+			t.Fatalf("Failed to set configuration: %v", err)
+		}
 
 		select {
 		case <-updated:
