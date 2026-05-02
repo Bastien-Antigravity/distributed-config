@@ -1,4 +1,4 @@
-package main
+package cgo_bridge
 
 import (
 	"os"
@@ -17,9 +17,9 @@ func TestBridge_ExpandedName(t *testing.T) {
 		handle := testInit("standalone")
 		defer Close(handle)
 
-		facadeMu.Lock()
-		session := facadeStore[handle]
-		facadeMu.Unlock()
+		FacadeMu.Lock()
+		session := FacadeStore[handle]
+		FacadeMu.Unlock()
 
 		if session.Config.Common.Name != "dynamic-bridge-app" {
 			t.Errorf("Expected expanded name 'dynamic-bridge-app', got '%s'", session.Config.Common.Name)
@@ -58,9 +58,9 @@ func TestBridge_LiveUpdate(t *testing.T) {
 		handle := testInit("standalone")
 		defer Close(handle)
 
-		facadeMu.Lock()
-		session := facadeStore[handle]
-		facadeMu.Unlock()
+		FacadeMu.Lock()
+		session := FacadeStore[handle]
+		FacadeMu.Unlock()
 
 		updated := make(chan bool, 1)
 		session.Config.OnLiveConfUpdate(func(updates map[string]map[string]string) {
@@ -91,15 +91,7 @@ func TestBridge_LiveUpdate(t *testing.T) {
 func TestBridge_Sync(t *testing.T) {
 	t.Run("Perform configuration sync", func(t *testing.T) {
 		handle := testInit("standalone")
-<<<<<<< HEAD
-		defer DistConf_Close(handle)
-
-		facadeMu.Lock()
-		session := facadeStore[handle]
-		facadeMu.Unlock()
-=======
 		defer Close(handle)
->>>>>>> develop
 
 		// Test Sync
 		if err := Sync(handle); err != nil {
@@ -122,59 +114,5 @@ func TestBridge_Security(t *testing.T) {
 // -------------------------------------------------------------------------
 
 func testInit(profile string) uintptr {
-<<<<<<< HEAD
-	cfg := distributed_config.New(profile)
-	if cfg == nil {
-		return 0
-	}
-	facadeMu.Lock()
-	defer facadeMu.Unlock()
-	id := facadeId
-	facadeStore[id] = &ConfigSession{Config: cfg}
-	facadeId++
-	return id
-}
-
-func DistConf_Sync_Internal(handle uintptr) int {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
-	if !ok {
-		return 0
-	}
-	if err := session.Config.Sync(); err != nil {
-		return 0
-	}
-	return 1
-}
-
-func DistConf_ShareConfig_Internal(handle uintptr, jsonData string) int {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
-	if !ok {
-		return 0
-	}
-	var payload interface{}
-	_ = json.Unmarshal([]byte(jsonData), &payload)
-	if err := session.Config.ShareConfig(payload); err != nil {
-		return 0
-	}
-	return 1
-}
-
-func DistConf_ValidateMandatoryServices_Internal(handle uintptr) int {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
-	if !ok {
-		return 0
-	}
-	if err := session.Config.ValidateMandatoryServices(); err != nil {
-		return 0
-	}
-	return 1
-=======
 	return New(profile)
->>>>>>> develop
 }

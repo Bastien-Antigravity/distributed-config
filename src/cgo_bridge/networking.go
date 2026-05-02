@@ -1,4 +1,4 @@
-package main
+package cgo_bridge
 
 /*
 #include <stdlib.h>
@@ -11,19 +11,11 @@ import (
 
 // -------------------------------------------------------------------------
 
-<<<<<<< HEAD
-//export DistConf_GetAddress
-func DistConf_GetAddress(handle uintptr, capability *C.char) *C.char {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
-=======
 // GetAddress is a Go-native wrapper for DistConf_GetAddress.
 func GetAddress(handle uintptr, capability string) (string, error) {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
->>>>>>> develop
 
 	if !ok || session.Config == nil {
 		return "", nil
@@ -34,19 +26,11 @@ func GetAddress(handle uintptr, capability string) (string, error) {
 
 // -------------------------------------------------------------------------
 
-<<<<<<< HEAD
-//export DistConf_GetGRPCAddress
-func DistConf_GetGRPCAddress(handle uintptr, capability *C.char) *C.char {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
-=======
 // GetGRPCAddress is a Go-native wrapper for DistConf_GetGRPCAddress.
 func GetGRPCAddress(handle uintptr, capability string) (string, error) {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
->>>>>>> develop
 
 	if !ok || session.Config == nil {
 		return "", nil
@@ -57,19 +41,11 @@ func GetGRPCAddress(handle uintptr, capability string) (string, error) {
 
 // -------------------------------------------------------------------------
 
-<<<<<<< HEAD
-//export DistConf_GetCapability
-func DistConf_GetCapability(handle uintptr, capability *C.char) *C.char {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
-=======
 // GetCapability is a Go-native wrapper for DistConf_GetCapability.
 func GetCapability(handle uintptr, capability string) (string, error) {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
->>>>>>> develop
 
 	if !ok || session.Config == nil {
 		return "", nil
@@ -90,19 +66,11 @@ func GetCapability(handle uintptr, capability string) (string, error) {
 
 // -------------------------------------------------------------------------
 
-<<<<<<< HEAD
-//export DistConf_GetFullConfig
-func DistConf_GetFullConfig(handle uintptr) *C.char {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
-=======
 // GetFullConfig is a Go-native wrapper for DistConf_GetFullConfig.
 func GetFullConfig(handle uintptr) (string, error) {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
->>>>>>> develop
 
 	if !ok || session.Config == nil {
 		return "", nil
