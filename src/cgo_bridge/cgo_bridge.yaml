@@ -1,5 +1,5 @@
 common:
-    name: common
+    name: ${APP_NAME:common}
     common_file_path: ""
     public_key: ""
     reset: false
