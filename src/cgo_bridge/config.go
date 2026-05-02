@@ -25,7 +25,7 @@ import (
 // -------------------------------------------------------------------------
 
 //export DistConf_Get
-func DistConf_Get(handle uintptr, section, key unsafe.Pointer) unsafe.Pointer {
+func DistConf_Get(handle uintptr, section, key *C.char) *C.char {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -34,39 +34,39 @@ func DistConf_Get(handle uintptr, section, key unsafe.Pointer) unsafe.Pointer {
 		return nil
 	}
 
-	sec := C.GoString((*C.char)(section))
-	k := C.GoString((*C.char)(key))
-
-	val := session.Config.Get(sanitizeString(sec), sanitizeString(k))
+	val := session.Config.Get(sanitizeString(C.GoString(section)), sanitizeString(C.GoString(key)))
 	if val == "" {
+		C.set_last_error(C.CString("key not found"))
 		return nil
 	}
-	return unsafe.Pointer(C.CString(val))
+	C.set_last_error(nil)
+	return C.CString(val)
 }
 
 // -------------------------------------------------------------------------
 
 //export DistConf_Set
-func DistConf_Set(handle uintptr, section, key, value unsafe.Pointer) {
+func DistConf_Set(handle uintptr, section, key, value *C.char) int {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
-		return
+		return 0
 	}
 
-	sec := C.GoString((*C.char)(section))
-	k := C.GoString((*C.char)(key))
-	v := C.GoString((*C.char)(value))
-
 	updates := map[string]map[string]string{
-		sanitizeString(sec): {
-			sanitizeString(k): sanitizeString(v),
+		sanitizeString(C.GoString(section)): {
+			sanitizeString(C.GoString(key)): sanitizeString(C.GoString(value)),
 		},
 	}
 	
-	session.Config.Set(updates)
+	if err := session.Config.Set(updates); err != nil {
+		C.set_last_error(C.CString(err.Error()))
+		return 0
+	}
+	C.set_last_error(nil)
+	return 1
 }
 
 // -------------------------------------------------------------------------
@@ -92,7 +92,7 @@ func DistConf_Sync(handle uintptr) int {
 // -------------------------------------------------------------------------
 
 //export DistConf_OnLiveConfUpdate
-func DistConf_OnLiveConfUpdate(handle uintptr, cb unsafe.Pointer) {
+func DistConf_OnLiveConfUpdate(handle uintptr, cb C.config_update_cb) {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -100,8 +100,6 @@ func DistConf_OnLiveConfUpdate(handle uintptr, cb unsafe.Pointer) {
 	if !ok || session.Config == nil {
 		return
 	}
-
-	actualCb := (C.config_update_cb)(cb)
 
 	session.Config.OnLiveConfUpdate(func(update map[string]map[string]string) {
 		jsonData, err := json.Marshal(update)
@@ -110,7 +108,7 @@ func DistConf_OnLiveConfUpdate(handle uintptr, cb unsafe.Pointer) {
 		}
 
 		cStr := C.CString(string(jsonData))
-		C.call_config_update_cb(actualCb, C.uintptr_t(handle), cStr)
+		C.call_config_update_cb(cb, C.uintptr_t(handle), cStr)
 		C.free(unsafe.Pointer(cStr))
 	})
 }
@@ -118,7 +116,7 @@ func DistConf_OnLiveConfUpdate(handle uintptr, cb unsafe.Pointer) {
 // -------------------------------------------------------------------------
 
 //export DistConf_OnRegistryUpdate
-func DistConf_OnRegistryUpdate(handle uintptr, cb unsafe.Pointer) {
+func DistConf_OnRegistryUpdate(handle uintptr, cb C.config_update_cb) {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -127,8 +125,6 @@ func DistConf_OnRegistryUpdate(handle uintptr, cb unsafe.Pointer) {
 		return
 	}
 
-	actualCb := (C.config_update_cb)(cb)
-
 	session.Config.OnRegistryUpdate(func(registry map[string][]string) {
 		jsonData, err := json.Marshal(registry)
 		if err != nil {
@@ -136,7 +132,7 @@ func DistConf_OnRegistryUpdate(handle uintptr, cb unsafe.Pointer) {
 		}
 
 		cStr := C.CString(string(jsonData))
-		C.call_config_update_cb(actualCb, C.uintptr_t(handle), cStr)
+		C.call_config_update_cb(cb, C.uintptr_t(handle), cStr)
 		C.free(unsafe.Pointer(cStr))
 	})
 }

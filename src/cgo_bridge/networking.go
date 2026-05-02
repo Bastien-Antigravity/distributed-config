@@ -12,7 +12,7 @@ import (
 // -------------------------------------------------------------------------
 
 //export DistConf_GetAddress
-func DistConf_GetAddress(handle uintptr, capability unsafe.Pointer) unsafe.Pointer {
+func DistConf_GetAddress(handle uintptr, capability *C.char) *C.char {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -21,17 +21,17 @@ func DistConf_GetAddress(handle uintptr, capability unsafe.Pointer) unsafe.Point
 		return nil
 	}
 
-	addr, err := session.Config.GetAddress(sanitizeString(C.GoString((*C.char)(capability))))
+	addr, err := session.Config.GetAddress(sanitizeString(C.GoString(capability)))
 	if err != nil {
 		return nil
 	}
-	return unsafe.Pointer(C.CString(addr))
+	return C.CString(addr)
 }
 
 // -------------------------------------------------------------------------
 
 //export DistConf_GetGRPCAddress
-func DistConf_GetGRPCAddress(handle uintptr, capability unsafe.Pointer) unsafe.Pointer {
+func DistConf_GetGRPCAddress(handle uintptr, capability *C.char) *C.char {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -40,17 +40,17 @@ func DistConf_GetGRPCAddress(handle uintptr, capability unsafe.Pointer) unsafe.P
 		return nil
 	}
 
-	addr, err := session.Config.GetGRPCAddress(sanitizeString(C.GoString((*C.char)(capability))))
+	addr, err := session.Config.GetGRPCAddress(sanitizeString(C.GoString(capability)))
 	if err != nil {
 		return nil
 	}
-	return unsafe.Pointer(C.CString(addr))
+	return C.CString(addr)
 }
 
 // -------------------------------------------------------------------------
 
 //export DistConf_GetCapability
-func DistConf_GetCapability(handle uintptr, capability unsafe.Pointer) unsafe.Pointer {
+func DistConf_GetCapability(handle uintptr, capability *C.char) *C.char {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -59,7 +59,7 @@ func DistConf_GetCapability(handle uintptr, capability unsafe.Pointer) unsafe.Po
 		return nil
 	}
 
-	capKey := sanitizeString(C.GoString((*C.char)(capability)))
+	capKey := sanitizeString(C.GoString(capability))
 	val, exists := session.Config.Capabilities[capKey]
 	if !exists || val == nil {
 		return nil
@@ -69,13 +69,13 @@ func DistConf_GetCapability(handle uintptr, capability unsafe.Pointer) unsafe.Po
 	if err != nil {
 		return nil
 	}
-	return unsafe.Pointer(C.CString(string(jsonData)))
+	return C.CString(string(jsonData))
 }
 
 // -------------------------------------------------------------------------
 
 //export DistConf_GetFullConfig
-func DistConf_GetFullConfig(handle uintptr) unsafe.Pointer {
+func DistConf_GetFullConfig(handle uintptr) *C.char {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -95,5 +95,5 @@ func DistConf_GetFullConfig(handle uintptr) unsafe.Pointer {
 	if err != nil {
 		return nil
 	}
-	return unsafe.Pointer(C.CString(string(jsonData)))
+	return C.CString(string(jsonData))
 }
