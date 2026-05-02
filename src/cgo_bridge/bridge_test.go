@@ -32,9 +32,9 @@ common:
 		handle := testInit("standalone")
 		defer DistConf_Close(handle)
 
-		facadeMu.Lock()
-		session := facadeStore[handle]
-		facadeMu.Unlock()
+		FacadeMu.Lock()
+		session := FacadeStore[handle]
+		FacadeMu.Unlock()
 
 		if session.Config.Common.Name != "dynamic-bridge-app" {
 			t.Errorf("Expected expanded name 'dynamic-bridge-app', got '%s'", session.Config.Common.Name)
@@ -75,9 +75,9 @@ common:
 		handle := testInit("standalone")
 		defer DistConf_Close(handle)
 
-		facadeMu.Lock()
-		session := facadeStore[handle]
-		facadeMu.Unlock()
+		FacadeMu.Lock()
+		session := FacadeStore[handle]
+		FacadeMu.Unlock()
 
 		updated := make(chan bool, 1)
 		session.Config.OnLiveConfUpdate(func(updates map[string]map[string]string) {
@@ -106,9 +106,9 @@ common:
 		handle := testInit("standalone")
 		defer DistConf_Close(handle)
 
-		facadeMu.Lock()
-		session := facadeStore[handle]
-		facadeMu.Unlock()
+		FacadeMu.Lock()
+		session := FacadeStore[handle]
+		FacadeMu.Unlock()
 
 		// Test Sync
 		if res := DistConf_Sync_Internal(handle); res != 1 {
@@ -150,18 +150,18 @@ func testInit(profile string) uintptr {
 	if cfg == nil {
 		return 0
 	}
-	facadeMu.Lock()
-	defer facadeMu.Unlock()
-	id := facadeId
-	facadeStore[id] = &ConfigSession{Config: cfg}
-	facadeId++
+	FacadeMu.Lock()
+	defer FacadeMu.Unlock()
+	id := FacadeId
+	FacadeStore[id] = &ConfigSession{Config: cfg}
+	FacadeId++
 	return id
 }
 
 func DistConf_Sync_Internal(handle uintptr) int {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
 	if !ok {
 		return 0
 	}
@@ -172,9 +172,9 @@ func DistConf_Sync_Internal(handle uintptr) int {
 }
 
 func DistConf_ShareConfig_Internal(handle uintptr, jsonData string) int {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
 	if !ok {
 		return 0
 	}
@@ -187,9 +187,9 @@ func DistConf_ShareConfig_Internal(handle uintptr, jsonData string) int {
 }
 
 func DistConf_ValidateMandatoryServices_Internal(handle uintptr) int {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
 	if !ok {
 		return 0
 	}
