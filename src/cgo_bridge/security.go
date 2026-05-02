@@ -1,4 +1,4 @@
-package main
+package cgo_bridge
 
 /*
 #include "helpers.h"

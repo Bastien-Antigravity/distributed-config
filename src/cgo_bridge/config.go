@@ -1,4 +1,4 @@
-package main
+package cgo_bridge
 
 /*
 #include <stdlib.h>
@@ -26,9 +26,9 @@ import (
 
 //export DistConf_Get
 func DistConf_Get(handle uintptr, section, key *C.char) *C.char {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return nil
@@ -47,9 +47,9 @@ func DistConf_Get(handle uintptr, section, key *C.char) *C.char {
 
 //export DistConf_Set
 func DistConf_Set(handle uintptr, section, key, value *C.char) int {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return 0
@@ -73,9 +73,9 @@ func DistConf_Set(handle uintptr, section, key, value *C.char) int {
 
 //export DistConf_Sync
 func DistConf_Sync(handle uintptr) int {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return 0
@@ -93,9 +93,9 @@ func DistConf_Sync(handle uintptr) int {
 
 //export DistConf_OnLiveConfUpdate
 func DistConf_OnLiveConfUpdate(handle uintptr, cb C.config_update_cb) {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
 	
 	if !ok || session.Config == nil {
 		return
@@ -117,9 +117,9 @@ func DistConf_OnLiveConfUpdate(handle uintptr, cb C.config_update_cb) {
 
 //export DistConf_OnRegistryUpdate
 func DistConf_OnRegistryUpdate(handle uintptr, cb C.config_update_cb) {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
 	
 	if !ok || session.Config == nil {
 		return
@@ -140,9 +140,9 @@ func DistConf_OnRegistryUpdate(handle uintptr, cb C.config_update_cb) {
 
 //export DistConf_ShareConfig
 func DistConf_ShareConfig(handle uintptr, json_data *C.char) int {
-	facadeMu.Lock()
-	session, ok := facadeStore[handle]
-	facadeMu.Unlock()
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return 0
