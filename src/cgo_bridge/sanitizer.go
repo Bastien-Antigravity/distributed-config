@@ -7,7 +7,6 @@ import "C"
 
 import (
 	"strings"
-	"unsafe"
 )
 
 // sanitizeString ensures that strings coming from C are clean.
@@ -21,13 +20,4 @@ func sanitizeString(input string) string {
 	s = strings.ReplaceAll(s, "\x00", "")
 
 	return s
-}
-
-// -------------------------------------------------------------------------
-
-//export DistConf_FreeString
-func DistConf_FreeString(ptr *C.char) {
-	if ptr != nil {
-		C.free(unsafe.Pointer(ptr))
-	}
 }
