@@ -92,7 +92,7 @@ func DistConf_Sync(handle uintptr) int {
 // -------------------------------------------------------------------------
 
 //export DistConf_OnLiveConfUpdate
-func DistConf_OnLiveConfUpdate(handle uintptr, cb C.config_update_cb) {
+func DistConf_OnLiveConfUpdate(handle uintptr, cb unsafe.Pointer) {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -100,6 +100,8 @@ func DistConf_OnLiveConfUpdate(handle uintptr, cb C.config_update_cb) {
 	if !ok || session.Config == nil {
 		return
 	}
+
+	actualCb := (C.config_update_cb)(cb)
 
 	session.Config.OnLiveConfUpdate(func(update map[string]map[string]string) {
 		jsonData, err := json.Marshal(update)
@@ -108,7 +110,7 @@ func DistConf_OnLiveConfUpdate(handle uintptr, cb C.config_update_cb) {
 		}
 
 		cStr := C.CString(string(jsonData))
-		C.call_config_update_cb(cb, C.uintptr_t(handle), cStr)
+		C.call_config_update_cb(actualCb, C.uintptr_t(handle), cStr)
 		C.free(unsafe.Pointer(cStr))
 	})
 }
@@ -116,7 +118,7 @@ func DistConf_OnLiveConfUpdate(handle uintptr, cb C.config_update_cb) {
 // -------------------------------------------------------------------------
 
 //export DistConf_OnRegistryUpdate
-func DistConf_OnRegistryUpdate(handle uintptr, cb C.config_update_cb) {
+func DistConf_OnRegistryUpdate(handle uintptr, cb unsafe.Pointer) {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
@@ -125,6 +127,8 @@ func DistConf_OnRegistryUpdate(handle uintptr, cb C.config_update_cb) {
 		return
 	}
 
+	actualCb := (C.config_update_cb)(cb)
+
 	session.Config.OnRegistryUpdate(func(registry map[string][]string) {
 		jsonData, err := json.Marshal(registry)
 		if err != nil {
@@ -132,7 +136,7 @@ func DistConf_OnRegistryUpdate(handle uintptr, cb C.config_update_cb) {
 		}
 
 		cStr := C.CString(string(jsonData))
-		C.call_config_update_cb(cb, C.uintptr_t(handle), cStr)
+		C.call_config_update_cb(actualCb, C.uintptr_t(handle), cStr)
 		C.free(unsafe.Pointer(cStr))
 	})
 }
