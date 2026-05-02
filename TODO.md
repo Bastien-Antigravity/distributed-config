@@ -1,13 +1,16 @@
-# Project TODOs
+# TODO: distributed-config
 
-### 1. Hot swapping of system components (capabilities): [IN PROGRESS]
-Now that the **Atomic Pointer Swap** architecture is in place, implementing hot-swapping of capabilities is significantly easier. We can now swap entire capability maps without blocking readers. Next step: Implement the "Capability Reload" trigger.
+## 🚨 High Priority (Governance Gaps)
+- [ ] **Strategy Merger (Purger Rule)**: Merge `Production` and `Staging` strategies into a single `CloudStrategy` to reduce code duplication (FEAT-004). (Approval Required)
+- [ ] **Sync Bug**: Fix `GetAddress` logic in `capabilities.go`. It currently caches the initial YAML state and ignores `LiveConfig` updates (FEAT-004). (Approval Required)
+- [ ] **Handle Race Condition**: Fix mutex unlock timing in `cgo_bridge/config.go` to prevent potential use-after-free during concurrent Close/Get (FEAT-006). (Approval Required)
 
-### 2. Release Artifact Management: [IN PROGRESS]
-Standardize the distribution of `config-tool` binaries and update `.gitignore` to allow tracking of stable release artifacts in the `release/` directory.
+## 🏗️ Architecture & Refactoring
+- [ ] Decouple private config management to microservice-toolbox.
+- [ ] Standardize error codes across all language bridges.
 
-### 3. Dynamic Key Discovery: [TODO]
-Implement a "smart" context-aware key discovery mechanism. The goal is to support multi-tenancy on the same host (multiple distributed systems) by dynamically determining the private/public key paths based on the `common.name` in the configuration or other unique identifiers, without adding excessive complexity to the decryption engine.
+## 🧪 Testing & CI/CD
+- [ ] Add integration tests for jittered exponential backoff.
 
-### 4. Create service_schemas capabillities regarding config type (standalone, test....: [TODO]
-
+## ✅ Completed
+- [x] Initial BDD Spec migration to Obsidian Brain.
