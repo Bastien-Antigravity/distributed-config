@@ -51,13 +51,17 @@ flowchart TD
     end
     style Discovery fill:#fce4ec,stroke:#f06292,stroke-width:2px,color:#880e4f
 
-    subgraph Polyglot [Polyglot Ecosystem]
+    subgraph Polyglot [Polyglot & Shared Engine]
         direction TB
-        CGO[CGO Bridge libdistconf]:::loader
-        Py[Python AppConfig]:::loader
-        Rs[Rust AppConfig]:::loader
-        CGO --> Py & Rs
-        Facade -->|Export| CGO
+        Logic[Shared Engine src/cgo_bridge]:::loader
+        FFI_Dist[FFI Standalone libdistconf]:::loader
+        FFI_Log[FFI Universal Logger libunilog]:::loader
+        
+        Logic --> FFI_Dist
+        Logic --> FFI_Log
+        
+        FFI_Dist --> Py[Python] & Rs[Rust] & CPP[C++]
+        FFI_Log --> GoLogger[Go App] & Apps[Other Apps]
     end
     style Polyglot fill:#e0f7fa,stroke:#00acc1,stroke-width:2px,color:#006064
 
@@ -97,8 +101,10 @@ Manages communication with the remote Config Server using a slimmed-down Protobu
 *   **Safe Socket**: High-performance TCP communication via `github.com/Bastien-Antigravity/safe-socket`.
 *   **Proto Handler**: Parses generic `GET_SYNC`, `PUT_SYNC`, `BROADCAST_SYNC`, and `BROADCAST_REGISTRY` commands. Routes unstructured JSON blobs to `LiveConfig` or Registry callbacks without needing rigidly coupled structs.
 
-### 5. CGO Bridge (`src/cgo_bridge`)
-Exposes the core Go library to non-Go languages via a stable C ABI.
+### 5. Shared CGO Engine (`src/cgo_bridge`)
+The engine logic is decoupled from the FFI exports to allow multiple entry points (Standalone vs. Universal Logger) to share the same runtime state.
+*   **Pure Go Logic**: All bridge logic resides in a pure Go package. It contains no `//export` statements, preventing linker symbol collisions when multiple libraries are linked into the same process.
+*   **Memory Space Unification**: By importing the same `src/cgo_bridge` package, both `libdistconf` and `libunilog` share the same global `FacadeStore`. This ensures that a configuration update in one is immediately visible to the other.
 *   **Handle-based Lifecycle**: Manages multiple concurrent configuration sessions via opaque handles, preventing memory leaks in FFI layers.
 *   **JSON Pass-through**: Uses JSON as the primary data exchange format for complex capabilities, ensuring forward compatibility without breaking FFI signatures.
 *   **Behavioral Parity**: Strictly reuses the Go core logic for environment expansion, path discovery, and validation, ensuring "identical-by-design" behavior across Python, Rust, and C++.
@@ -112,6 +118,16 @@ To avoid unnecessary locks and mutex contention, the `LiveConfig` storage utiliz
 *   **Lock-Free Reads**: The `Get()` operation performs a lock-free load of the pointer. This ensures that application threads never block, even during a massive network update.
 *   **Snapshot Isolation**: Readers always see a consistent, immutable snapshot of the configuration.
 *   **Atomic Updates**: Both local `Set()` calls and remote `BROADCAST_SYNC` updates follow the Read-Copy-Update (RCU) pattern. A new map is prepared and then atomically swapped into place, ensuring 100% snapshot integrity for all concurrent readers.
+
+## FFI Implementation Notes
+ 
+### Shared Library Unloading (The `dlclose` Hang)
+When wrapping the Go shared library in languages like Rust or Python, **it is critical to never unload the library (`dlclose`) once it has been loaded.**
+*   **The Reason**: The Go runtime starts background threads (GC, scheduler) that do not support being shut down or re-initialized within the same process. Unloading the library while these threads are active causes the process to hang indefinitely.
+*   **The Solution**: Always use a "load-once" pattern (e.g., leaked static references in Rust) to ensure the library remains resident for the life of the process.
+ 
+### Handle Management
+Always ensure that `DistConf_Close(handle)` is called via a finalizer or `Drop` implementation to prevent memory leaks in the Go-side `FacadeStore`.
 
 ## Configuration Precedence
 
