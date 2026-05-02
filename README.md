@@ -163,7 +163,7 @@ The unified **`config-tool`** is provided in the `cmd/` directory:
 
 The `distributed-config` core is exposed via a stable C ABI. 
 
-### **Key Bridge API:**
+### **Key Bridge API:** 
 - `DistConf_New(profile)`: Initialize a new session.
 - `DistConf_Get(handle, section, key)`: Retrieve a value.
 - `DistConf_Set(handle, section, key, val)`: Update a value locally (triggers callbacks).
