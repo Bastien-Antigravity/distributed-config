@@ -1,4 +1,4 @@
-package cgo_bridge
+package main
 
 /*
 #include <stdlib.h>
@@ -17,10 +17,12 @@ type ConfigSession struct {
 }
 
 var (
-	FacadeMu    sync.Mutex
-	FacadeStore         = make(map[uintptr]*ConfigSession)
-	FacadeId    uintptr = 1
+	facadeMu    sync.Mutex
+	facadeStore         = make(map[uintptr]*ConfigSession)
+	facadeId    uintptr = 1
 )
+
+func main() {}
 
 // -------------------------------------------------------------------------
 
@@ -33,14 +35,14 @@ func DistConf_New(profile *C.char) uintptr {
 		return 0
 	}
 
-	FacadeMu.Lock()
-	defer FacadeMu.Unlock()
+	facadeMu.Lock()
+	defer facadeMu.Unlock()
 
-	id := FacadeId
-	FacadeStore[id] = &ConfigSession{
+	id := facadeId
+	facadeStore[id] = &ConfigSession{
 		Config: cfg,
 	}
-	FacadeId++
+	facadeId++
 	return id
 }
 
@@ -48,7 +50,7 @@ func DistConf_New(profile *C.char) uintptr {
 
 //export DistConf_Close
 func DistConf_Close(handle uintptr) {
-	FacadeMu.Lock()
-	defer FacadeMu.Unlock()
-	delete(FacadeStore, handle)
+	facadeMu.Lock()
+	defer facadeMu.Unlock()
+	delete(facadeStore, handle)
 }

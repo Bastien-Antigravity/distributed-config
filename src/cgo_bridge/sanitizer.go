@@ -1,4 +1,4 @@
-package cgo_bridge
+package main
 
 /*
 #include <stdlib.h>

@@ -1,4 +1,4 @@
-package cgo_bridge
+package main
 
 /*
 #include <stdlib.h>
@@ -13,9 +13,9 @@ import (
 
 //export DistConf_GetAddress
 func DistConf_GetAddress(handle uintptr, capability *C.char) *C.char {
-	FacadeMu.Lock()
-	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
+	facadeMu.Lock()
+	session, ok := facadeStore[handle]
+	facadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return nil
@@ -32,9 +32,9 @@ func DistConf_GetAddress(handle uintptr, capability *C.char) *C.char {
 
 //export DistConf_GetGRPCAddress
 func DistConf_GetGRPCAddress(handle uintptr, capability *C.char) *C.char {
-	FacadeMu.Lock()
-	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
+	facadeMu.Lock()
+	session, ok := facadeStore[handle]
+	facadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return nil
@@ -51,9 +51,9 @@ func DistConf_GetGRPCAddress(handle uintptr, capability *C.char) *C.char {
 
 //export DistConf_GetCapability
 func DistConf_GetCapability(handle uintptr, capability *C.char) *C.char {
-	FacadeMu.Lock()
-	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
+	facadeMu.Lock()
+	session, ok := facadeStore[handle]
+	facadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return nil
@@ -76,9 +76,9 @@ func DistConf_GetCapability(handle uintptr, capability *C.char) *C.char {
 
 //export DistConf_GetFullConfig
 func DistConf_GetFullConfig(handle uintptr) *C.char {
-	FacadeMu.Lock()
-	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
+	facadeMu.Lock()
+	session, ok := facadeStore[handle]
+	facadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return nil

@@ -44,7 +44,7 @@ The library uses a layered approach to build the final configuration:
 - **Fail-Safe & Strict**: Enforces "Mandatory Service Validation" (Fail-Fast logic) to ensure critical infrastructure like `log_server` is correctly configured (via any source) before boot.
 - **Live Updates**: Support for dynamic configuration updates via callbacks. Manually calling `Set()` (bulk) or `SetSingle()` (convenience) on the facade now correctly triggers local observers and automatically synchronizes with the fleet.
 - **High Performance & Lock-Free**: Uses an **Atomic Pointer Swap (RCU)** architecture. Configuration reads (`Get`) are 100% lock-free and non-blocking, ensuring zero-latency configuration access for high-frequency microservices. Even during bulk updates, readers always see a consistent snapshot.
-- **Polyglot Ecosystem (v1.9.9+)**: Native support for **Python, Rust, C/C++, and VBA** via a centralized CGO-based shared library (`libdistconf`). Achieve 100% architectural parity across your entire microservice fleet with raw error transparency.
+- **Polyglot Ecosystem (v1.9.6+)**: Native support for **Python, Rust, C/C++, and VBA** via a centralized CGO-based shared library (`libdistconf`). Achieve 100% architectural parity across your entire microservice fleet.
 
 ## Installation
 
@@ -172,7 +172,6 @@ The `distributed-config` core is exposed via a stable C ABI.
 - `DistConf_ShareConfig(handle, json)`: Broadcast state (flat or nested map) to the ecosystem.
 - `DistConf_ValidateMandatoryServices(handle)`: Ensure the environment satisfies mandatory services.
 - `DistConf_Decrypt(handle, ciphertext)`: Decrypt a secret.
-- `DistConf_GetLastError()`: Retrieve the last raw engine-level error message.
 
 For high-level usage, refer to the **`distconf/`** directory or the **`microservice-toolbox`** implementations.
 
