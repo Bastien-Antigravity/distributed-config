@@ -5,6 +5,10 @@ package cgo_bridge
 */
 import "C"
 
+import (
+	"encoding/json"
+)
+
 // -------------------------------------------------------------------------
 
 // IsValid is a Go-native wrapper for checking handle validity.
@@ -28,4 +32,23 @@ func ValidateMandatoryServices(handle uintptr) error {
 	}
 
 	return session.Config.ValidateMandatoryServices()
+}
+
+// -------------------------------------------------------------------------
+
+// ShareConfig is a Go-native wrapper for DistConf_ShareConfig.
+func ShareConfig(handle uintptr, jsonData string) error {
+	FacadeMu.Lock()
+	session, ok := FacadeStore[handle]
+	FacadeMu.Unlock()
+
+	if !ok || session.Config == nil {
+		return nil
+	}
+
+	var payload interface{}
+	if err := json.Unmarshal([]byte(jsonData), &payload); err != nil {
+		return err
+	}
+	return session.Config.ShareConfig(payload)
 }

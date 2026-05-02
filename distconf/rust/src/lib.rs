@@ -1,6 +1,5 @@
 use libc::{c_char, uintptr_t, c_int};
 use std::ffi::{CStr, CString};
-use std::ptr;
 use std::sync::Arc;
 use libloading::{Library, Symbol};
 use serde_json::Value;
@@ -8,13 +7,15 @@ use serde_json::Value;
 pub type ConfigUpdateCb = extern "C" fn(handle: uintptr_t, json_data: *const c_char);
 
 pub struct DistConfig {
-    lib: Arc<Library>,
+    lib: &'static Library,
     handle: uintptr_t,
 }
 
 impl DistConfig {
     pub fn new(profile: &str, lib_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let lib = unsafe { Arc::new(Library::new(lib_path)?) };
+        // We use a static reference and leak the library because Go's runtime 
+        // does not support being unloaded (dlclose) and will hang.
+        let lib = Box::leak(Box::new(unsafe { Library::new(lib_path)? }));
         
         let handle = unsafe {
             let func: Symbol<unsafe extern "C" fn(*const c_char) -> uintptr_t> = lib.get(b"DistConf_New")?;

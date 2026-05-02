@@ -113,6 +113,9 @@ extern char* DistConf_GetLastError(void);
 extern char* DistConf_Decrypt(GoUintptr handle, char* ciphertext);
 extern GoInt DistConf_IsValid(GoUintptr handle);
 extern GoInt DistConf_ValidateMandatoryServices(GoUintptr handle);
+extern GoInt DistConf_ShareConfig(GoUintptr handle, char* jsonData);
+extern void DistConf_OnLiveConfUpdate(GoUintptr handle, config_update_cb cb);
+extern void DistConf_OnRegistryUpdate(GoUintptr handle, config_update_cb cb);
 
 #ifdef __cplusplus
 }

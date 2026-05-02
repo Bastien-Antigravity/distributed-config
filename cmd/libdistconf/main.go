@@ -18,6 +18,7 @@ static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const c
 import "C"
 
 import (
+	"encoding/json"
 	"unsafe"
 	"github.com/Bastien-Antigravity/distributed-config/src/cgo_bridge"
 )
@@ -140,4 +141,60 @@ func DistConf_ValidateMandatoryServices(handle uintptr) int {
 		return 0
 	}
 	return 1
+}
+
+//export DistConf_ShareConfig
+func DistConf_ShareConfig(handle uintptr, jsonData *C.char) int {
+	if err := cgo_bridge.ShareConfig(handle, C.GoString(jsonData)); err != nil {
+		return 0
+	}
+	return 1
+}
+
+// -------------------------------------------------------------------------
+// CALLBACKS
+// -------------------------------------------------------------------------
+
+//export DistConf_OnLiveConfUpdate
+func DistConf_OnLiveConfUpdate(handle uintptr, cb C.config_update_cb) {
+	cgo_bridge.FacadeMu.Lock()
+	session, ok := cgo_bridge.FacadeStore[handle]
+	cgo_bridge.FacadeMu.Unlock()
+
+	if !ok || session.Config == nil {
+		return
+	}
+
+	session.Config.OnLiveConfUpdate(func(update map[string]map[string]string) {
+		jsonData, err := json.Marshal(update)
+		if err != nil {
+			return
+		}
+
+		cStr := C.CString(string(jsonData))
+		C.call_config_update_cb(cb, C.uintptr_t(handle), cStr)
+		C.free(unsafe.Pointer(cStr))
+	})
+}
+
+//export DistConf_OnRegistryUpdate
+func DistConf_OnRegistryUpdate(handle uintptr, cb C.config_update_cb) {
+	cgo_bridge.FacadeMu.Lock()
+	session, ok := cgo_bridge.FacadeStore[handle]
+	cgo_bridge.FacadeMu.Unlock()
+
+	if !ok || session.Config == nil {
+		return
+	}
+
+	session.Config.OnRegistryUpdate(func(registry map[string][]string) {
+		jsonData, err := json.Marshal(registry)
+		if err != nil {
+			return
+		}
+
+		cStr := C.CString(string(jsonData))
+		C.call_config_update_cb(cb, C.uintptr_t(handle), cStr)
+		C.free(unsafe.Pointer(cStr))
+	})
 }
