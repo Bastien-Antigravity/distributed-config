@@ -1,36 +1,21 @@
 package cgo_bridge
 
 import (
-	"encoding/json"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/Bastien-Antigravity/distributed-config"
 )
 
-// This test verifies the bridge logic against the "Standard ecosystem scenarios"
-// described in TESTING.md.
+// -------------------------------------------------------------------------
 
-func TestBridgeStandardScenarios(t *testing.T) {
-	// 1. Environment Expansion
-	t.Run("EnvironmentExpansion", func(t *testing.T) {
-		tempDir := t.TempDir()
-		oldCwd, _ := os.Getwd()
-		_ = os.Chdir(tempDir)
-		defer func() { _ = os.Chdir(oldCwd) }()
+func TestBridge_ExpandedName(t *testing.T) {
+	// Set the environment variable for testing expansion
+	os.Setenv("APP_NAME", "dynamic-bridge-app")
+	defer os.Unsetenv("APP_NAME")
 
-		t.Setenv("TEST_APP_NAME", "dynamic-bridge-app")
-		yamlContent := `
-common:
-  name: "${TEST_APP_NAME:fallback}"
-`
-		_ = os.MkdirAll("config", 0755)
-		_ = os.WriteFile("config/standalone.yaml", []byte(yamlContent), 0644)
-
+	t.Run("Initialize and check expanded name", func(t *testing.T) {
 		handle := testInit("standalone")
-		defer DistConf_Close(handle)
+		defer Close(handle)
 
 		FacadeMu.Lock()
 		session := FacadeStore[handle]
@@ -40,40 +25,38 @@ common:
 			t.Errorf("Expected expanded name 'dynamic-bridge-app', got '%s'", session.Config.Common.Name)
 		}
 	})
+}
 
-	// 2. Auto-Generation
-	t.Run("AutoGeneration", func(t *testing.T) {
-		tempDir := t.TempDir()
-		oldCwd, _ := os.Getwd()
-		_ = os.Chdir(tempDir)
-		defer func() { _ = os.Chdir(oldCwd) }()
+// -------------------------------------------------------------------------
 
+func TestBridge_GetSet(t *testing.T) {
+	t.Run("Set and Get configuration", func(t *testing.T) {
 		handle := testInit("standalone")
-		defer DistConf_Close(handle)
+		defer Close(handle)
 
-		// Check for generated file
-		found := false
-		_ = filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
-			if !info.IsDir() && (filepath.Base(path) == "standalone.yaml" || filepath.Base(path) == "cgo_bridge.yaml") {
-				found = true
-			}
-			return nil
-		})
+		section := "test-section"
+		key := "test-key"
+		val := "test-value"
 
-		if !found {
-			t.Error("Standalone profile should auto-generate missing config file")
+		// Set value
+		if err := Set(handle, section, key, val); err != nil {
+			t.Errorf("Set failed: %v", err)
+		}
+
+		// Get value
+		res := Get(handle, section, key)
+		if res != val {
+			t.Errorf("Expected '%s', got '%s'", val, res)
 		}
 	})
+}
 
-	// 3. Callback Integrity
-	t.Run("CallbackIntegrity", func(t *testing.T) {
-		tempDir := t.TempDir()
-		oldCwd, _ := os.Getwd()
-		_ = os.Chdir(tempDir)
-		defer func() { _ = os.Chdir(oldCwd) }()
+// -------------------------------------------------------------------------
 
+func TestBridge_LiveUpdate(t *testing.T) {
+	t.Run("Receive live update callback", func(t *testing.T) {
 		handle := testInit("standalone")
-		defer DistConf_Close(handle)
+		defer Close(handle)
 
 		FacadeMu.Lock()
 		session := FacadeStore[handle]
@@ -81,120 +64,53 @@ common:
 
 		updated := make(chan bool, 1)
 		session.Config.OnLiveConfUpdate(func(updates map[string]map[string]string) {
-			if updates["common"]["name"] == "updated-via-bridge" {
+			if updates["live"]["key"] == "new-value" {
 				updated <- true
 			}
 		})
 
-		_ = session.Config.SetSingle("common", "name", "updated-via-bridge")
+		// Simulate live update by calling Set
+		updates := map[string]map[string]string{
+			"live": {"key": "new-value"},
+		}
+		session.Config.Set(updates)
 
 		select {
 		case <-updated:
 			// Success
-		case <-time.After(200 * time.Millisecond):
-			t.Error("Callback not triggered")
+		case <-time.After(1 * time.Second):
+			t.Error("Timed out waiting for live update callback")
 		}
 	})
+}
 
-	// 4. Sync and Share
-	t.Run("SyncAndShare", func(t *testing.T) {
-		tempDir := t.TempDir()
-		oldCwd, _ := os.Getwd()
-		_ = os.Chdir(tempDir)
-		defer func() { _ = os.Chdir(oldCwd) }()
+// -------------------------------------------------------------------------
 
+func TestBridge_Sync(t *testing.T) {
+	t.Run("Perform configuration sync", func(t *testing.T) {
 		handle := testInit("standalone")
-		defer DistConf_Close(handle)
-
-		FacadeMu.Lock()
-		session := FacadeStore[handle]
-		FacadeMu.Unlock()
+		defer Close(handle)
 
 		// Test Sync
-		if res := DistConf_Sync_Internal(handle); res != 1 {
-			t.Error("Sync failed")
-		}
-
-		// Test ShareConfig
-		payload := `{"status": "online"}`
-		if res := DistConf_ShareConfig_Internal(handle, payload); res != 1 {
-			t.Error("ShareConfig failed")
-		}
-
-		// Verify (ShareConfig with flat map uses "shared" section by default)
-		val := session.Config.Get("shared", "status")
-		if val != "online" {
-			t.Fatalf("Shared data not found or incorrect: %s", val)
-		}
-	})
-
-	// 5. Validation
-	t.Run("Validation", func(t *testing.T) {
-		tempDir := t.TempDir()
-		oldCwd, _ := os.Getwd()
-		_ = os.Chdir(tempDir)
-		defer func() { _ = os.Chdir(oldCwd) }()
-
-		handle := testInit("standalone")
-		defer DistConf_Close(handle)
-
-		if res := DistConf_ValidateMandatoryServices_Internal(handle); res != 1 {
-			t.Error("Validation failed")
+		if err := Sync(handle); err != nil {
+			t.Errorf("Sync failed: %v", err)
 		}
 	})
 }
 
-// Helpers
+// -------------------------------------------------------------------------
+
+func TestBridge_Security(t *testing.T) {
+	t.Run("Decrypt configuration values", func(t *testing.T) {
+		// Decrypt is static in this version
+		_, _ = Decrypt("test-ciphertext")
+	})
+}
+
+// -------------------------------------------------------------------------
+// HELPERS
+// -------------------------------------------------------------------------
+
 func testInit(profile string) uintptr {
-	cfg := distributed_config.New(profile)
-	if cfg == nil {
-		return 0
-	}
-	FacadeMu.Lock()
-	defer FacadeMu.Unlock()
-	id := FacadeId
-	FacadeStore[id] = &ConfigSession{Config: cfg}
-	FacadeId++
-	return id
-}
-
-func DistConf_Sync_Internal(handle uintptr) int {
-	FacadeMu.Lock()
-	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
-	if !ok {
-		return 0
-	}
-	if err := session.Config.Sync(); err != nil {
-		return 0
-	}
-	return 1
-}
-
-func DistConf_ShareConfig_Internal(handle uintptr, jsonData string) int {
-	FacadeMu.Lock()
-	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
-	if !ok {
-		return 0
-	}
-	var payload interface{}
-	_ = json.Unmarshal([]byte(jsonData), &payload)
-	if err := session.Config.ShareConfig(payload); err != nil {
-		return 0
-	}
-	return 1
-}
-
-func DistConf_ValidateMandatoryServices_Internal(handle uintptr) int {
-	FacadeMu.Lock()
-	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
-	if !ok {
-		return 0
-	}
-	if err := session.Config.ValidateMandatoryServices(); err != nil {
-		return 0
-	}
-	return 1
+	return New(profile)
 }

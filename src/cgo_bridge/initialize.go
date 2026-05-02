@@ -2,6 +2,7 @@ package cgo_bridge
 
 /*
 #include <stdlib.h>
+#include "helpers.h"
 */
 import "C"
 
@@ -24,9 +25,9 @@ var (
 
 // -------------------------------------------------------------------------
 
-//export DistConf_New
-func DistConf_New(profile *C.char) uintptr {
-	prof := sanitizeString(C.GoString(profile))
+// New is a Go-native wrapper for DistConf_New.
+func New(profile string) uintptr {
+	prof := sanitizeString(profile)
 	
 	cfg := distributed_config.New(prof)
 	if cfg == nil {
@@ -46,8 +47,8 @@ func DistConf_New(profile *C.char) uintptr {
 
 // -------------------------------------------------------------------------
 
-//export DistConf_Close
-func DistConf_Close(handle uintptr) {
+// Close is a Go-native wrapper for DistConf_Close.
+func Close(handle uintptr) {
 	FacadeMu.Lock()
 	defer FacadeMu.Unlock()
 	delete(FacadeStore, handle)

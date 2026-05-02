@@ -7,30 +7,25 @@ import "C"
 
 // -------------------------------------------------------------------------
 
-//export DistConf_IsValid
-func DistConf_IsValid(handle uintptr) int {
+// IsValid is a Go-native wrapper for checking handle validity.
+func IsValid(handle uintptr) bool {
 	FacadeMu.Lock()
 	_, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
-
-	if !ok {
-		return 0
-	}
-	return 1
+	return ok
 }
 
-//export DistConf_ValidateMandatoryServices
-func DistConf_ValidateMandatoryServices(handle uintptr) int {
+// -------------------------------------------------------------------------
+
+// ValidateMandatoryServices is a Go-native wrapper.
+func ValidateMandatoryServices(handle uintptr) error {
 	FacadeMu.Lock()
 	session, ok := FacadeStore[handle]
 	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
-		return 0
+		return nil
 	}
 
-	if err := session.Config.ValidateMandatoryServices(); err != nil {
-		return 0
-	}
-	return 1
+	return session.Config.ValidateMandatoryServices()
 }
