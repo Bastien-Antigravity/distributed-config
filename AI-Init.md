@@ -1,3 +1,9 @@
+---
+microservice: distributed-config
+type: governance
+status: active
+---
+
 # ⚡ AI Initialization: distributed-config
 
 > [!IMPORTANT] MANDATORY INITIALIZATION
