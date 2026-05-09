@@ -18,8 +18,8 @@ type ConfigProtoHandler struct {
 	parentConfig *core.Config
 
 	// Callbacks
-	onLiveConfUpdate  func(map[string]map[string]string)
-	onRegistryUpdate  func(map[string][]string)
+	onLiveConfUpdate func(map[string]map[string]string)
+	onRegistryUpdate func(map[string][]string)
 }
 
 // -----------------------------------------------------------------------------

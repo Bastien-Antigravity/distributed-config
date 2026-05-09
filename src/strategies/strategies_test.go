@@ -42,7 +42,7 @@ func TestProductionStrategy(t *testing.T) {
 
 	t.Run("TestProduction_FailsOnMissingEnvData", func(t *testing.T) {
 		// In Production, missing files are ignored (returns nil).
-		// However! Since no file provides config_server and environment 
+		// However! Since no file provides config_server and environment
 		// variables are not set, it will fail the ValidateMandatoryServices check at the end.
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
 		strategy := &ProductionStrategy{}

@@ -19,8 +19,8 @@ import "C"
 
 import (
 	"encoding/json"
-	"unsafe"
 	"github.com/Bastien-Antigravity/distributed-config/src/cgo_bridge"
+	"unsafe"
 )
 
 func main() {}

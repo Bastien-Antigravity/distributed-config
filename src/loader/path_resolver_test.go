@@ -39,12 +39,12 @@ func TestResolveConfigPath(t *testing.T) {
 		_ = os.WriteFile(exePathLocal, []byte("name: wrong"), 0644)
 
 		path := ResolveConfigPath("staging")
-		
+
 		path, _ = filepath.Abs(path)
 		path, _ = filepath.EvalSymlinks(path)
 		expected, _ := filepath.Abs(targetPath)
 		expected, _ = filepath.EvalSymlinks(expected)
-		
+
 		if path != expected {
 			t.Errorf("Expected path %s, got %s", expected, path)
 		}
@@ -61,10 +61,10 @@ func TestResolveConfigPath(t *testing.T) {
 		// Create specific file based on exeName
 		exePathLocal := filepath.Join(configDir, exeName+".yaml")
 		_ = os.WriteFile(exePathLocal, []byte("name: exefallback"), 0644)
-		
+
 		// Target 'production' is missing, fallback should catch exeName in config/
 		path := ResolveConfigPath("production")
-		
+
 		path, _ = filepath.Abs(path)
 		path, _ = filepath.EvalSymlinks(path)
 		expected, _ := filepath.Abs(exePathLocal)
@@ -83,10 +83,10 @@ func TestResolveConfigPath(t *testing.T) {
 		// Create specific file based on exeName in CWD
 		exePathLocal := filepath.Join(tempRun, exeName+".yaml")
 		_ = os.WriteFile(exePathLocal, []byte("name: exefallback_cwd"), 0644)
-		
+
 		// Target 'production' is missing, fallback should catch exeName in CWD
 		path := ResolveConfigPath("production")
-		
+
 		path, _ = filepath.Abs(path)
 		path, _ = filepath.EvalSymlinks(path)
 		expected, _ := filepath.Abs(exePathLocal)
@@ -96,7 +96,7 @@ func TestResolveConfigPath(t *testing.T) {
 			t.Errorf("Expected [exe].yaml path %s, got %s", expected, path)
 		}
 	})
-	
+
 	t.Run("Priority-7-CompleteFallback", func(t *testing.T) {
 		tempRun, _ := os.MkdirTemp(tempDir, "run-*")
 		_ = os.Chdir(tempRun)

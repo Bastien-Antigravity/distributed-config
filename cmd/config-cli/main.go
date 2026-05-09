@@ -45,7 +45,7 @@ func main() {
 
 func printConfig(config *distconf.Config) {
 	fmt.Println("\nCurrent Configuration:")
-	
+
 	livePtr := config.LiveConfig.Load()
 	if livePtr == nil || len(*livePtr) == 0 {
 		fmt.Println("  (Empty)")

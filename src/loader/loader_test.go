@@ -38,7 +38,7 @@ capabilities:
 		if cfg.Common.Name != "test-app" {
 			t.Errorf("Expected name 'test-app', got '%s'", cfg.Common.Name)
 		}
-		
+
 		var ts MockTS
 		if err := cfg.GetCapability("timescale_db", &ts); err != nil {
 			t.Fatalf("Failed to get capability: %v", err)
@@ -73,7 +73,7 @@ capabilities:
 		if cfg.Common.Name != "service-S123" {
 			t.Errorf("Expected name 'service-S123', got '%s'", cfg.Common.Name)
 		}
-		
+
 		var ts MockTS
 		if err := cfg.GetCapability("timescale_db", &ts); err != nil {
 			t.Fatalf("Failed to get capability: %v", err)
@@ -109,7 +109,7 @@ capabilities:
 		if cfg.Common.Name != "RealValue" {
 			t.Errorf("Expected 'RealValue', got '%s'", cfg.Common.Name)
 		}
-		
+
 		var ts MockTS
 		if err := cfg.GetCapability("timescale_db", &ts); err != nil {
 			t.Fatalf("Failed to get capability: %v", err)
@@ -173,7 +173,7 @@ capabilities:
 		}
 
 		server := cfg.Capabilities["server"].(map[string]interface{})
-		
+
 		// 8080 should be string
 		if _, ok := server["port"].(string); !ok {
 			t.Errorf("expected port to be string, got %T", server["port"])
@@ -209,7 +209,7 @@ capabilities:
 	t.Run("TestEnvironmentFirstBoot-SafeLoader", func(t *testing.T) {
 		configPath := filepath.Join(tempDir, "missing_safe.yaml")
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
-		
+
 		// LoadConfigFromFileSafe should NOT create a file and should NOT return an error
 		err := LoadConfigFromFileSafe(cfg, configPath)
 		if err != nil {

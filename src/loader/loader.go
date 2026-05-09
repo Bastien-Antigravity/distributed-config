@@ -10,7 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-
 // -----------------------------------------------------------------------------
 
 // EnsureFileExists checks if a file exists. If it doesn't, it creates it using the provided payload.
@@ -97,7 +96,6 @@ func LoadConfigFromFileSafe(config *models.Config, filePath string) error {
 	}
 	return err
 }
-
 
 // -----------------------------------------------------------------------------
 

@@ -23,17 +23,17 @@ type CommonConfig struct {
 
 type Config struct {
 	// Distributed system name
-	Common       CommonConfig           `yaml:"common" json:"common"`
+	Common CommonConfig `yaml:"common" json:"common"`
 
-	// Data storage for Config params 
-	// main config 
-	Capabilities map[string]interface{} `yaml:"capabilities" json:"capabilities"`
+	// Data storage for Config params
+	// main config
+	Capabilities map[string]interface{}                       `yaml:"capabilities" json:"capabilities"`
 	LiveConfig   atomic.Pointer[map[string]map[string]string] `yaml:"-"`
 
 	// Internal state
 	ConfigPath string       `yaml:"-"`
 	Logger     utils.Logger `yaml:"-"`
-}	
+}
 
 // -----------------------------------------------------------------------------
 
@@ -156,7 +156,7 @@ func (c *Config) ValidateMandatoryServices() error {
 }
 
 // ShareConfig merges the provided configuration updates into the LiveConfig.
-// It accepts either map[string]map[string]string (multi-section) 
+// It accepts either map[string]map[string]string (multi-section)
 // or map[string]string (single section, using "shared" as default).
 // -----------------------------------------------------------------------------
 

@@ -28,7 +28,7 @@ var (
 // New is a Go-native wrapper for DistConf_New.
 func New(profile string) uintptr {
 	prof := sanitizeString(profile)
-	
+
 	cfg := distributed_config.New(prof)
 	if cfg == nil {
 		return 0

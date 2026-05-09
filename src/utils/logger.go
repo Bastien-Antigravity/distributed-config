@@ -28,14 +28,14 @@ func EnsureSafeLogger(log Logger) Logger {
 
 type noOpLogger struct{}
 
-func (n *noOpLogger) Debug(string, ...any)    {}
+func (n *noOpLogger) Debug(string, ...any)            {}
 func (n *noOpLogger) Info(format string, args ...any) { fmt.Printf(format+"\n", args...) } // Keep basic console output if no logger provided for core config
-func (n *noOpLogger) Warning(string, ...any)  {}
-func (n *noOpLogger) Error(string, ...any)    {}
-func (n *noOpLogger) Critical(string, ...any) {}
-func (n *noOpLogger) Logon(string, ...any)    {}
-func (n *noOpLogger) Logout(string, ...any)   {}
-func (n *noOpLogger) Trade(string, ...any)    {}
-func (n *noOpLogger) Schedule(string, ...any) {}
-func (n *noOpLogger) Report(string, ...any)   {}
-func (n *noOpLogger) Stream(string, ...any)   {}
+func (n *noOpLogger) Warning(string, ...any)          {}
+func (n *noOpLogger) Error(string, ...any)            {}
+func (n *noOpLogger) Critical(string, ...any)         {}
+func (n *noOpLogger) Logon(string, ...any)            {}
+func (n *noOpLogger) Logout(string, ...any)           {}
+func (n *noOpLogger) Trade(string, ...any)            {}
+func (n *noOpLogger) Schedule(string, ...any)         {}
+func (n *noOpLogger) Report(string, ...any)           {}
+func (n *noOpLogger) Stream(string, ...any)           {}

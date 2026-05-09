@@ -37,7 +37,7 @@ func Set(handle uintptr, section, key, value string) error {
 			sanitizeString(key): sanitizeString(value),
 		},
 	}
-	
+
 	return session.Config.Set(updates)
 }
 

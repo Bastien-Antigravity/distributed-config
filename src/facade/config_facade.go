@@ -94,9 +94,9 @@ func (config *Config) Set(updates map[string]map[string]string) error {
 			config.Config.Logger.Error("Strategy.Set failed: %v", err)
 			return err // Abort local callback on failure and return error
 		}
-		
-		// Single Source of Truth Eventing: 
-		// If pushing to a central server, we rely on the Watch() listener to 
+
+		// Single Source of Truth Eventing:
+		// If pushing to a central server, we rely on the Watch() listener to
 		// catch the server's BROADCAST_SYNC to trigger observers safely.
 		name := config.strategy.Name()
 		if name == "production" || name == "test" {
