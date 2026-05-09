@@ -35,7 +35,13 @@ func (s *StandaloneStrategy) Load(cfg *core.Config) error {
 	fullPath := loader.ResolveConfigPath("standalone")
 
 	// 2. Load File (Generates default if missing - standard loader behavior)
-	return loader.LoadConfigFromFile(cfg, fullPath)
+	if err := loader.LoadConfigFromFile(cfg, fullPath); err != nil {
+		return err
+	}
+
+	// 3. Env Load (Overrides NAME/RESET if provided dynamically)
+	loader.LoadCommonFromEnv(cfg)
+	return nil
 }
 
 // -----------------------------------------------------------------------------
