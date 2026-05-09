@@ -161,8 +161,19 @@ func (c *Config) ValidateMandatoryServices() error {
 // -----------------------------------------------------------------------------
 
 func (c *Config) ShareConfig(payload interface{}) error {
+	updates, err := ParseSharePayload(payload)
+	if err != nil {
+		return err
+	}
+	c.Set(updates)
+	return nil
+}
+
+// ParseSharePayload converts a generic payload into a structured configuration update map.
+// Supports map[string]map[string]string, map[string]string, and map[string]interface{}.
+func ParseSharePayload(payload interface{}) (map[string]map[string]string, error) {
 	if payload == nil {
-		return nil
+		return nil, nil
 	}
 
 	var updates map[string]map[string]string
@@ -196,11 +207,10 @@ func (c *Config) ShareConfig(payload interface{}) error {
 			}
 		}
 	default:
-		return fmt.Errorf("unsupported payload type for ShareConfig: %T", payload)
+		return nil, fmt.Errorf("unsupported payload type for ShareConfig: %T", payload)
 	}
 
-	c.Set(updates)
-	return nil
+	return updates, nil
 }
 
 // -----------------------------------------------------------------------------

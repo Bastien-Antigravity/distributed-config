@@ -129,3 +129,14 @@ func (config *Config) Sync() error {
 	}
 	return config.strategy.Sync(config.Config)
 }
+
+// ShareConfig overrides core.Config.ShareConfig to ensure updates are synchronized
+// according to the current strategy (e.g., pushed to Config Server in Production).
+// -----------------------------------------------------------------------------
+func (config *Config) ShareConfig(payload interface{}) error {
+	updates, err := core.ParseSharePayload(payload)
+	if err != nil {
+		return err
+	}
+	return config.Set(updates)
+}
