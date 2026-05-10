@@ -1,7 +1,7 @@
 # 🧬 Project DNA: distributed-config
 
 ## 🎯 High-Level Intent (BDD)
-- **Goal**: Provide a client library for microservices to interact with the centralized `config-server`.
+- **Goal**: Provide a client library for microservices to interact with the centralized `config-server`. 
 - **Key Pattern**: **Client-Side Discovery / Caching Proxy**.
 
 ## 🛠 Technical Constraints
