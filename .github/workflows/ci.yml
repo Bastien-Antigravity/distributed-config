@@ -40,6 +40,17 @@ jobs:
           go mod tidy
           go test -v ./...
 
+      - name: Build Shared Library
+        if: steps.check_go.outputs.exists == 'true'
+        run: make build-lib
+
+      - name: Upload Shared Library
+        if: steps.check_go.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: libdistconf
+          path: distconf/libdistconf/
+
       - name: Run golangci-lint
         if: steps.check_go.outputs.exists == 'true'
         uses: golangci/golangci-lint-action@v7
