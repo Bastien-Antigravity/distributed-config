@@ -11,7 +11,9 @@ func TestResolveConfigPath(t *testing.T) {
 	// Create a dummy test environment in a temp directory
 	tempDir_raw, _ := os.MkdirTemp("", "distconf-test-*")
 	tempDir, _ := filepath.EvalSymlinks(tempDir_raw)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	oldCwd, _ := os.Getwd()
 	_ = os.Chdir(tempDir)

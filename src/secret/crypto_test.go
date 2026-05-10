@@ -30,7 +30,9 @@ func TestEncryptionRoundTrip(t *testing.T) {
 	// 2. Setup local private.pem for getPrivateKey() fallback
 	tempKeyFile := "./private.pem"
 	_ = os.WriteFile(tempKeyFile, privPEM, 0600)
-	defer os.Remove(tempKeyFile)
+	defer func() {
+		_ = os.Remove(tempKeyFile)
+	}()
 
 	// 3. Test Encrypt
 	original := "bastien-secret-123"
@@ -58,7 +60,9 @@ func TestProcessConfigSecrets(t *testing.T) {
 	privPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privKey)})
 
 	_ = os.WriteFile("./private.pem", privPEM, 0600)
-	defer os.Remove("./private.pem")
+	defer func() {
+		_ = os.Remove("./private.pem")
+	}()
 
 	// Create encrypted value
 	secret := "my-db-password"

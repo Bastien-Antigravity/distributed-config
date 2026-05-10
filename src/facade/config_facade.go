@@ -91,7 +91,7 @@ func (config *Config) OnRegistryUpdate(onRegistryUpdateFn func(map[string][]stri
 func (config *Config) Set(updates map[string]map[string]string) error {
 	if config.strategy != nil {
 		if err := config.strategy.Set(config.Config, updates); err != nil {
-			config.Config.Logger.Error("Strategy.Set failed: %v", err)
+			config.Logger.Error("Strategy.Set failed: %v", err)
 			return err // Abort local callback on failure and return error
 		}
 
@@ -109,7 +109,7 @@ func (config *Config) Set(updates map[string]map[string]string) error {
 
 	// Trigger local callback for UI consistency (Standalone & Staging)
 	if config.ParentOnLiveConfUpdate != nil {
-		config.ParentOnLiveConfUpdate(*config.Config.LiveConfig.Load())
+		config.ParentOnLiveConfUpdate(*config.LiveConfig.Load())
 	}
 	return nil
 }

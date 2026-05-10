@@ -11,9 +11,8 @@ func main() {
 	fmt.Println("Running Distributed Config Integration Tests...")
 	fmt.Println("---------------------------------------------")
 
-	failed := false
-
-	if !runTest("Standalone Profile Init", testStandaloneProfile) {
+	failed := !runTest("Standalone Profile Init", testStandaloneProfile)
+	if !runTest("Test Profile Init", testTestProfile) {
 		failed = true
 	}
 

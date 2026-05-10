@@ -5,9 +5,9 @@ GOTEST=$(GOCMD) test
 
 .PHONY: all build clean test
 
-all: build build-lib
+all: build
 
-build:
+build: build-lib
 	mkdir -p bin
 	$(GOBUILD) -o bin/ ./cmd/...
 
