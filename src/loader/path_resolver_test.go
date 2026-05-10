@@ -106,9 +106,9 @@ func TestResolveConfigPath(t *testing.T) {
 
 		// Nothing created
 		path := ResolveConfigPath("production")
-		// Should just default to [exeName].yaml strings
-		if path != exeName+".yaml" {
-			t.Errorf("Expected fallback %s.yaml, got %s", exeName, path)
+		// Should just default to [targetName].yaml string
+		if path != "production.yaml" {
+			t.Errorf("Expected fallback production.yaml, got %s", path)
 		}
 	})
 }
