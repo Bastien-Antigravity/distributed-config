@@ -32,7 +32,12 @@ func ResolveConfigPath(targetName string) string {
 	// 2. Build Search Candidates (STRICT ORDER)
 	var candidates []string
 
-	// Steps 1 & 2: config/[targetName].yaml (CWD then EXEDIR)
+	// Steps 1 & 2: [targetName].yaml in CWD
+	if targetName != "" && cwd != "" {
+		candidates = append(candidates, filepath.Join(cwd, targetName+".yaml"))
+	}
+
+	// Steps 3 & 4: config/[targetName].yaml (CWD then EXEDIR)
 	if targetName != "" {
 		if cwd != "" {
 			candidates = append(candidates, filepath.Join(cwd, "config", targetName+".yaml"))
@@ -42,7 +47,7 @@ func ResolveConfigPath(targetName string) string {
 		}
 	}
 
-	// Steps 3 & 4: config/[exeName].yaml (CWD then EXEDIR)
+	// Steps 5 & 6: config/[exeName].yaml (CWD then EXEDIR)
 	if exeName != "" {
 		if cwd != "" {
 			candidates = append(candidates, filepath.Join(cwd, "config", exeName+".yaml"))
@@ -52,7 +57,7 @@ func ResolveConfigPath(targetName string) string {
 		}
 	}
 
-	// Steps 5 & 6: [exeName].yaml (CWD then EXEDIR)
+	// Steps 7 & 8: [exeName].yaml (CWD then EXEDIR)
 	if exeName != "" {
 		if cwd != "" {
 			candidates = append(candidates, filepath.Join(cwd, exeName+".yaml"))
@@ -69,10 +74,13 @@ func ResolveConfigPath(targetName string) string {
 		}
 	}
 
-	// 4. Default Path: if nothing found, return [exeName].yaml or [targetName].yaml as a guess
-	finalDefault := exeName
-	if finalDefault == "" {
-		finalDefault = targetName
+	// 4. Default: return targetName if provided, otherwise exeName
+	if targetName != "" {
+		return targetName + ".yaml"
 	}
-	return finalDefault + ".yaml"
+	if exeName != "" {
+		return exeName + ".yaml"
+	}
+
+	return "config.yaml"
 }

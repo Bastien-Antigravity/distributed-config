@@ -232,28 +232,41 @@ func (c *Config) GetGRPCAddress(capability string) (string, error) {
 // -----------------------------------------------------------------------------
 
 func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
-	if c.Capabilities == nil {
-		return "", fmt.Errorf("no capabilities found")
-	}
-	capRaw, ok := c.Capabilities[capability]
-	if !ok {
-		return "", fmt.Errorf("capability %s not found", capability)
+	// 1. Check LiveConfig (Overrides from CLI or Server)
+	host := c.Get("capabilities", capability+"."+hostKey)
+	port := c.Get("capabilities", capability+"."+portKey)
+
+	// 2. Fallback to static Capabilities map if missing from LiveConfig
+	if host == "" || port == "" {
+		if c.Capabilities == nil {
+			return "", fmt.Errorf("no capabilities found and no live override for %s", capability)
+		}
+		capRaw, ok := c.Capabilities[capability]
+		if !ok {
+			if host == "" {
+				return "", fmt.Errorf("capability %s not found", capability)
+			}
+		} else {
+			cap, ok := capRaw.(map[string]interface{})
+			if ok {
+				if host == "" {
+					h, _ := cap[hostKey].(string)
+					host = h
+				}
+				if port == "" {
+					p, _ := cap[portKey].(string)
+					port = p
+				}
+			}
+		}
 	}
 
-	cap, ok := capRaw.(map[string]interface{})
-	if !ok {
-		return "", fmt.Errorf("invalid capability format for %s", capability)
-	}
-
-	host, ok := cap[hostKey].(string)
-	if !ok || host == "" {
+	if host == "" {
 		return "", fmt.Errorf("host key %s missing or empty in capability %s", hostKey, capability)
 	}
-
-	p, ok := cap[portKey].(string)
-	if !ok || p == "" {
+	if port == "" {
 		return "", fmt.Errorf("port key %s missing or empty in capability %s", portKey, capability)
 	}
 
-	return fmt.Sprintf("%s:%s", host, p), nil
+	return fmt.Sprintf("%s:%s", host, port), nil
 }
