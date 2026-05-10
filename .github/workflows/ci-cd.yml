@@ -29,7 +29,7 @@ jobs:
         run: go build ./...
 
       - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
 
       - name: Run golangci-lint
         run: $(go env GOPATH)/bin/golangci-lint run
@@ -47,6 +47,11 @@ jobs:
       - name: Build CGO Shared Library
         run: make build-lib
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Run Python SDK Tests
         run: |
           cd distconf/python
@@ -57,6 +62,11 @@ jobs:
           cd distconf/cpp
           g++ -std=c++11 tests/test_distconf.cpp -I. -L../libdistconf -ldistconf -o test_app
           LD_LIBRARY_PATH=../libdistconf ./test_app
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.91
 
       - name: Run Rust SDK Tests
         run: |
