@@ -9,4 +9,4 @@ description = "Rust wrapper for the Distributed Config CGO bridge"
 libc = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-libloading = "0.8"
+libloading = "0.9"
