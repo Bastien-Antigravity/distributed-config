@@ -142,3 +142,12 @@ func (s *ProductionStrategy) GetHandler() *network.ConfigProtoHandler {
 	}
 	return nil
 }
+
+// -----------------------------------------------------------------------------
+
+func (s *ProductionStrategy) Close() error {
+	if s.Client != nil {
+		return s.Client.Close()
+	}
+	return nil
+}

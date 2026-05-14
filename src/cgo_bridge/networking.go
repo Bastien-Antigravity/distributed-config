@@ -13,9 +13,9 @@ import (
 
 // GetAddress is a Go-native wrapper for DistConf_GetAddress.
 func GetAddress(handle uintptr, capability string) (string, error) {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return "", nil
@@ -28,9 +28,9 @@ func GetAddress(handle uintptr, capability string) (string, error) {
 
 // GetGRPCAddress is a Go-native wrapper for DistConf_GetGRPCAddress.
 func GetGRPCAddress(handle uintptr, capability string) (string, error) {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return "", nil
@@ -43,9 +43,9 @@ func GetGRPCAddress(handle uintptr, capability string) (string, error) {
 
 // GetCapability is a Go-native wrapper for DistConf_GetCapability.
 func GetCapability(handle uintptr, capability string) (string, error) {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return "", nil
@@ -68,9 +68,9 @@ func GetCapability(handle uintptr, capability string) (string, error) {
 
 // GetFullConfig is a Go-native wrapper for DistConf_GetFullConfig.
 func GetFullConfig(handle uintptr) (string, error) {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return "", nil

@@ -13,9 +13,9 @@ import (
 
 // IsValid is a Go-native wrapper for checking handle validity.
 func IsValid(handle uintptr) bool {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	_, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 	return ok
 }
 
@@ -23,9 +23,9 @@ func IsValid(handle uintptr) bool {
 
 // ValidateMandatoryServices is a Go-native wrapper.
 func ValidateMandatoryServices(handle uintptr) error {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return nil
@@ -38,9 +38,9 @@ func ValidateMandatoryServices(handle uintptr) error {
 
 // ShareConfig is a Go-native wrapper for DistConf_ShareConfig.
 func ShareConfig(handle uintptr, jsonData string) error {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return nil

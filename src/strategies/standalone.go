@@ -63,3 +63,9 @@ func (s *StandaloneStrategy) Set(cfg *core.Config, updates map[string]map[string
 func (s *StandaloneStrategy) GetHandler() *network.ConfigProtoHandler {
 	return nil
 }
+
+// -----------------------------------------------------------------------------
+
+func (s *StandaloneStrategy) Close() error {
+	return nil
+}

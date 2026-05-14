@@ -115,3 +115,12 @@ func (s *StagingStrategy) Set(cfg *core.Config, updates map[string]map[string]st
 	cfg.Set(updates)
 	return nil
 }
+
+// -----------------------------------------------------------------------------
+
+func (s *StagingStrategy) Close() error {
+	if s.Client != nil {
+		return s.Client.Close()
+	}
+	return nil
+}

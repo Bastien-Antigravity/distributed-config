@@ -130,6 +130,15 @@ func (config *Config) Sync() error {
 	return config.strategy.Sync(config.Config)
 }
 
+// Close shuts down any active resources associated with the configuration strategy.
+// -----------------------------------------------------------------------------
+func (config *Config) Close() error {
+	if config.strategy != nil {
+		return config.strategy.Close()
+	}
+	return nil
+}
+
 // ShareConfig overrides core.Config.ShareConfig to ensure updates are synchronized
 // according to the current strategy (e.g., pushed to Config Server in Production).
 // -----------------------------------------------------------------------------

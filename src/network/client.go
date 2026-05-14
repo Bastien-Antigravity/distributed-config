@@ -2,6 +2,8 @@ package network
 
 import (
 	"fmt"
+	"sync"
+	"time"
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
 
@@ -16,6 +18,8 @@ type Client struct {
 	sock    safesocket.Socket
 	Handler *ConfigProtoHandler
 	quit    chan struct{}
+	backoff *Backoff
+	mu      sync.RWMutex
 }
 
 // -----------------------------------------------------------------------------
@@ -28,6 +32,7 @@ func NewClient(addr string, config *core.Config) (*Client, error) {
 		addr:    addr,
 		Handler: h,
 		quit:    make(chan struct{}),
+		backoff: NewBackoff(),
 	}
 	if err := c.connect(); err != nil {
 		return nil, err
@@ -50,11 +55,18 @@ func (c *Client) connect() error {
 
 	client, err := safesocket.Create(profile, c.addr, "127.0.0.1", "client", false)
 	if err != nil {
-		c.Handler.parentConfig.Logger.Error("Mock: Failed to connect to %s (using safe-socket)", c.addr)
+		c.Handler.parentConfig.Logger.Error("Mock: Failed to create socket to %s (using safe-socket)", c.addr)
 		return err
 	}
+
+	if err := client.Open(); err != nil {
+		return err
+	}
+
+	c.mu.Lock()
 	c.sock = client
-	return c.sock.Open()
+	c.mu.Unlock()
+	return nil
 }
 
 // -----------------------------------------------------------------------------
@@ -62,6 +74,8 @@ func (c *Client) connect() error {
 // Close closes the connection and stops the background listener.
 func (c *Client) Close() error {
 	close(c.quit)
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.sock != nil {
 		return c.sock.Close()
 	}
@@ -73,18 +87,42 @@ func (c *Client) Close() error {
 // Watch starts a background goroutine to handle asynchronous updates (BROADCASTs).
 func (c *Client) Watch() {
 	go func() {
+		attempt := 0
 		for {
 			select {
 			case <-c.quit:
 				return
 			default:
-				if c.sock == nil {
-					return
+				c.mu.RLock()
+				sock := c.sock
+				c.mu.RUnlock()
+
+				if sock == nil {
+					// Try to reconnect
+					delay := c.backoff.GetDelay(attempt)
+					c.Handler.parentConfig.Logger.Info("Client: Connection lost. Retrying in %v...", delay)
+					time.Sleep(delay)
+					if err := c.connect(); err == nil {
+						c.Handler.parentConfig.Logger.Info("Client: Reconnected to %s", c.addr)
+						attempt = 0
+						// Re-sync after reconnection
+						_, _ = c.GetConfig()
+					} else {
+						attempt++
+					}
+					continue
 				}
-				data, err := c.sock.Receive()
+
+				data, err := sock.Receive()
 				if err != nil {
-					// Connection likely closed
-					return
+					// Connection likely closed or failed
+					c.mu.Lock()
+					if c.sock == sock {
+						_ = c.sock.Close()
+						c.sock = nil
+					}
+					c.mu.Unlock()
+					continue
 				}
 				if len(data) > 0 {
 					_ = c.Handler.HandleIncoming(data)
@@ -104,13 +142,17 @@ func (c *Client) GetConfig() (*core.Config, error) {
 		return nil, err
 	}
 
-	if c.sock != nil {
-		if err := c.sock.Send(data); err != nil {
+	c.mu.RLock()
+	sock := c.sock
+	c.mu.RUnlock()
+
+	if sock != nil {
+		if err := sock.Send(data); err != nil {
 			return nil, err
 		}
 
 		// Receive response (safe-socket handles framing)
-		data, err := c.sock.Receive()
+		data, err := sock.Receive()
 		if err != nil {
 			return nil, err
 		}
@@ -143,8 +185,20 @@ func (c *Client) UpdateConfigMap(m *map[string]map[string]string) error {
 	if err != nil {
 		return err
 	}
-	if c.sock != nil {
-		return c.sock.Send(data)
+
+	c.mu.RLock()
+	sock := c.sock
+	c.mu.RUnlock()
+
+	if sock != nil {
+		return sock.Send(data)
 	}
 	return nil
+}
+
+// IsConnected returns true if the client is currently connected.
+func (c *Client) IsConnected() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.sock != nil
 }
