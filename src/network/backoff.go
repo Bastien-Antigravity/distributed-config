@@ -3,6 +3,7 @@ package network
 import (
 	"math"
 	"math/rand"
+	"strconv"
 	"time"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
@@ -19,13 +20,17 @@ type Backoff struct {
 // NewBackoff creates a new backoff strategy using parameters from the config
 func NewBackoff(cfg *core.Config) *Backoff {
 	base := 100 * time.Millisecond
-	if cfg != nil && cfg.RetryBaseMS > 0 {
-		base = time.Duration(cfg.RetryBaseMS) * time.Millisecond
+	if cfg != nil && cfg.Common.RetryBaseMS != "" {
+		if val, err := strconv.Atoi(cfg.Common.RetryBaseMS); err == nil && val > 0 {
+			base = time.Duration(val) * time.Millisecond
+		}
 	}
 
 	max := 5 * time.Second
-	if cfg != nil && cfg.RetryMaxSec > 0 {
-		max = time.Duration(cfg.RetryMaxSec) * time.Second
+	if cfg != nil && cfg.Common.RetryMaxSec != "" {
+		if val, err := strconv.Atoi(cfg.Common.RetryMaxSec); err == nil && val > 0 {
+			max = time.Duration(val) * time.Second
+		}
 	}
 
 	return &Backoff{

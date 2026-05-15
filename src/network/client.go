@@ -2,10 +2,11 @@ package network
 
 import (
 	"fmt"
-	"github.com/Bastien-Antigravity/distributed-config/src/core"
-	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
 	"sync"
 	"time"
+
+	"github.com/Bastien-Antigravity/distributed-config/src/core"
+	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
 
 	safesocket "github.com/Bastien-Antigravity/safe-socket"
 )
@@ -53,13 +54,13 @@ func (c *Client) connect() error {
 	// 2. Build Profile String (syntax: profile:identity)
 	profile := fmt.Sprintf("tcp-hello:%s", identity)
 
-	// 3. Determine Local IP for binding
-	localIP := c.Handler.parentConfig.Common.LocalIP
-	if localIP == "" {
-		localIP = "127.0.0.1"
+	// 3. Determine Public IP for binding
+	publicIP := c.Handler.parentConfig.Common.PublicIP
+	if publicIP == "" {
+		publicIP = "127.0.0.1"
 	}
 
-	client, err := safesocket.Create(profile, c.addr, localIP, "client", false)
+	client, err := safesocket.Create(profile, c.addr, publicIP, "client", false)
 	if err != nil {
 		c.Handler.parentConfig.Logger.Error("Mock: Failed to create socket to %s (using safe-socket)", c.addr)
 		return err

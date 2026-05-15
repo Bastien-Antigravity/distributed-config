@@ -16,6 +16,11 @@ type CommonConfig struct {
 	CommonFilePath string `yaml:"common_file_path" json:"common_file_path"`
 	PublicKey      string `yaml:"public_key" json:"public_key"`
 	Reset          bool   `yaml:"reset" json:"reset"`
+
+	// Network Settings
+	PublicIP    string `yaml:"public_ip" json:"public_ip"`         // Binding interface, defaults to 127.0.0.1
+	RetryBaseMS string `yaml:"retry_base_ms" json:"retry_base_ms"` // Base delay for backoff, defaults to "100"
+	RetryMaxSec string `yaml:"retry_max_sec" json:"retry_max_sec"` // Max delay for backoff, defaults to "5"
 }
 
 // Config Data Struct (Pure Data)
@@ -32,11 +37,6 @@ type Config struct {
 
 	// Internal state
 	Logger utils.Logger `yaml:"-"`
-
-	// Network Settings
-	LocalIP     string `yaml:"local_ip" json:"local_ip"`         // Binding interface, defaults to 127.0.0.1
-	RetryBaseMS int    `yaml:"retry_base_ms" json:"retry_base_ms"` // Base delay for backoff, defaults to 100
-	RetryMaxSec int    `yaml:"retry_max_sec" json:"retry_max_sec"` // Max delay for backoff, defaults to 5
 }
 
 // -----------------------------------------------------------------------------
