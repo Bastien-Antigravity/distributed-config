@@ -28,7 +28,8 @@ class TestDistConfigFull(unittest.TestCase):
         # 3. Safety Hatch: If the library is missing, attempt to build it via the root Makefile
         if not osPathExists(cls.lib_path):
             import subprocess
-            root_dir = osPathDirname(osPathDirname(osPathDirname(osPathAbspath(__file__))))
+            # Climb 4 levels: tests/ -> python/ -> distconf/ -> distributed-config/ (ROOT)
+            root_dir = osPathDirname(osPathDirname(osPathDirname(osPathDirname(osPathAbspath(__file__)))))
             makefile = osPathJoin(root_dir, "Makefile")
             if osPathExists(makefile):
                 print(f"Library missing at {cls.lib_path}. Attempting auto-build via {root_dir}...")

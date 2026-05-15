@@ -1,6 +1,8 @@
-.PHONY: all test build-lib clean
+.PHONY: all build test build-lib clean
 
-all: test
+all: build
+
+build: build-lib
 
 # Attempt to build the library if it's missing
 build-lib:
