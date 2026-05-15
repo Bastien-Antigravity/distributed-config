@@ -3,7 +3,17 @@ GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 
-.PHONY: all build clean test
+# Determine OS and Library Extension
+OS=$(shell go env GOOS)
+ifeq ($(OS),windows)
+	LIB_EXT=dll
+else ifeq ($(OS),darwin)
+	LIB_EXT=dylib
+else
+	LIB_EXT=so
+endif
+
+.PHONY: all build clean test build-lib build-dll build-all
 
 all: build
 
@@ -13,11 +23,13 @@ build: build-lib
 
 build-lib:
 	mkdir -p distconf/libdistconf
-	# For macOS we use .dylib, for others we use .so
-	# go build generates the .h file automatically with -buildmode=c-shared
-	$(GOBUILD) -buildmode=c-shared -o distconf/libdistconf/libdistconf.so ./cmd/libdistconf
-	# On macOS, rename to .dylib for clarity if needed, but .so works for many loaders
-	cp distconf/libdistconf/libdistconf.so distconf/libdistconf/libdistconf.dylib || true
+	# Use dynamic extension based on host OS
+	$(GOBUILD) -buildmode=c-shared -o distconf/libdistconf/libdistconf.$(LIB_EXT) ./cmd/libdistconf
+	# For macOS, set the install_name to @rpath to allow relative loading via LC_RPATH
+	@if [ "$(LIB_EXT)" = "dylib" ]; then \
+		install_name_tool -id @rpath/libdistconf.dylib distconf/libdistconf/libdistconf.dylib; \
+		cp distconf/libdistconf/libdistconf.dylib distconf/libdistconf/libdistconf.so || true; \
+	fi
 
 build-dll:
 	mkdir -p distconf/libdistconf
@@ -30,6 +42,10 @@ clean:
 	$(GOCLEAN)
 	rm -rf bin/
 	rm -rf release/
+	rm -f distconf/libdistconf/libdistconf.so
+	rm -f distconf/libdistconf/libdistconf.dylib
+	rm -f distconf/libdistconf/libdistconf.h
+	rm -f distconf/libdistconf/libdistconf.dll
 
 test:
 	$(GOTEST) -v ./...

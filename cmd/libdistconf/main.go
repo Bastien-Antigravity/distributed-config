@@ -9,6 +9,7 @@ package main
 typedef void (*config_update_cb)(uintptr_t handle, const char* json_data);
 
 // Helper to safely execute a C callback from Go
+static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) __attribute__((unused));
 static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) {
     if (cb != NULL) {
         cb(handle, json_data);
@@ -19,8 +20,9 @@ import "C"
 
 import (
 	"encoding/json"
-	"github.com/Bastien-Antigravity/distributed-config/src/cgo_bridge"
 	"unsafe"
+
+	"github.com/Bastien-Antigravity/distributed-config/src/cgo_bridge"
 )
 
 func main() {}

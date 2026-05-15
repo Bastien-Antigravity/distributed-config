@@ -37,7 +37,15 @@ class DistConfig:
 
     def _load_lib(self, lib_path: Optional[str]) -> Optional[Any]:
         if not lib_path:
-            lib_path = osGetenv("LIBDISTCONF_PATH", "libdistconf.so")
+            import platform
+            system = platform.system()
+            if system == "Darwin":
+                ext = ".dylib"
+            elif system == "Windows":
+                ext = ".dll"
+            else:
+                ext = ".so"
+            lib_path = osGetenv("LIBDISTCONF_PATH", f"libdistconf{ext}")
             
         try:
             lib = ctypesCDLL(lib_path)

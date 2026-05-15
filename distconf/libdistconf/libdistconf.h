@@ -31,6 +31,7 @@ extern const char *_GoStringPtr(_GoString_ s);
 typedef void (*config_update_cb)(uintptr_t handle, const char* json_data);
 
 // Helper to safely execute a C callback from Go
+static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) __attribute__((unused));
 static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) {
     if (cb != NULL) {
         cb(handle, json_data);

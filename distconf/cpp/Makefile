@@ -1,6 +1,21 @@
+# Determine OS and Library Extension
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+	LIB_EXT = dylib
+	RPATH = -Wl,-rpath,@loader_path/../../libdistconf
+else ifeq ($(UNAME_S),Linux)
+	LIB_EXT = so
+	RPATH = -Wl,-rpath,'$$ORIGIN/../../libdistconf'
+else
+	LIB_EXT = dll
+	RPATH = 
+endif
+
+LIB_PATH = ../libdistconf/libdistconf.$(LIB_EXT)
+
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -I. -I../libdistconf
-LDFLAGS = -L../libdistconf -ldistconf -Wl,-rpath,../libdistconf
+LDFLAGS = -L../libdistconf -ldistconf $(RPATH)
 
 # If DISTCONF_DIR is set, use it for headers and lib
 ifneq ($(DISTCONF_DIR),)
@@ -11,18 +26,20 @@ endif
 TEST_SRC = tests/test_distconf.cpp
 TEST_BIN = bin/test_distconf
 
-.PHONY: all clean test build-lib
+.PHONY: all clean test
 
-all: build-lib $(TEST_BIN)
+all: $(TEST_BIN)
 
-# Attempt to build the library if it's missing and we are in a Go environment
-build-lib:
-	@if [ ! -f ../libdistconf/libdistconf.so ] && [ ! -f ../libdistconf/libdistconf.dylib ] && [ -f ../../Makefile ]; then \
-		echo "Shared library missing, attempting to build..."; \
-		cd ../.. && make build-lib; \
+# Dependency on the library file
+$(LIB_PATH):
+	@if [ -f ../../Makefile ]; then \
+		echo "Shared library missing or outdated, attempting to build..."; \
+		$(MAKE) -C ../.. build-lib; \
+	else \
+		echo "Warning: Root Makefile not found, cannot build library automatically."; \
 	fi
 
-$(TEST_BIN): $(TEST_SRC)
+$(TEST_BIN): $(TEST_SRC) $(LIB_PATH)
 	mkdir -p bin
 	$(CXX) $(CXXFLAGS) $(TEST_SRC) -o $(TEST_BIN) $(LDFLAGS)
 

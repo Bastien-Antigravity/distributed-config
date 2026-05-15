@@ -156,7 +156,11 @@ mod tests {
         }
         let mut path = "../libdistconf/libdistconf.so".to_string();
         if !Path::new(&path).exists() {
-            path = path.replace(".so", ".dylib");
+            if cfg!(target_os = "macos") {
+                path = path.replace(".so", ".dylib");
+            } else if cfg!(target_os = "windows") {
+                path = path.replace(".so", ".dll");
+            }
         }
         path
     }
