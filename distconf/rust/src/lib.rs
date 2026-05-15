@@ -151,6 +151,9 @@ mod tests {
     use std::path::Path;
 
     fn get_lib_path() -> String {
+        if let Ok(path) = std::env::var("LIBDISTCONF_PATH") {
+            return path;
+        }
         let mut path = "../libdistconf/libdistconf.so".to_string();
         if !Path::new(&path).exists() {
             path = path.replace(".so", ".dylib");

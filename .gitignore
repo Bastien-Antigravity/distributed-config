@@ -120,6 +120,8 @@ obj/
 *.o
 *.a
 *.so
+*.dylib
+*.dll
 *.out
 # --- Secrets & Config ---
 .env*

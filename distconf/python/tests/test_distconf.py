@@ -2,6 +2,7 @@
 # coding:utf-8
 
 import unittest
+from os import getenv as osGetenv
 from os.path import abspath as osPathAbspath, dirname as osPathDirname, exists as osPathExists
 from sys import path as sysPath
 from time import sleep as timeSleep
@@ -14,8 +15,11 @@ from distconf import DistConfig
 class TestDistConfigFull(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Path to the library built by the Makefile
-        cls.lib_path = osPathAbspath("../../distconf/libdistconf/libdistconf.so")
+        # Respect LIBDISTCONF_PATH if set, otherwise fallback to relative path
+        cls.lib_path = osGetenv("LIBDISTCONF_PATH")
+        if not cls.lib_path:
+            cls.lib_path = osPathAbspath("../../distconf/libdistconf/libdistconf.so")
+            
         if not osPathExists(cls.lib_path):
             # Try dylib for macOS
             cls.lib_path = cls.lib_path.replace(".so", ".dylib")

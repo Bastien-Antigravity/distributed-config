@@ -31,7 +31,7 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 		for {
 			select {
 			case <-serverStop1:
-				server1.Close()
+				_ = server1.Close()
 				return
 			default:
 				conn, err := server1.Accept()
@@ -39,7 +39,7 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 					return
 				}
 				go func() {
-					defer conn.Close()
+					defer func() { _ = conn.Close() }()
 					for {
 						_, err := conn.ReadMessage()
 						if err != nil {
@@ -67,7 +67,7 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	client.Watch()
 	time.Sleep(200 * time.Millisecond)
@@ -94,7 +94,7 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 		for {
 			select {
 			case <-serverStop2:
-				newServer.Close()
+				_ = newServer.Close()
 				return
 			default:
 				conn, err := newServer.Accept()
@@ -102,7 +102,7 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 					return
 				}
 				go func() {
-					defer conn.Close()
+					defer func() { _ = conn.Close() }()
 					for {
 						_, err := conn.ReadMessage()
 						if err != nil {
