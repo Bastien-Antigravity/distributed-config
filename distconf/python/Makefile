@@ -18,5 +18,6 @@ build-lib:
 test: build-lib
 	python3 tests/test_distconf.py
 
+
 clean:
 	rm -rf __pycache__ tests/__pycache__
