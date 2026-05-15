@@ -2,10 +2,10 @@ package network
 
 import (
 	"fmt"
-	"sync"
-	"time"
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
+	"sync"
+	"time"
 
 	safesocket "github.com/Bastien-Antigravity/safe-socket"
 )

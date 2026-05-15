@@ -31,7 +31,7 @@ type Config struct {
 	LiveConfig   atomic.Pointer[map[string]map[string]string] `yaml:"-"`
 
 	// Internal state
-	Logger     utils.Logger `yaml:"-"`
+	Logger utils.Logger `yaml:"-"`
 }
 
 // -----------------------------------------------------------------------------

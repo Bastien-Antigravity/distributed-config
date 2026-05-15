@@ -53,7 +53,7 @@ func TestBackoff_Jitter(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		d := b.GetDelay(0)
 		delays[d] = true
-		
+
 		// Ensure it's within range [50ms, 150ms]
 		if d < 50*time.Millisecond || d > 150*time.Millisecond {
 			t.Errorf("Delay %v out of jitter range [50ms, 150ms]", d)

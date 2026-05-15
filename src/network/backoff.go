@@ -31,7 +31,7 @@ func (b *Backoff) GetDelay(attempt int) time.Duration {
 	}
 
 	delay := float64(b.BaseDelay) * math.Pow(b.Factor, float64(attempt))
-	
+
 	// Apply Jitter
 	if b.Jitter > 0 {
 		jitterRange := delay * b.Jitter

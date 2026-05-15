@@ -12,12 +12,12 @@ import (
 
 func TestNetworkResilience_Reconnection(t *testing.T) {
 	addr := "127.0.0.1:9999"
-	
+
 	server1, err := safesocket.Create("tcp-hello:server", addr, "127.0.0.1", "server", false)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
-	
+
 	// Use a channel to control server lifecycle
 	serverStop1 := make(chan struct{})
 	serverReady1 := make(chan struct{})
@@ -27,7 +27,7 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 			return
 		}
 		close(serverReady1)
-		
+
 		for {
 			select {
 			case <-serverStop1:
@@ -85,7 +85,7 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create new server: %v", err)
 	}
-	
+
 	go func() {
 		if err := newServer.Listen(); err != nil {
 			return
