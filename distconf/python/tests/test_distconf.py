@@ -18,11 +18,15 @@ class TestDistConfigFull(unittest.TestCase):
         # Respect LIBDISTCONF_PATH if set, otherwise fallback to relative path
         cls.lib_path = osGetenv("LIBDISTCONF_PATH")
         if not cls.lib_path:
-            cls.lib_path = osPathAbspath("../../distconf/libdistconf/libdistconf.so")
-            
-        if not osPathExists(cls.lib_path):
-            # Try dylib for macOS
-            cls.lib_path = cls.lib_path.replace(".so", ".dylib")
+            import platform
+            system = platform.system()
+            if system == "Darwin":
+                ext = ".dylib"
+            elif system == "Windows":
+                ext = ".dll"
+            else:
+                ext = ".so"
+            cls.lib_path = osPathAbspath(f"../../distconf/libdistconf/libdistconf{ext}")
 
     # -----------------------------------------------------------------------------------------------
 

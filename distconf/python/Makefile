@@ -4,8 +4,14 @@ all: test
 
 # Attempt to build the library if it's missing
 build-lib:
-	@if [ ! -f ../libdistconf/libdistconf.so ] && [ ! -f ../libdistconf/libdistconf.dylib ] && [ -f ../../Makefile ]; then \
-		echo "Shared library missing, attempting to build..."; \
+	@OS=$$(go env GOOS 2>/dev/null || uname -s | tr '[:upper:]' '[:lower:]'); \
+	case $$OS in \
+		darwin)  EXT="dylib" ;; \
+		windows*) EXT="dll" ;; \
+		*)       EXT="so" ;; \
+	esac; \
+	if [ ! -f ../libdistconf/libdistconf.$$EXT ] && [ -f ../../Makefile ]; then \
+		echo "Shared library missing ($$EXT), attempting to build..."; \
 		$(MAKE) -C ../.. build-lib; \
 	fi
 
