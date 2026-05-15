@@ -1,6 +1,0 @@
-common:
-    name: CHANGE_ME
-    reset: false
-capabilities: {}
-common_file_path: ""
-memconfigpath: ""
