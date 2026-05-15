@@ -4,9 +4,11 @@ import (
 	"math"
 	"math/rand"
 	"time"
+
+	"github.com/Bastien-Antigravity/distributed-config/src/core"
 )
 
-// Backoff implements jittered exponential backoff.
+// Backoff implements exponential backoff with jitter
 type Backoff struct {
 	BaseDelay time.Duration
 	MaxDelay  time.Duration
@@ -14,11 +16,21 @@ type Backoff struct {
 	Jitter    float64
 }
 
-// NewBackoff creates a new Backoff instance with standard defaults.
-func NewBackoff() *Backoff {
+// NewBackoff creates a new backoff strategy using parameters from the config
+func NewBackoff(cfg *core.Config) *Backoff {
+	base := 100 * time.Millisecond
+	if cfg != nil && cfg.RetryBaseMS > 0 {
+		base = time.Duration(cfg.RetryBaseMS) * time.Millisecond
+	}
+
+	max := 5 * time.Second
+	if cfg != nil && cfg.RetryMaxSec > 0 {
+		max = time.Duration(cfg.RetryMaxSec) * time.Second
+	}
+
 	return &Backoff{
-		BaseDelay: 100 * time.Millisecond,
-		MaxDelay:  5 * time.Second,
+		BaseDelay: base,
+		MaxDelay:  max,
 		Factor:    2.0,
 		Jitter:    0.1,
 	}

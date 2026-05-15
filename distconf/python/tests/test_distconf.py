@@ -3,7 +3,7 @@
 
 import unittest
 from os import getenv as osGetenv
-from os.path import abspath as osPathAbspath, dirname as osPathDirname, exists as osPathExists
+from os.path import abspath as osPathAbspath, dirname as osPathDirname, exists as osPathExists, join as osPathJoin
 from sys import path as sysPath
 from time import sleep as timeSleep
 
@@ -15,18 +15,26 @@ from distconf import DistConfig
 class TestDistConfigFull(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Respect LIBDISTCONF_PATH if set, otherwise fallback to relative path
+        # 1. Prioritize the environment variable (Set by Fleet CI or manual dev)
         cls.lib_path = osGetenv("LIBDISTCONF_PATH")
+        
+        # 2. If not set, try to find it in the standard relative location
         if not cls.lib_path:
             import platform
             system = platform.system()
-            if system == "Darwin":
-                ext = ".dylib"
-            elif system == "Windows":
-                ext = ".dll"
-            else:
-                ext = ".so"
+            ext = ".dylib" if system == "Darwin" else (".dll" if system == "Windows" else ".so")
             cls.lib_path = osPathAbspath(f"../../distconf/libdistconf/libdistconf{ext}")
+            
+        # 3. Safety Hatch: If the library is missing, attempt to build it via the root Makefile
+        if not osPathExists(cls.lib_path):
+            import subprocess
+            root_dir = osPathDirname(osPathDirname(osPathDirname(osPathAbspath(__file__))))
+            makefile = osPathJoin(root_dir, "Makefile")
+            if osPathExists(makefile):
+                print(f"Library missing at {cls.lib_path}. Attempting auto-build via {root_dir}...")
+                subprocess.run(["make", "-C", root_dir, "build-lib"], check=False)
+            else:
+                print(f"Warning: Library missing and root Makefile not found at {root_dir}")
 
     # -----------------------------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@ import (
 )
 
 func TestBackoff_GetDelay(t *testing.T) {
-	b := NewBackoff()
+	b := NewBackoff(nil)
 	b.BaseDelay = 100 * time.Millisecond
 	b.MaxDelay = 1000 * time.Millisecond
 	b.Factor = 2.0
@@ -44,7 +44,7 @@ func TestBackoff_GetDelay(t *testing.T) {
 }
 
 func TestBackoff_Jitter(t *testing.T) {
-	b := NewBackoff()
+	b := NewBackoff(nil)
 	b.BaseDelay = 100 * time.Millisecond
 	b.Jitter = 0.5 // High jitter
 

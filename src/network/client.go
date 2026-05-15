@@ -32,7 +32,7 @@ func NewClient(addr string, config *core.Config) (*Client, error) {
 		addr:    addr,
 		Handler: h,
 		quit:    make(chan struct{}),
-		backoff: NewBackoff(),
+		backoff: NewBackoff(config),
 	}
 	if err := c.connect(); err != nil {
 		return nil, err
@@ -53,7 +53,13 @@ func (c *Client) connect() error {
 	// 2. Build Profile String (syntax: profile:identity)
 	profile := fmt.Sprintf("tcp-hello:%s", identity)
 
-	client, err := safesocket.Create(profile, c.addr, "127.0.0.1", "client", false)
+	// 3. Determine Local IP for binding
+	localIP := c.Handler.parentConfig.Common.LocalIP
+	if localIP == "" {
+		localIP = "127.0.0.1"
+	}
+
+	client, err := safesocket.Create(profile, c.addr, localIP, "client", false)
 	if err != nil {
 		c.Handler.parentConfig.Logger.Error("Mock: Failed to create socket to %s (using safe-socket)", c.addr)
 		return err
