@@ -1,3 +1,7 @@
+---
+tags:
+- '#ai/ignore'
+---
 # Testing Playbook
 
 Reliability is a core requirement for a configuration library. This project employs a multi-layered testing strategy to ensure correctness, performance, and resilience.

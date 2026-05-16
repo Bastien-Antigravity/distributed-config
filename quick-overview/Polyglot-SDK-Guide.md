@@ -1,3 +1,7 @@
+---
+tags:
+- '#ai/ignore'
+---
 # Polyglot SDK Guide
 
 \`distributed-config\` provides a centralized Go core that is exposed to other languages through a C-compatible ABI (CGO Bridge). This ensures 100% architectural parity across the entire microservice fleet.

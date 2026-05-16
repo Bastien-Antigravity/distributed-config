@@ -4,8 +4,9 @@ type: repository
 status: active
 language: go
 tags:
-  - domain/configuration
-  - domain/networking
+- \'#service/distributed-config\'
+  - '#domain/configuration'
+  - '#domain/networking'
 ---
 
 # Distributed Config

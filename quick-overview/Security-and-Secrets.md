@@ -1,3 +1,7 @@
+---
+tags:
+- '#ai/ignore'
+---
 # Security & Secrets
 
 \`distributed-config\` provides native support for managing sensitive information (API keys, passwords) using RSA-based encryption and environment variable expansion.

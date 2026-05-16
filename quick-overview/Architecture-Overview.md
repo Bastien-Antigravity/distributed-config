@@ -1,3 +1,7 @@
+---
+tags:
+- '#ai/ignore'
+---
 # Architecture Overview
 
 The `distributed-config` project is a robust, strategy-based configuration management library designed for high-performance, polyglot environments. It emphasizes thread-safety, real-time updates (hot-reloading), and environment-specific behaviors.

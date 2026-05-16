@@ -1,3 +1,7 @@
+---
+tags:
+- '#ai/ignore'
+---
 # General Project Information
 
 This document provides a quick reference for the project structure, configuration files, and common developer tasks.

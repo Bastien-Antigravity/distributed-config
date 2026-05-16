@@ -1,3 +1,7 @@
+---
+tags:
+- '#ai/ignore'
+---
 # Configuration Behavior & Priority
 
 This document explains how `distributed-config` discovers, loads, and prioritizes configuration data across different environments and profiles.

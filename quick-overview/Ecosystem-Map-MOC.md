@@ -1,3 +1,7 @@
+---
+tags:
+- '#ai/ignore'
+---
 # Ecosystem Map: distributed-config
 
 This document provides a high-level overview of how `distributed-config` interacts with other components in the Bastien-Antigravity ecosystem.
