@@ -2,13 +2,16 @@ package facade
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/factory"
 	"github.com/Bastien-Antigravity/distributed-config/src/interfaces"
+	"github.com/Bastien-Antigravity/distributed-config/src/loader"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
+	"gopkg.in/yaml.v3"
 )
 
 // Facade Config Struct
@@ -148,4 +151,68 @@ func (config *Config) ShareConfig(payload interface{}) error {
 		return err
 	}
 	return config.Set(updates)
+}
+
+// ApplyFileOverride loads a YAML file, expands environment variables, and merges it
+// into the current configuration. This ensures 100% logic identity for local overrides.
+// -----------------------------------------------------------------------------
+func (config *Config) ApplyFileOverride(filePath string) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read override file: %w", err)
+	}
+
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return fmt.Errorf("failed to parse override yaml: %w", err)
+	}
+
+	// Apply Go-native expansion and type forcing
+	loader.ProcessNode(&root)
+
+	// Decode into core.Config to leverage existing field mapping (Common, Capabilities, etc)
+	// We use a temporary struct to capture everything, including custom sections
+	var raw map[string]interface{}
+	if err := root.Decode(&raw); err != nil {
+		return fmt.Errorf("failed to decode override map: %w", err)
+	}
+
+	// 1. Handle standard sections (Common)
+	if comm, ok := raw["common"].(map[string]interface{}); ok {
+		if name, ok := comm["name"].(string); ok {
+			config.Config.Common.Name = name
+		}
+	}
+
+	// 2. Handle capabilities (Merge)
+	if caps, ok := raw["capabilities"].(map[string]interface{}); ok {
+		if config.Config.Capabilities == nil {
+			config.Config.Capabilities = make(map[string]interface{})
+		}
+		for k, v := range caps {
+			config.Config.Capabilities[k] = v
+		}
+	}
+
+	// 3. Handle 'local' and any other custom sections by merging them into LiveConfig
+	// To ensure they are available via Get(section, key) or GetFullConfig()
+	updates := make(map[string]map[string]string)
+	for section, content := range raw {
+		if section == "common" || section == "capabilities" {
+			continue
+		}
+		if kv, ok := content.(map[string]interface{}); ok {
+			updates[section] = make(map[string]string)
+			for k, v := range kv {
+				updates[section][k] = fmt.Sprintf("%v", v)
+			}
+		}
+	}
+
+	if len(updates) > 0 {
+		config.Config.Set(updates)
+	}
+
+	config.Logger.Info("Standardized File Override applied from: %s", filePath)
+	return nil
 }
