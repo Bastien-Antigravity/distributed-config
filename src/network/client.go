@@ -60,7 +60,10 @@ func (c *Client) connect() error {
 		publicIP = "127.0.0.1"
 	}
 
-	client, err := safesocket.Create(profile, c.addr, publicIP, "client", false)
+	client, err := safesocket.CreateWithConfig(profile, c.addr, safesocket.SocketConfig{
+		PublicIP: publicIP,
+		Deadline: 30 * time.Second,
+	}, "client", false)
 	if err != nil {
 		c.Handler.parentConfig.Logger.Error("Mock: Failed to create socket to %s (using safe-socket)", c.addr)
 		return err

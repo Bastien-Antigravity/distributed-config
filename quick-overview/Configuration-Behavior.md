@@ -1,9 +1,15 @@
 ---
+microservice: distributed-config
+type: documentation
+status: active
 tags:
 - '#ai/ignore'
 - '#zone/3-fleet'
+- '#type/documentation'
+- '#domain/configuration'
 ---
-# Configuration Behavior & Priority
+# Configuration Behavior
+ & Priority
 
 This document explains how `distributed-config` discovers, loads, and prioritizes configuration data across different environments and profiles.
 

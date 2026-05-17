@@ -31,12 +31,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     
-    if cfg.share_config(&payload) {
+    if cfg.share_config(&payload).is_ok() {
         println!("Successfully shared node info.");
     }
 
     // 5. Validate environment
-    if cfg.validate_mandatory_services() {
+    if cfg.validate_mandatory_services().is_ok() {
         println!("Mandatory services validated.");
     }
 

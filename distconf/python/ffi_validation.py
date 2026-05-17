@@ -5,11 +5,11 @@ import ctypes
 from typing import Optional
 
 # Path to the shared library
-LIB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "release", "libdistconf.dylib") # Adjust for OS
+LIB_PATH = os.path.join(os.path.dirname(__file__), "..", "libdistconf", "libdistconf.dylib") # Adjust for OS
 if sys.platform == "win32":
-    LIB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "release", "libdistconf.dll")
+    LIB_PATH = os.path.join(os.path.dirname(__file__), "..", "libdistconf", "libdistconf.dll")
 elif sys.platform == "linux":
-    LIB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "release", "libdistconf.so")
+    LIB_PATH = os.path.join(os.path.dirname(__file__), "..", "libdistconf", "libdistconf.so")
 
 def validate_ffi():
     print(f"--- FFI Validation: Python ---")

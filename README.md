@@ -46,7 +46,7 @@ The library uses a layered approach to build the final configuration:
 - **Fail-Safe & Strict**: Enforces "Mandatory Service Validation" (Fail-Fast logic) to ensure critical infrastructure like `log_server` is correctly configured (via any source) before boot.
 - **Live Updates**: Support for dynamic configuration updates via callbacks. Manually calling `Set()` (bulk) or `SetSingle()` (convenience) on the facade now correctly triggers local observers and automatically synchronizes with the fleet.
 - **High Performance & Lock-Free**: Uses an **Atomic Pointer Swap (RCU)** architecture. Configuration reads (`Get`) are 100% lock-free and non-blocking, ensuring zero-latency configuration access for high-frequency microservices. Even during bulk updates, readers always see a consistent snapshot.
-- **Polyglot Ecosystem (v1.9.9+)**: Native support for **Python, Rust, C/C++, and VBA** via a centralized CGO-based shared library (`libdistconf`). Achieve 100% architectural parity across your entire microservice fleet with raw error transparency.
+- **Polyglot Ecosystem (v0.0.1)**: Native support for **Python, Rust, C/C++, and VBA** via a centralized CGO-based shared library (`libdistconf`). Achieve 100% architectural parity across your entire microservice fleet with raw error transparency.
  
 ## 🛡️ Feature Specs & Governance (BDD)
 The behavior of this microservice is governed by strict specifications in the **[[business-bdd-brain|Business-Specs Brain]]**:
@@ -135,8 +135,8 @@ func main() {
 |---|---|
 | **standalone** | Loads from local YAML file only. No network connection. |
 | **test**       | Uses hardcoded "safe" defaults (127.0.0.2). Connects to server to mimic production. |
-| **staging**    | Connects to Config Server (Read-only). Mandatory local configuration file. |
-| **production** | Full synchronization with Config Server (GET & PUT). Enforces strict safety checks. |
+| **staging**    | CloudStrategy (Read-Only). Remote sync disabled. Mandatory local configuration file. |
+| **production** | CloudStrategy (Full Sync). Enforces strict safety checks (e.g. No 127.0.0.2). |
 
 ## Secrets
 
@@ -149,7 +149,7 @@ capabilities:
     chat_id: "${TR_CHATID}"
 ```
 
-## Security & Encryption (v1.9.1+)
+## Security & Encryption (v0.0.1)
 
 `distributed-config` supports native RSA encryption for sensitive fields. If a string is wrapped in `ENC(...)`, it will be automatically decrypted at runtime using a private key.
 

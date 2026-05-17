@@ -9,36 +9,39 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 )
 
-// ProductionStrategy: Connects to Config Server (GET & PUT). Full Sync.
+// CloudStrategy: Unified strategy for Staging and Production.
+// Connects to Config Server for remote configuration.
 //
 // 1. Common Config:
 //   - Source: Environment -> Server -> File.
 //   - Logic: Local File is the authoritative source (overrides Server).
-//   - Integrity: PANICS if any IP IS 127.0.0.2 (Safety Check).
 //
 // 2. Live Config:
 //   - Behavior: Fetched from Server (GET).
 //
-// 3. Persistence / Dump:
-//   - On Missing File: Optional. proceeds with Environment/Server data.
-//   - Sync: ACTIVE. Pushes local changes to the Server (PUT).
+// 3. Persistence / Sync:
+//   - On Missing File: Optional. Proceeds with Environment/Server data.
+//   - Production: Sync is ACTIVE (PUT to server). Integrity checks enabled.
+//   - Staging: Sync is DISABLED (Read-Only). Integrity checks skipped.
 // -----------------------------------------------------------------------------
 
-type ProductionStrategy struct {
-	Client *network.Client
+type CloudStrategy struct {
+	Client   *network.Client
+	Profile  string // "production" or "staging"
+	ReadOnly bool   // Disables remote sync/authoritative updates
 }
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) Name() string { return "production" }
+func (s *CloudStrategy) Name() string { return s.Profile }
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) Load(cfg *core.Config) error {
-	cfg.Logger.Info("Strategy: Production")
+func (s *CloudStrategy) Load(cfg *core.Config) error {
+	cfg.Logger.Info("Strategy: Cloud (%s)", s.Profile)
 
 	// 1. Initial File Load (Gets Capabilities & config_server IP)
-	fullPath := loader.ResolveConfigPath("production")
+	fullPath := loader.ResolveConfigPath(s.Profile)
 	_ = loader.LoadConfigFromFileSafe(cfg, fullPath)
 
 	// 2. Env Load (Overrides IP or NAME if provided dynamically)
@@ -58,7 +61,7 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 			serverConfig, err := client.GetConfig()
 			s.Client.Watch() // Start background hot-reloading AFTER initial sync
 			if err == nil {
-				cfg.Logger.Info("Production: Loaded configuration from Server")
+				cfg.Logger.Info("Cloud (%s): Loaded configuration from Server", s.Profile)
 				// Deep Merge: Name
 				if serverConfig.Common.Name != "" {
 					cfg.Common.Name = serverConfig.Common.Name
@@ -75,7 +78,7 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 			}
 		}
 	} else {
-		cfg.Logger.Error("Production: Required capability 'config_server' is missing!")
+		cfg.Logger.Error("Cloud (%s): Required capability 'config_server' is missing!", s.Profile)
 	}
 
 	// 4. File Load Override (File Wins)
@@ -86,14 +89,16 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 		}
 	}
 
-	// 5. Integrity Check
-	if err := loader.CheckProductionIPs(cfg); err != nil {
-		return err
+	// 5. Integrity Check (Production only)
+	if s.Profile == "production" {
+		if err := loader.CheckProductionIPs(cfg); err != nil {
+			return err
+		}
 	}
 
 	// 6. Mandatory Service Validation
 	if err := cfg.ValidateMandatoryServices(); err != nil {
-		return fmt.Errorf("production: validation failed: %w", err)
+		return fmt.Errorf("cloud strategy (%s): validation failed: %w", s.Profile, err)
 	}
 
 	return nil
@@ -101,9 +106,14 @@ func (s *ProductionStrategy) Load(cfg *core.Config) error {
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) Sync(cfg *core.Config) error {
+func (s *CloudStrategy) Sync(cfg *core.Config) error {
+	if s.ReadOnly {
+		cfg.Logger.Info("Cloud (%s): Sync disabled (Read-Only Mode)", s.Profile)
+		return nil
+	}
+
 	if s.Client != nil {
-		cfg.Logger.Info("Production: Syncing updates to Server...")
+		cfg.Logger.Info("Cloud (%s): Syncing updates to Server...", s.Profile)
 		return s.Client.UpdateConfig(cfg)
 	}
 	return nil
@@ -111,32 +121,37 @@ func (s *ProductionStrategy) Sync(cfg *core.Config) error {
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
+func (s *CloudStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
+	if s.ReadOnly {
+		// Staging/Read-only behavior: Update locally only.
+		cfg.Set(updates)
+		return nil
+	}
+
 	if s.Client == nil {
-		return fmt.Errorf("production: config server client not initialized")
+		return fmt.Errorf("cloud strategy (%s): config server client not initialized", s.Profile)
 	}
 
 	// 1. Prepare the full state we WANT to reach (Preview)
-	// We don't call cfg.Set yet to maintain server authority.
 	nextState := cfg.PreviewSet(updates)
 	if nextState == nil {
-		return fmt.Errorf("production: failed to calculate next configuration state")
+		return fmt.Errorf("cloud strategy (%s): failed to calculate next configuration state", s.Profile)
 	}
 
 	// 2. Push to server (Authoritative Check)
-	cfg.Logger.Info("Production: Pushing authoritative update request to Server...")
+	cfg.Logger.Info("Cloud (%s): Pushing authoritative update request to Server...", s.Profile)
 	if err := s.Client.UpdateConfigMap(nextState); err != nil {
-		return fmt.Errorf("production: server rejected update: %w", err)
+		return fmt.Errorf("cloud strategy (%s): server rejected update: %w", s.Profile, err)
 	}
 
-	// 3. Success! Now apply locally (Direct apply, no redundant calculation)
+	// 3. Success! Now apply locally
 	cfg.Apply(nextState)
 	return nil
 }
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) GetHandler() *network.ConfigProtoHandler {
+func (s *CloudStrategy) GetHandler() *network.ConfigProtoHandler {
 	if s.Client != nil {
 		return s.Client.Handler
 	}
@@ -145,7 +160,7 @@ func (s *ProductionStrategy) GetHandler() *network.ConfigProtoHandler {
 
 // -----------------------------------------------------------------------------
 
-func (s *ProductionStrategy) Close() error {
+func (s *CloudStrategy) Close() error {
 	if s.Client != nil {
 		return s.Client.Close()
 	}

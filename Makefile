@@ -13,7 +13,7 @@ else
 	LIB_EXT=so
 endif
 
-.PHONY: all build clean test build-lib build-dll build-all
+.PHONY: all build clean test build-lib build-dll build-all test-sdk
 
 all: build
 
@@ -46,7 +46,23 @@ clean:
 	rm -f distconf/libdistconf/libdistconf.dylib
 	rm -f distconf/libdistconf/libdistconf.h
 	rm -f distconf/libdistconf/libdistconf.dll
+	# Purge transient test artifacts
+	rm -f distconf-*.yaml
+	rm -f Python.yaml
+	rm -f *.yaml.bak
 
 test:
 	$(GOTEST) -v ./...
+
+test-sdk: build-lib
+	@echo "--- Running Polyglot SDK Tests ---"
+	# Python
+	@echo "Testing Python..."
+	cd distconf/python && python3 ffi_validation.py && python3 -m unittest discover tests
+	# Rust
+	@echo "Testing Rust..."
+	cd distconf/rust && cargo run --example ffi_validation && cargo test
+	# C++
+	@echo "Testing C++..."
+	cd distconf/cpp && g++ -std=c++11 examples/ffi_validation.cpp -ldl -o ffi_val && ./ffi_val && rm ffi_val
 

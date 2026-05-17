@@ -34,7 +34,7 @@ func TestStandaloneStrategy(t *testing.T) {
 	})
 }
 
-func TestProductionStrategy(t *testing.T) {
+func TestCloudStrategy_Production(t *testing.T) {
 	tempDir := t.TempDir()
 	oldCwd, _ := os.Getwd()
 	_ = os.Chdir(tempDir)
@@ -45,11 +45,11 @@ func TestProductionStrategy(t *testing.T) {
 		// However! Since no file provides config_server and environment
 		// variables are not set, it will fail the ValidateMandatoryServices check at the end.
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
-		strategy := &ProductionStrategy{}
+		strategy := &CloudStrategy{Profile: "production", ReadOnly: false}
 
 		err := strategy.Load(cfg)
 		if err == nil {
-			t.Errorf("Expected ProductionStrategy to fail-fast due to missing mandatory configuration (Log/Config Server)")
+			t.Errorf("Expected CloudStrategy (production) to fail-fast due to missing mandatory configuration (Log/Config Server)")
 		}
 
 		if cfg.Capabilities != nil && cfg.Capabilities["log_server"] != nil {
@@ -72,16 +72,16 @@ capabilities:
 		_ = os.WriteFile("config/production.yaml", []byte(badProdYaml), 0644)
 
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
-		strategy := &ProductionStrategy{}
+		strategy := &CloudStrategy{Profile: "production", ReadOnly: false}
 
 		err := strategy.Load(cfg)
 		if err == nil {
-			t.Errorf("Expected ProductionStrategy to fail due to CheckProductionIPs catching the 127.0.0.2 leak")
+			t.Errorf("Expected CloudStrategy (production) to fail due to CheckProductionIPs catching the 127.0.0.2 leak")
 		}
 	})
 }
 
-func TestStagingStrategy(t *testing.T) {
+func TestCloudStrategy_Staging(t *testing.T) {
 	tempDir := t.TempDir()
 	oldCwd, _ := os.Getwd()
 	_ = os.Chdir(tempDir)
@@ -89,11 +89,11 @@ func TestStagingStrategy(t *testing.T) {
 
 	t.Run("TestStaging_EnvironmentFirst_MissingDataFails", func(t *testing.T) {
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
-		strategy := &StagingStrategy{}
+		strategy := &CloudStrategy{Profile: "staging", ReadOnly: true}
 
 		err := strategy.Load(cfg)
 		if err == nil {
-			t.Errorf("Expected StagingStrategy to fail-fast due to missing mandatory infrastructure")
+			t.Errorf("Expected CloudStrategy (staging) to fail-fast due to missing mandatory infrastructure")
 		}
 	})
 }

@@ -17,9 +17,9 @@ func NewStrategy(profile string) (interfaces.ConfigStrategy, error) {
 	case "test":
 		return &strategies.TestStrategy{}, nil
 	case "staging":
-		return &strategies.StagingStrategy{}, nil
+		return &strategies.CloudStrategy{Profile: "staging", ReadOnly: true}, nil
 	case "production":
-		return &strategies.ProductionStrategy{}, nil
+		return &strategies.CloudStrategy{Profile: "production", ReadOnly: false}, nil
 	default:
 		return nil, fmt.Errorf("unknown profile: '%s'. Available: standalone, test, staging, production", profile)
 	}

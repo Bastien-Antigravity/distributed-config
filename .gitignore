@@ -87,6 +87,12 @@ todo.txt
 ARCHITECTURE.md.bak
 zzz_memo
 
+# Test Artifacts & Dumps
+distconf-*.yaml
+Python.yaml
+standalone.yaml.bak
+test.yaml.bak
+
 # Binary / Data
 *.exe
 *.pkl
