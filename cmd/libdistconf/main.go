@@ -20,12 +20,48 @@ import "C"
 
 import (
 	"encoding/json"
+	"strings"
 	"unsafe"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/cgo_bridge"
 )
 
 func main() {}
+
+// -------------------------------------------------------------------------
+// HELPERS
+// -------------------------------------------------------------------------
+
+func mapErrorCode(err error) C.int {
+	if err == nil {
+		return C.DISTCONF_SUCCESS
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "not found"):
+		return C.DISTCONF_ERR_KEY_NOT_FOUND
+	case strings.Contains(msg, "invalid handle"):
+		return C.DISTCONF_ERR_INVALID_HANDLE
+	case strings.Contains(msg, "validation failed"):
+		return C.DISTCONF_ERR_VALIDATION_FAILED
+	case strings.Contains(msg, "network") || strings.Contains(msg, "connection"):
+		return C.DISTCONF_ERR_NETWORK_FAILURE
+	case strings.Contains(msg, "decryption"):
+		return C.DISTCONF_ERR_DECRYPTION_FAILED
+	default:
+		return C.DISTCONF_ERR_GENERIC
+	}
+}
+
+func setLastError(code C.int, msg string) {
+	if code == C.DISTCONF_SUCCESS {
+		C.set_last_error(code, nil)
+	} else {
+		cStr := C.CString(msg)
+		defer C.free(unsafe.Pointer(cStr))
+		C.set_last_error(code, cStr)
+	}
+}
 
 // -------------------------------------------------------------------------
 
@@ -38,42 +74,49 @@ func DistConf_FreeString(ptr *C.char) {
 
 //export DistConf_New
 func DistConf_New(profile *C.char) uintptr {
-	return cgo_bridge.New(C.GoString(profile))
+	handle := cgo_bridge.New(C.GoString(profile))
+	if handle == 0 {
+		setLastError(C.DISTCONF_ERR_GENERIC, "failed to initialize configuration")
+	} else {
+		setLastError(C.DISTCONF_SUCCESS, "")
+	}
+	return handle
 }
 
 //export DistConf_Close
 func DistConf_Close(handle uintptr) {
 	cgo_bridge.Close(handle)
+	setLastError(C.DISTCONF_SUCCESS, "")
 }
 
 //export DistConf_Get
 func DistConf_Get(handle uintptr, section, key *C.char) *C.char {
 	val := cgo_bridge.Get(handle, C.GoString(section), C.GoString(key))
 	if val == "" {
-		C.set_last_error(C.CString("key not found"))
+		setLastError(C.DISTCONF_ERR_KEY_NOT_FOUND, "key not found")
 		return nil
 	}
-	C.set_last_error(nil)
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return C.CString(val)
 }
 
 //export DistConf_Set
 func DistConf_Set(handle uintptr, section, key, value *C.char) int {
 	if err := cgo_bridge.Set(handle, C.GoString(section), C.GoString(key), C.GoString(value)); err != nil {
-		C.set_last_error(C.CString(err.Error()))
+		setLastError(mapErrorCode(err), err.Error())
 		return 0
 	}
-	C.set_last_error(nil)
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return 1
 }
 
 //export DistConf_Sync
 func DistConf_Sync(handle uintptr) int {
 	if err := cgo_bridge.Sync(handle); err != nil {
-		C.set_last_error(C.CString(err.Error()))
+		setLastError(mapErrorCode(err), err.Error())
 		return 0
 	}
-	C.set_last_error(nil)
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return 1
 }
 
@@ -81,8 +124,10 @@ func DistConf_Sync(handle uintptr) int {
 func DistConf_GetAddress(handle uintptr, capability *C.char) *C.char {
 	addr, err := cgo_bridge.GetAddress(handle, C.GoString(capability))
 	if err != nil {
+		setLastError(mapErrorCode(err), err.Error())
 		return nil
 	}
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return C.CString(addr)
 }
 
@@ -90,8 +135,10 @@ func DistConf_GetAddress(handle uintptr, capability *C.char) *C.char {
 func DistConf_GetGRPCAddress(handle uintptr, capability *C.char) *C.char {
 	addr, err := cgo_bridge.GetGRPCAddress(handle, C.GoString(capability))
 	if err != nil {
+		setLastError(mapErrorCode(err), err.Error())
 		return nil
 	}
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return C.CString(addr)
 }
 
@@ -99,8 +146,10 @@ func DistConf_GetGRPCAddress(handle uintptr, capability *C.char) *C.char {
 func DistConf_GetCapability(handle uintptr, capability *C.char) *C.char {
 	val, err := cgo_bridge.GetCapability(handle, C.GoString(capability))
 	if err != nil {
+		setLastError(mapErrorCode(err), err.Error())
 		return nil
 	}
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return C.CString(val)
 }
 
@@ -108,8 +157,10 @@ func DistConf_GetCapability(handle uintptr, capability *C.char) *C.char {
 func DistConf_GetFullConfig(handle uintptr) *C.char {
 	val, err := cgo_bridge.GetFullConfig(handle)
 	if err != nil {
+		setLastError(mapErrorCode(err), err.Error())
 		return nil
 	}
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return C.CString(val)
 }
 
@@ -118,38 +169,49 @@ func DistConf_GetLastError() *C.char {
 	return C.last_error
 }
 
+//export DistConf_GetLastErrorCode
+func DistConf_GetLastErrorCode() int {
+	return int(C.last_error_code)
+}
+
 //export DistConf_Decrypt
 func DistConf_Decrypt(handle uintptr, ciphertext *C.char) *C.char {
 	decrypted, err := cgo_bridge.Decrypt(C.GoString(ciphertext))
 	if err != nil {
-		C.set_last_error(C.CString(err.Error()))
+		setLastError(mapErrorCode(err), err.Error())
 		return nil
 	}
-	C.set_last_error(nil)
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return C.CString(decrypted)
 }
 
 //export DistConf_IsValid
 func DistConf_IsValid(handle uintptr) int {
 	if ok := cgo_bridge.IsValid(handle); ok {
+		setLastError(C.DISTCONF_SUCCESS, "")
 		return 1
 	}
+	setLastError(C.DISTCONF_ERR_INVALID_HANDLE, "invalid handle")
 	return 0
 }
 
 //export DistConf_ValidateMandatoryServices
 func DistConf_ValidateMandatoryServices(handle uintptr) int {
 	if err := cgo_bridge.ValidateMandatoryServices(handle); err != nil {
+		setLastError(mapErrorCode(err), err.Error())
 		return 0
 	}
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return 1
 }
 
 //export DistConf_ShareConfig
 func DistConf_ShareConfig(handle uintptr, jsonData *C.char) int {
 	if err := cgo_bridge.ShareConfig(handle, C.GoString(jsonData)); err != nil {
+		setLastError(mapErrorCode(err), err.Error())
 		return 0
 	}
+	setLastError(C.DISTCONF_SUCCESS, "")
 	return 1
 }
 
@@ -164,9 +226,11 @@ func DistConf_OnLiveConfUpdate(handle uintptr, cb C.config_update_cb) {
 	cgo_bridge.FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
+		setLastError(C.DISTCONF_ERR_INVALID_HANDLE, "invalid handle")
 		return
 	}
 
+	setLastError(C.DISTCONF_SUCCESS, "")
 	session.Config.OnLiveConfUpdate(func(update map[string]map[string]string) {
 		jsonData, err := json.Marshal(update)
 		if err != nil {
@@ -186,9 +250,11 @@ func DistConf_OnRegistryUpdate(handle uintptr, cb C.config_update_cb) {
 	cgo_bridge.FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
+		setLastError(C.DISTCONF_ERR_INVALID_HANDLE, "invalid handle")
 		return
 	}
 
+	setLastError(C.DISTCONF_SUCCESS, "")
 	session.Config.OnRegistryUpdate(func(registry map[string][]string) {
 		jsonData, err := json.Marshal(registry)
 		if err != nil {

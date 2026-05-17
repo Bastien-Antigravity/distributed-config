@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync/atomic"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
@@ -118,12 +119,53 @@ func (c *Config) PreviewSet(updates map[string]map[string]string) *map[string]ma
 
 // GetCapability extracts a specific capability dictionary and unmarshals it into the target struct.
 // It uses JSON round-tripping for easy conversion from nested map[string]interface{} to strongly typed structs.
+// It also merges overrides from LiveConfig if they exist.
 func (c *Config) GetCapability(key string, target interface{}) error {
 	val, ok := c.Capabilities[key]
 	if !ok || val == nil {
-		return fmt.Errorf("capability '%s' is strictly required but missing", key)
+		// Even if not in static Capabilities, it might be in LiveConfig
+		val = make(map[string]interface{})
 	}
-	data, err := json.Marshal(val)
+
+	// 1. Convert static/base capability to map for merging
+	capMap, ok := val.(map[string]interface{})
+	if !ok {
+		// If it's not a map, we can't easily merge, but we still try to marshal it
+		data, err := json.Marshal(val)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(data, target)
+	}
+
+	// 2. Check for LiveConfig overrides
+	// We check both the direct section (e.g. "log_server") AND the "capabilities" section (legacy/alternative)
+	ptr := c.LiveConfig.Load()
+	if ptr != nil {
+		live := *ptr
+		// Direct section override (Priority 1)
+		if overrides, ok := live[key]; ok {
+			for k, v := range overrides {
+				capMap[k] = v
+			}
+		}
+		// "capabilities" section override (e.g. key "log_server.ip") (Priority 2 - Legacy)
+		if capsSection, ok := live["capabilities"]; ok {
+			prefix := key + "."
+			for k, v := range capsSection {
+				if strings.HasPrefix(k, prefix) {
+					subKey := strings.TrimPrefix(k, prefix)
+					capMap[subKey] = v
+				}
+			}
+		}
+	}
+
+	if len(capMap) == 0 {
+		return fmt.Errorf("capability '%s' is strictly required but missing from all sources", key)
+	}
+
+	data, err := json.Marshal(capMap)
 	if err != nil {
 		return err
 	}
@@ -237,8 +279,17 @@ func (c *Config) GetGRPCAddress(capability string) (string, error) {
 
 func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
 	// 1. Check LiveConfig (Overrides from CLI or Server)
-	host := c.Get("capabilities", capability+"."+hostKey)
-	port := c.Get("capabilities", capability+"."+portKey)
+	// Try direct section first (e.g. section "log_server" key "ip")
+	host := c.Get(capability, hostKey)
+	port := c.Get(capability, portKey)
+
+	// Fallback to "capabilities" section (legacy/alternative)
+	if host == "" {
+		host = c.Get("capabilities", capability+"."+hostKey)
+	}
+	if port == "" {
+		port = c.Get("capabilities", capability+"."+portKey)
+	}
 
 	// 2. Fallback to static Capabilities map if missing from LiveConfig
 	if host == "" || port == "" {

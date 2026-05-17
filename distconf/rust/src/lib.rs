@@ -3,8 +3,33 @@ use std::ffi::{CStr, CString};
 use std::sync::Arc;
 use libloading::{Library, Symbol};
 use serde_json::Value;
+use std::fmt;
 
 pub type ConfigUpdateCb = extern "C" fn(handle: uintptr_t, json_data: *const c_char);
+
+// Standardized Error Codes (must match helpers.h)
+pub const DISTCONF_SUCCESS: i32 = 0;
+pub const DISTCONF_ERR_GENERIC: i32 = 1;
+pub const DISTCONF_ERR_INVALID_HANDLE: i32 = 2;
+pub const DISTCONF_ERR_KEY_NOT_FOUND: i32 = 3;
+pub const DISTCONF_ERR_VALIDATION_FAILED: i32 = 4;
+pub const DISTCONF_ERR_NETWORK_FAILURE: i32 = 5;
+pub const DISTCONF_ERR_DECRYPTION_FAILED: i32 = 6;
+pub const DISTCONF_ERR_INVALID_INPUT: i32 = 7;
+
+#[derive(Debug)]
+pub struct DistConfError {
+    pub message: String,
+    pub code: i32,
+}
+
+impl fmt::Display for DistConfError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "DistConf Error ({}): {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for DistConfError {}
 
 pub struct DistConfig {
     lib: &'static Library,
@@ -24,10 +49,31 @@ impl DistConfig {
         };
 
         if handle == 0 {
-            return Err("Failed to initialize DistConf".into());
+            return Err(Self::get_last_error_static(lib).into());
         }
 
         Ok(DistConfig { lib, handle })
+    }
+
+    fn get_last_error_static(lib: &Library) -> DistConfError {
+        unsafe {
+            let get_code: Symbol<unsafe extern "C" fn() -> c_int> = lib.get(b"DistConf_GetLastErrorCode").unwrap();
+            let get_msg: Symbol<unsafe extern "C" fn() -> *const c_char> = lib.get(b"DistConf_GetLastError").unwrap();
+            
+            let code = get_code();
+            let msg_ptr = get_msg();
+            let message = if msg_ptr.is_null() {
+                "Unknown error".to_string()
+            } else {
+                CStr::from_ptr(msg_ptr).to_string_lossy().into_owned()
+            };
+            
+            DistConfError { message, code }
+        }
+    }
+
+    fn raise_last_error(&self) -> DistConfError {
+        Self::get_last_error_static(self.lib)
     }
 
     pub fn get(&self, section: &str, key: &str) -> String {
@@ -46,30 +92,39 @@ impl DistConfig {
         }
     }
 
-    pub fn set(&self, section: &str, key: &str, value: &str) -> bool {
+    pub fn set(&self, section: &str, key: &str, value: &str) -> Result<(), DistConfError> {
         unsafe {
             let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char, *const c_char, *const c_char) -> c_int> = 
                 self.lib.get(b"DistConf_Set").unwrap();
             let section_c = CString::new(section).unwrap();
             let key_c = CString::new(key).unwrap();
             let value_c = CString::new(value).unwrap();
-            func(self.handle, section_c.as_ptr(), key_c.as_ptr(), value_c.as_ptr()) == 1
+            if func(self.handle, section_c.as_ptr(), key_c.as_ptr(), value_c.as_ptr()) == 0 {
+                return Err(self.raise_last_error());
+            }
+            Ok(())
         }
     }
 
-    pub fn sync(&self) -> bool {
+    pub fn sync(&self) -> Result<(), DistConfError> {
         unsafe {
             let func: Symbol<unsafe extern "C" fn(uintptr_t) -> c_int> = self.lib.get(b"DistConf_Sync").unwrap();
-            func(self.handle) == 1
+            if func(self.handle) == 0 {
+                return Err(self.raise_last_error());
+            }
+            Ok(())
         }
     }
 
-    pub fn share_config(&self, payload: &Value) -> bool {
+    pub fn share_config(&self, payload: &Value) -> Result<(), DistConfError> {
         unsafe {
             let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char) -> c_int> = 
                 self.lib.get(b"DistConf_ShareConfig").unwrap();
             let json_data = CString::new(payload.to_string()).unwrap();
-            func(self.handle, json_data.as_ptr()) == 1
+            if func(self.handle, json_data.as_ptr()) == 0 {
+                return Err(self.raise_last_error());
+            }
+            Ok(())
         }
     }
 
@@ -89,41 +144,44 @@ impl DistConfig {
         }
     }
 
-    pub fn validate_mandatory_services(&self) -> bool {
+    pub fn validate_mandatory_services(&self) -> Result<(), DistConfError> {
         unsafe {
             let func: Symbol<unsafe extern "C" fn(uintptr_t) -> c_int> = 
                 self.lib.get(b"DistConf_ValidateMandatoryServices").unwrap();
-            func(self.handle) == 1
+            if func(self.handle) == 0 {
+                return Err(self.raise_last_error());
+            }
+            Ok(())
         }
     }
 
-    pub fn get_address(&self, capability: &str) -> String {
+    pub fn get_address(&self, capability: &str) -> Result<String, DistConfError> {
         unsafe {
             let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char) -> *mut c_char> = 
                 self.lib.get(b"DistConf_GetAddress").unwrap();
             let cap_c = CString::new(capability).unwrap();
             let res = func(self.handle, cap_c.as_ptr());
             if res.is_null() {
-                return "".to_string();
+                return Err(self.raise_last_error());
             }
             let val = CStr::from_ptr(res).to_string_lossy().into_owned();
             self.free_string(res);
-            val
+            Ok(val)
         }
     }
 
-    pub fn decrypt(&self, ciphertext: &str) -> String {
+    pub fn decrypt(&self, ciphertext: &str) -> Result<String, DistConfError> {
         unsafe {
             let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char) -> *mut c_char> = 
                 self.lib.get(b"DistConf_Decrypt").unwrap();
             let cipher_c = CString::new(ciphertext).unwrap();
             let res = func(self.handle, cipher_c.as_ptr());
             if res.is_null() {
-                return ciphertext.to_string();
+                return Err(self.raise_last_error());
             }
             let val = CStr::from_ptr(res).to_string_lossy().into_owned();
             self.free_string(res);
-            val
+            Ok(val)
         }
     }
 
@@ -179,7 +237,7 @@ mod tests {
         println!("Loading DistConfig...");
         let cfg = DistConfig::new("standalone", &lib_path).unwrap();
         println!("DistConfig loaded. Calling set()...");
-        cfg.set("rust_test", "key", "val");
+        cfg.set("rust_test", "key", "val").expect("set failed");
         println!("set() returned. Calling get()...");
         let val = cfg.get("rust_test", "key");
         println!("get() returned: {}", val);

@@ -111,6 +111,7 @@ extern char* DistConf_GetGRPCAddress(GoUintptr handle, char* capability);
 extern char* DistConf_GetCapability(GoUintptr handle, char* capability);
 extern char* DistConf_GetFullConfig(GoUintptr handle);
 extern char* DistConf_GetLastError(void);
+extern GoInt DistConf_GetLastErrorCode(void);
 extern char* DistConf_Decrypt(GoUintptr handle, char* ciphertext);
 extern GoInt DistConf_IsValid(GoUintptr handle);
 extern GoInt DistConf_ValidateMandatoryServices(GoUintptr handle);
