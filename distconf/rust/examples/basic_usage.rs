@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("App Name: {}", app_name);
 
     // 3. Set local state
-    cfg.set("rust_demo", "status", "ready");
+    cfg.set("rust_demo", "status", "ready")?;
     println!("Local Status: {}", cfg.get("rust_demo", "status"));
 
     // 4. Share object (Using serde_json macro)
@@ -31,12 +31,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     
-    if cfg.share_config(&payload) {
+    if cfg.share_config(&payload).is_ok() {
         println!("Successfully shared node info.");
     }
 
     // 5. Validate environment
-    if cfg.validate_mandatory_services() {
+    if cfg.validate_mandatory_services().is_ok() {
         println!("Mandatory services validated.");
     }
 

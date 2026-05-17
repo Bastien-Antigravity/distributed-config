@@ -24,4 +24,7 @@ type ConfigStrategy interface {
 
 	// GetHandler returns the network handler if the strategy supports it.
 	GetHandler() *network.ConfigProtoHandler
+
+	// Close shuts down the strategy and any associated resources (e.g. network client).
+	Close() error
 }

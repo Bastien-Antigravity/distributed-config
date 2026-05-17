@@ -17,26 +17,47 @@ import (
 var ENC_REGEX = regexp.MustCompile(`ENC\(([^)]+)\)`)
 
 func getPrivateKey() (*rsa.PrivateKey, error) {
-	keyPath := os.Getenv("BASTIEN_PRIVATE_KEY_PATH")
-	if keyPath == "" {
-		keyPath = "/etc/bastien/private.pem"
-		// Fallback for local sandbox testing
-		if _, err := os.Stat("./private.pem"); err == nil {
-			keyPath = "./private.pem"
+	// 1. Check for direct key content in environment variable (Highest Priority)
+	keyContent := os.Getenv("BASTIEN_PRIVATE_KEY")
+	var data []byte
+	var err error
+
+	if keyContent != "" {
+		data = []byte(keyContent)
+	} else {
+		// 2. Fallback to file path
+		keyPath := os.Getenv("BASTIEN_PRIVATE_KEY_PATH")
+		if keyPath == "" {
+			keyPath = "/etc/bastien/private.pem"
+			// Fallback for local sandbox testing
+			if _, err := os.Stat("./private.pem"); err == nil {
+				keyPath = "./private.pem"
+			}
+		}
+		data, err = os.ReadFile(keyPath)
+		if err != nil {
+			return nil, fmt.Errorf("private key not found in BASTIEN_PRIVATE_KEY or at %s: %w", keyPath, err)
 		}
 	}
 
-	data, err := os.ReadFile(keyPath)
-	if err != nil {
-		return nil, fmt.Errorf("private key not found at %s: %w", keyPath, err)
-	}
-
 	block, _ := pem.Decode(data)
-	if block == nil || block.Type != "RSA PRIVATE KEY" {
+	if block == nil || (block.Type != "RSA PRIVATE KEY" && block.Type != "PRIVATE KEY") {
 		return nil, fmt.Errorf("failed to decode PEM block containing RSA private key")
 	}
 
-	return x509.ParsePKCS1PrivateKey(block.Bytes)
+	// Try PKCS#1 first, then fallback to PKCS#8
+	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+		return key, nil
+	}
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+	rsaKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("not an RSA private key")
+	}
+	return rsaKey, nil
 }
 
 // Encrypt encrypts the plaintext using the provided RSA Public Key (PEM format).

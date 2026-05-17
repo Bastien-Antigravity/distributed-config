@@ -91,12 +91,12 @@ func (config *Config) OnRegistryUpdate(onRegistryUpdateFn func(map[string][]stri
 func (config *Config) Set(updates map[string]map[string]string) error {
 	if config.strategy != nil {
 		if err := config.strategy.Set(config.Config, updates); err != nil {
-			config.Config.Logger.Error("Strategy.Set failed: %v", err)
+			config.Logger.Error("Strategy.Set failed: %v", err)
 			return err // Abort local callback on failure and return error
 		}
-		
-		// Single Source of Truth Eventing: 
-		// If pushing to a central server, we rely on the Watch() listener to 
+
+		// Single Source of Truth Eventing:
+		// If pushing to a central server, we rely on the Watch() listener to
 		// catch the server's BROADCAST_SYNC to trigger observers safely.
 		name := config.strategy.Name()
 		if name == "production" || name == "test" {
@@ -109,7 +109,7 @@ func (config *Config) Set(updates map[string]map[string]string) error {
 
 	// Trigger local callback for UI consistency (Standalone & Staging)
 	if config.ParentOnLiveConfUpdate != nil {
-		config.ParentOnLiveConfUpdate(*config.Config.LiveConfig.Load())
+		config.ParentOnLiveConfUpdate(*config.LiveConfig.Load())
 	}
 	return nil
 }
@@ -128,4 +128,24 @@ func (config *Config) Sync() error {
 		return fmt.Errorf("no strategy associated with this configuration")
 	}
 	return config.strategy.Sync(config.Config)
+}
+
+// Close shuts down any active resources associated with the configuration strategy.
+// -----------------------------------------------------------------------------
+func (config *Config) Close() error {
+	if config.strategy != nil {
+		return config.strategy.Close()
+	}
+	return nil
+}
+
+// ShareConfig overrides core.Config.ShareConfig to ensure updates are synchronized
+// according to the current strategy (e.g., pushed to Config Server in Production).
+// -----------------------------------------------------------------------------
+func (config *Config) ShareConfig(payload interface{}) error {
+	updates, err := core.ParseSharePayload(payload)
+	if err != nil {
+		return err
+	}
+	return config.Set(updates)
 }

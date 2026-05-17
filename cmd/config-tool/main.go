@@ -68,7 +68,9 @@ func handleKeygen() {
 		fmt.Printf("Error creating private.pem: %v\n", err)
 		os.Exit(1)
 	}
-	defer privFile.Close()
+	defer func() {
+		_ = privFile.Close()
+	}()
 
 	privPEM := &pem.Block{
 		Type:  "RSA PRIVATE KEY",
@@ -85,7 +87,9 @@ func handleKeygen() {
 		fmt.Printf("Error creating public.pem: %v\n", err)
 		os.Exit(1)
 	}
-	defer pubFile.Close()
+	defer func() {
+		_ = pubFile.Close()
+	}()
 
 	pubBytes, _ := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
 	pubPEM := &pem.Block{

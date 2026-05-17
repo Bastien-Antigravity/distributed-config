@@ -2,7 +2,6 @@ package core
 
 import "fmt"
 
-
 // -----------------------------------------------------------------------------
 
 // LogServerCap defines the mandatory capabilities for the centralized logging server.

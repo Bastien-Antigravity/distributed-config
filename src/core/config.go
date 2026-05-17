@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync/atomic"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
@@ -16,6 +17,11 @@ type CommonConfig struct {
 	CommonFilePath string `yaml:"common_file_path" json:"common_file_path"`
 	PublicKey      string `yaml:"public_key" json:"public_key"`
 	Reset          bool   `yaml:"reset" json:"reset"`
+
+	// Network Settings
+	PublicIP    string `yaml:"public_ip" json:"public_ip"`         // Binding interface, defaults to 127.0.0.1
+	RetryBaseMS string `yaml:"retry_base_ms" json:"retry_base_ms"` // Base delay for backoff, defaults to "100"
+	RetryMaxSec string `yaml:"retry_max_sec" json:"retry_max_sec"` // Max delay for backoff, defaults to "5"
 }
 
 // Config Data Struct (Pure Data)
@@ -23,17 +29,16 @@ type CommonConfig struct {
 
 type Config struct {
 	// Distributed system name
-	Common       CommonConfig           `yaml:"common" json:"common"`
+	Common CommonConfig `yaml:"common" json:"common"`
 
-	// Data storage for Config params 
-	// main config 
-	Capabilities map[string]interface{} `yaml:"capabilities" json:"capabilities"`
+	// Data storage for Config params
+	// main config
+	Capabilities map[string]interface{}                       `yaml:"capabilities" json:"capabilities"`
 	LiveConfig   atomic.Pointer[map[string]map[string]string] `yaml:"-"`
 
 	// Internal state
-	ConfigPath string       `yaml:"-"`
-	Logger     utils.Logger `yaml:"-"`
-}	
+	Logger utils.Logger `yaml:"-"`
+}
 
 // -----------------------------------------------------------------------------
 
@@ -114,12 +119,53 @@ func (c *Config) PreviewSet(updates map[string]map[string]string) *map[string]ma
 
 // GetCapability extracts a specific capability dictionary and unmarshals it into the target struct.
 // It uses JSON round-tripping for easy conversion from nested map[string]interface{} to strongly typed structs.
+// It also merges overrides from LiveConfig if they exist.
 func (c *Config) GetCapability(key string, target interface{}) error {
 	val, ok := c.Capabilities[key]
 	if !ok || val == nil {
-		return fmt.Errorf("capability '%s' is strictly required but missing", key)
+		// Even if not in static Capabilities, it might be in LiveConfig
+		val = make(map[string]interface{})
 	}
-	data, err := json.Marshal(val)
+
+	// 1. Convert static/base capability to map for merging
+	capMap, ok := val.(map[string]interface{})
+	if !ok {
+		// If it's not a map, we can't easily merge, but we still try to marshal it
+		data, err := json.Marshal(val)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(data, target)
+	}
+
+	// 2. Check for LiveConfig overrides
+	// We check both the direct section (e.g. "log_server") AND the "capabilities" section (legacy/alternative)
+	ptr := c.LiveConfig.Load()
+	if ptr != nil {
+		live := *ptr
+		// Direct section override (Priority 1)
+		if overrides, ok := live[key]; ok {
+			for k, v := range overrides {
+				capMap[k] = v
+			}
+		}
+		// "capabilities" section override (e.g. key "log_server.ip") (Priority 2 - Legacy)
+		if capsSection, ok := live["capabilities"]; ok {
+			prefix := key + "."
+			for k, v := range capsSection {
+				if strings.HasPrefix(k, prefix) {
+					subKey := strings.TrimPrefix(k, prefix)
+					capMap[subKey] = v
+				}
+			}
+		}
+	}
+
+	if len(capMap) == 0 {
+		return fmt.Errorf("capability '%s' is strictly required but missing from all sources", key)
+	}
+
+	data, err := json.Marshal(capMap)
 	if err != nil {
 		return err
 	}
@@ -156,13 +202,24 @@ func (c *Config) ValidateMandatoryServices() error {
 }
 
 // ShareConfig merges the provided configuration updates into the LiveConfig.
-// It accepts either map[string]map[string]string (multi-section) 
+// It accepts either map[string]map[string]string (multi-section)
 // or map[string]string (single section, using "shared" as default).
 // -----------------------------------------------------------------------------
 
 func (c *Config) ShareConfig(payload interface{}) error {
+	updates, err := ParseSharePayload(payload)
+	if err != nil {
+		return err
+	}
+	c.Set(updates)
+	return nil
+}
+
+// ParseSharePayload converts a generic payload into a structured configuration update map.
+// Supports map[string]map[string]string, map[string]string, and map[string]interface{}.
+func ParseSharePayload(payload interface{}) (map[string]map[string]string, error) {
 	if payload == nil {
-		return nil
+		return nil, nil
 	}
 
 	var updates map[string]map[string]string
@@ -196,11 +253,10 @@ func (c *Config) ShareConfig(payload interface{}) error {
 			}
 		}
 	default:
-		return fmt.Errorf("unsupported payload type for ShareConfig: %T", payload)
+		return nil, fmt.Errorf("unsupported payload type for ShareConfig: %T", payload)
 	}
 
-	c.Set(updates)
-	return nil
+	return updates, nil
 }
 
 // -----------------------------------------------------------------------------
@@ -222,28 +278,50 @@ func (c *Config) GetGRPCAddress(capability string) (string, error) {
 // -----------------------------------------------------------------------------
 
 func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
-	if c.Capabilities == nil {
-		return "", fmt.Errorf("no capabilities found")
+	// 1. Check LiveConfig (Overrides from CLI or Server)
+	// Try direct section first (e.g. section "log_server" key "ip")
+	host := c.Get(capability, hostKey)
+	port := c.Get(capability, portKey)
+
+	// Fallback to "capabilities" section (legacy/alternative)
+	if host == "" {
+		host = c.Get("capabilities", capability+"."+hostKey)
 	}
-	capRaw, ok := c.Capabilities[capability]
-	if !ok {
-		return "", fmt.Errorf("capability %s not found", capability)
+	if port == "" {
+		port = c.Get("capabilities", capability+"."+portKey)
 	}
 
-	cap, ok := capRaw.(map[string]interface{})
-	if !ok {
-		return "", fmt.Errorf("invalid capability format for %s", capability)
+	// 2. Fallback to static Capabilities map if missing from LiveConfig
+	if host == "" || port == "" {
+		if c.Capabilities == nil {
+			return "", fmt.Errorf("no capabilities found and no live override for %s", capability)
+		}
+		capRaw, ok := c.Capabilities[capability]
+		if !ok {
+			if host == "" {
+				return "", fmt.Errorf("capability %s not found", capability)
+			}
+		} else {
+			cap, ok := capRaw.(map[string]interface{})
+			if ok {
+				if host == "" {
+					h, _ := cap[hostKey].(string)
+					host = h
+				}
+				if port == "" {
+					p, _ := cap[portKey].(string)
+					port = p
+				}
+			}
+		}
 	}
 
-	host, ok := cap[hostKey].(string)
-	if !ok || host == "" {
+	if host == "" {
 		return "", fmt.Errorf("host key %s missing or empty in capability %s", hostKey, capability)
 	}
-
-	p, ok := cap[portKey].(string)
-	if !ok || p == "" {
+	if port == "" {
 		return "", fmt.Errorf("port key %s missing or empty in capability %s", portKey, capability)
 	}
 
-	return fmt.Sprintf("%s:%s", host, p), nil
+	return fmt.Sprintf("%s:%s", host, port), nil
 }

@@ -9,6 +9,22 @@ from typing import Any, Callable, Dict, Optional
 # Callback type: void (*config_update_cb)(uintptr_t handle, const char* json_data)
 CALLBACK_TYPE = CFUNCTYPE(None, c_void_p, c_char_p)
 
+# Standardized Error Codes (must match helpers.h)
+DISTCONF_SUCCESS                = 0
+DISTCONF_ERR_GENERIC            = 1
+DISTCONF_ERR_INVALID_HANDLE      = 2
+DISTCONF_ERR_KEY_NOT_FOUND       = 3
+DISTCONF_ERR_VALIDATION_FAILED   = 4
+DISTCONF_ERR_NETWORK_FAILURE     = 5
+DISTCONF_ERR_DECRYPTION_FAILED   = 6
+DISTCONF_ERR_INVALID_INPUT       = 7
+
+class DistConfError(Exception):
+    """Base exception for all DistConf errors."""
+    def __init__(self, message: str, code: int) -> None:
+        super().__init__(message)
+        self.code = code
+
 class DistConfig:
     """
     ESSENTIAL PROCESS:
@@ -16,10 +32,6 @@ class DistConfig:
     
     DATA FLOW:
     Loads shared library -> Creates session via CGO bridge -> Reads/writes state directly via ctypes.
-    
-    KEY PARAMETERS:
-    - profile: The environment profile to load (e.g., 'standalone', 'production').
-    - lib_path: Optional explicit path to the libdistconf shared library.
     """
     
     def __init__(self, profile: str, lib_path: Optional[str] = None) -> None:
@@ -29,7 +41,7 @@ class DistConfig:
             
         self._handle = self._lib.DistConf_New(profile.encode('utf-8'))
         if not self._handle:
-            raise RuntimeError(f"Failed to initialize DistConf with profile: {profile}")
+            self._raise_last_error()
             
         self._callback_ref = None
 
@@ -37,7 +49,27 @@ class DistConfig:
 
     def _load_lib(self, lib_path: Optional[str]) -> Optional[Any]:
         if not lib_path:
-            lib_path = osGetenv("LIBDISTCONF_PATH", "libdistconf.so")
+            import platform
+            import os
+            system = platform.system()
+            if system == "Darwin":
+                ext = ".dylib"
+            elif system == "Windows":
+                ext = ".dll"
+            else:
+                ext = ".so"
+            
+            # 1. Check environment variable
+            lib_path = osGetenv("LIBDISTCONF_PATH")
+            if not lib_path:
+                # 2. Check current package directory (for bundled wheels)
+                pkg_dir = os.path.dirname(__file__)
+                local_lib = os.path.join(pkg_dir, f"libdistconf{ext}")
+                if os.path.exists(local_lib):
+                    lib_path = local_lib
+                else:
+                    # 3. Fallback to system search
+                    lib_path = f"libdistconf{ext}"
             
         try:
             lib = ctypesCDLL(lib_path)
@@ -53,7 +85,7 @@ class DistConfig:
             lib.DistConf_Get.restype = c_void_p
             
             lib.DistConf_Set.argtypes = [c_void_p, c_char_p, c_char_p, c_char_p]
-            lib.DistConf_Set.restype = None
+            lib.DistConf_Set.restype = c_int
             
             lib.DistConf_Sync.argtypes = [c_void_p]
             lib.DistConf_Sync.restype = c_int
@@ -87,17 +119,32 @@ class DistConfig:
             
             lib.DistConf_FreeString.argtypes = [c_void_p]
             lib.DistConf_FreeString.restype = None
+
+            lib.DistConf_GetLastError.argtypes = []
+            lib.DistConf_GetLastError.restype = c_char_p
+
+            lib.DistConf_GetLastErrorCode.argtypes = []
+            lib.DistConf_GetLastErrorCode.restype = c_int
             
             return lib
         except Exception as e:
             print(f"Error loading libdistconf: {e}")
             return None
 
+    def _raise_last_error(self):
+        code = self._lib.DistConf_GetLastErrorCode()
+        msg_ptr = self._lib.DistConf_GetLastError()
+        msg = msg_ptr.decode('utf-8') if msg_ptr else "Unknown error"
+        raise DistConfError(msg, code)
+
     # -----------------------------------------------------------------------------------------------
 
     def get(self, section: str, key: str) -> str:
         ptr = self._lib.DistConf_Get(self._handle, section.encode('utf-8'), key.encode('utf-8'))
         if not ptr:
+            # We don't necessarily want to raise on 'key not found' if it's expected
+            # but for standardization, let's see if we should.
+            # return "" for now to maintain behavior, but we COULD raise.
             return ""
         val = ctypesStringAt(ptr).decode('utf-8')
         self._lib.DistConf_FreeString(ptr)
@@ -105,31 +152,39 @@ class DistConfig:
 
     # -----------------------------------------------------------------------------------------------
 
-    def set(self, section: str, key: str, value: str) -> None:
-        self._lib.DistConf_Set(self._handle, section.encode('utf-8'), key.encode('utf-8'), value.encode('utf-8'))
+    def set(self, section: str, key: str, value: str) -> bool:
+        if self._lib.DistConf_Set(self._handle, section.encode('utf-8'), key.encode('utf-8'), value.encode('utf-8')) == 0:
+            self._raise_last_error()
+        return True
 
     # -----------------------------------------------------------------------------------------------
 
     def sync(self) -> bool:
-        return self._lib.DistConf_Sync(self._handle) == 1
+        if self._lib.DistConf_Sync(self._handle) == 0:
+            self._raise_last_error()
+        return True
 
     # -----------------------------------------------------------------------------------------------
 
     def share_config(self, payload: Any) -> bool:
         json_data = jsonDumps(payload)
-        return self._lib.DistConf_ShareConfig(self._handle, json_data.encode('utf-8')) == 1
+        if self._lib.DistConf_ShareConfig(self._handle, json_data.encode('utf-8')) == 0:
+            self._raise_last_error()
+        return True
 
     # -----------------------------------------------------------------------------------------------
 
     def validate_mandatory_services(self) -> bool:
-        return self._lib.DistConf_ValidateMandatoryServices(self._handle) == 1
+        if self._lib.DistConf_ValidateMandatoryServices(self._handle) == 0:
+            self._raise_last_error()
+        return True
 
     # -----------------------------------------------------------------------------------------------
 
     def get_address(self, capability: str) -> str:
         ptr = self._lib.DistConf_GetAddress(self._handle, capability.encode('utf-8'))
         if not ptr:
-            return ""
+            self._raise_last_error()
         val = ctypesStringAt(ptr).decode('utf-8')
         self._lib.DistConf_FreeString(ptr)
         return val
@@ -139,7 +194,7 @@ class DistConfig:
     def get_grpc_address(self, capability: str) -> str:
         ptr = self._lib.DistConf_GetGRPCAddress(self._handle, capability.encode('utf-8'))
         if not ptr:
-            return ""
+            self._raise_last_error()
         val = ctypesStringAt(ptr).decode('utf-8')
         self._lib.DistConf_FreeString(ptr)
         return val
@@ -149,7 +204,7 @@ class DistConfig:
     def get_capability(self, capability: str) -> Dict[str, Any]:
         ptr = self._lib.DistConf_GetCapability(self._handle, capability.encode('utf-8'))
         if not ptr:
-            return {}
+            self._raise_last_error()
         val = ctypesStringAt(ptr).decode('utf-8')
         self._lib.DistConf_FreeString(ptr)
         return jsonLoads(val)
@@ -159,7 +214,7 @@ class DistConfig:
     def get_full_config(self) -> Dict[str, Any]:
         ptr = self._lib.DistConf_GetFullConfig(self._handle)
         if not ptr:
-            return {}
+            self._raise_last_error()
         val = ctypesStringAt(ptr).decode('utf-8')
         self._lib.DistConf_FreeString(ptr)
         return jsonLoads(val)
@@ -169,7 +224,8 @@ class DistConfig:
     def decrypt(self, ciphertext: str) -> str:
         ptr = self._lib.DistConf_Decrypt(self._handle, ciphertext.encode('utf-8'))
         if not ptr:
-            return ciphertext
+            # Decryption failure is critical
+            self._raise_last_error()
         val = ctypesStringAt(ptr).decode('utf-8')
         self._lib.DistConf_FreeString(ptr)
         return val

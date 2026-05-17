@@ -10,8 +10,10 @@ import (
 
 func TestBridge_ExpandedName(t *testing.T) {
 	// Set the environment variable for testing expansion
-	os.Setenv("APP_NAME", "dynamic-bridge-app")
-	defer os.Unsetenv("APP_NAME")
+	_ = os.Setenv("NAME", "dynamic-bridge-app")
+	defer func() {
+		_ = os.Unsetenv("NAME")
+	}()
 
 	t.Run("Initialize and check expanded name", func(t *testing.T) {
 		handle := testInit("standalone")

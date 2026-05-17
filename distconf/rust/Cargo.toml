@@ -1,6 +1,6 @@
 [package]
 name = "distconf"
-version = "1.9.922"
+version = "0.0.1"
 edition = "2021"
 authors = ["Bastien-Antigravity"]
 description = "Rust wrapper for the Distributed Config CGO bridge"

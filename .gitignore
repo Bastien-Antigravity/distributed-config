@@ -10,6 +10,7 @@
 .Trashes
 Thumbs.db
 ehthumbs.db
+*.mdb
 
 # IDEs
 .vscode/
@@ -86,6 +87,12 @@ todo.txt
 ARCHITECTURE.md.bak
 zzz_memo
 
+# Test Artifacts & Dumps
+distconf-*.yaml
+Python.yaml
+standalone.yaml.bak
+test.yaml.bak
+
 # Binary / Data
 *.exe
 *.pkl
@@ -95,3 +102,39 @@ zzz_memo
 !release/config-tool-*
 !distconf/
 !distconf/libdistconf-*
+# 🌍 Bastien-Antigravity Global GitIgnore Template
+# Purpose: Unified noise-reduction across the fleet.
+# --- System Files ---
+desktop.ini
+# --- IDEs & Editors ---
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*~
+.fleet/
+.helix/
+# --- Build & Dependency Artifacts ---
+# Rust
+# Go
+__debug_bin
+*.test
+# Python
+.venv
+# C++
+obj/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.out
+# --- Secrets & Config ---
+.env*
+*.pem
+*.key
+*.cert
+secrets.yaml
+# --- Project Specific Noise ---
+*.bak
+*.tmp

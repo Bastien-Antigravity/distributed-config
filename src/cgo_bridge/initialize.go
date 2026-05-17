@@ -18,7 +18,7 @@ type ConfigSession struct {
 }
 
 var (
-	FacadeMu    sync.Mutex
+	FacadeMu    sync.RWMutex
 	FacadeStore         = make(map[uintptr]*ConfigSession)
 	FacadeId    uintptr = 1
 )
@@ -28,7 +28,7 @@ var (
 // New is a Go-native wrapper for DistConf_New.
 func New(profile string) uintptr {
 	prof := sanitizeString(profile)
-	
+
 	cfg := distributed_config.New(prof)
 	if cfg == nil {
 		return 0
@@ -50,6 +50,13 @@ func New(profile string) uintptr {
 // Close is a Go-native wrapper for DistConf_Close.
 func Close(handle uintptr) {
 	FacadeMu.Lock()
-	defer FacadeMu.Unlock()
-	delete(FacadeStore, handle)
+	session, ok := FacadeStore[handle]
+	if ok {
+		delete(FacadeStore, handle)
+	}
+	FacadeMu.Unlock()
+
+	if ok && session.Config != nil {
+		_ = session.Config.Close()
+	}
 }

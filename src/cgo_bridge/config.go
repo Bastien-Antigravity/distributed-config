@@ -9,9 +9,9 @@ import "C"
 
 // Get is a Go-native wrapper for DistConf_Get, using string types for cross-package compatibility.
 func Get(handle uintptr, section, key string) string {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return ""
@@ -24,9 +24,9 @@ func Get(handle uintptr, section, key string) string {
 
 // Set is a Go-native wrapper for DistConf_Set, using string types.
 func Set(handle uintptr, section, key, value string) error {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return nil // Or handle error
@@ -37,7 +37,7 @@ func Set(handle uintptr, section, key, value string) error {
 			sanitizeString(key): sanitizeString(value),
 		},
 	}
-	
+
 	return session.Config.Set(updates)
 }
 
@@ -45,9 +45,9 @@ func Set(handle uintptr, section, key, value string) error {
 
 // Sync is a Go-native wrapper for DistConf_Sync.
 func Sync(handle uintptr) error {
-	FacadeMu.Lock()
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
-	FacadeMu.Unlock()
 
 	if !ok || session.Config == nil {
 		return nil

@@ -131,3 +131,12 @@ func (s *TestStrategy) Set(cfg *core.Config, updates map[string]map[string]strin
 	cfg.Apply(nextState)
 	return nil
 }
+
+// -----------------------------------------------------------------------------
+
+func (s *TestStrategy) Close() error {
+	if s.Client != nil {
+		return s.Client.Close()
+	}
+	return nil
+}

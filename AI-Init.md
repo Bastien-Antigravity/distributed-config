@@ -1,11 +1,19 @@
+---
+microservice: distributed-config
+type: governance
+status: active
+tags:
+- '#service/distributed-config'
+- '#zone/3-fleet'
+---
+
 # ⚡ AI Initialization: distributed-config
 
 > [!IMPORTANT] MANDATORY INITIALIZATION
 > Copy and paste this prompt when starting a new session in this repository:
 > 
-> *"Read the ecosystem map in **[[00-Master-MOC]]** and restore session state from **[[distributed-config/AI-Session-State]]**. Follow the standardized loop in **[[00-Daily-AI-Playbook]]**."*
-
-## 🛡️ Architectural Guardrails (v1.9.1+)
-- **Networking**: This library relies on `safe-socket v1.8.2+` for Infinite Wait support. Always ensure `go.mod` is synchronized during propagation.
-- **Secrets Management**: The `secret` package is critical. Any changes to configuration loading MUST preserve the `ProcessConfigSecrets` callback to ensure RSA-encrypted fields are decrypted at boot.
-- **CLI Tools**: Maintain `cmd/config-keygen` and `cmd/config-encrypt` as the primary bootstrap utilities.
+> "1. Read the ecosystem map in **[[Ecosystem-Map-MOC]]**."
+> "2. Load project constraints from **[[AI-Project-DNA]]**."
+> "3. Restore session state from **[[AI-Session-State]]**."
+> "4. **Sentinel Audit**: Run `python core-kms-brain/Scripts/Brain-Health-Audit.py` and resolve any drift."
+> "5. **Squad Protocol**: You are now the **Lead Developer**. Identify and hire the required **Specialists** from `core-kms-brain/Role-Prompts/03-Developer/Squad/`."

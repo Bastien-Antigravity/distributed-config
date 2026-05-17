@@ -7,8 +7,11 @@ package core
 func NewDefaultConfig() *Config {
 	return &Config{
 		Common: CommonConfig{
-			Name:  "common",
-			Reset: false,
+			Name:        "common",
+			Reset:       false,
+			PublicIP:    "127.0.0.1",
+			RetryBaseMS: "100",
+			RetryMaxSec: "5",
 		},
 		Capabilities: map[string]interface{}{
 			"log_server": map[string]interface{}{
