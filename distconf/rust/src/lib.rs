@@ -1,6 +1,5 @@
 use libc::{c_char, uintptr_t, c_int};
 use std::ffi::{CStr, CString};
-use std::sync::Arc;
 use libloading::{Library, Symbol};
 use serde_json::Value;
 use std::fmt;
