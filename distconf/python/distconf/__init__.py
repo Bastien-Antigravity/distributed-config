@@ -50,6 +50,7 @@ class DistConfig:
     def _load_lib(self, lib_path: Optional[str]) -> Optional[Any]:
         if not lib_path:
             import platform
+            import os
             system = platform.system()
             if system == "Darwin":
                 ext = ".dylib"
@@ -57,7 +58,18 @@ class DistConfig:
                 ext = ".dll"
             else:
                 ext = ".so"
-            lib_path = osGetenv("LIBDISTCONF_PATH", f"libdistconf{ext}")
+            
+            # 1. Check environment variable
+            lib_path = osGetenv("LIBDISTCONF_PATH")
+            if not lib_path:
+                # 2. Check current package directory (for bundled wheels)
+                pkg_dir = os.path.dirname(__file__)
+                local_lib = os.path.join(pkg_dir, f"libdistconf{ext}")
+                if os.path.exists(local_lib):
+                    lib_path = local_lib
+                else:
+                    # 3. Fallback to system search
+                    lib_path = f"libdistconf{ext}"
             
         try:
             lib = ctypesCDLL(lib_path)

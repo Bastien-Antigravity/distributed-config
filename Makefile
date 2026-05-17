@@ -25,9 +25,13 @@ build-lib:
 	mkdir -p distconf/libdistconf
 	# Use dynamic extension based on host OS
 	$(GOBUILD) -buildmode=c-shared -o distconf/libdistconf/libdistconf.$(LIB_EXT) ./cmd/libdistconf
+	# Copy to Python package for bundling
+	mkdir -p distconf/python/distconf
+	cp distconf/libdistconf/libdistconf.$(LIB_EXT) distconf/python/distconf/
 	# For macOS, set the install_name to @rpath to allow relative loading via LC_RPATH
 	@if [ "$(LIB_EXT)" = "dylib" ]; then \
 		install_name_tool -id @rpath/libdistconf.dylib distconf/libdistconf/libdistconf.dylib; \
+		install_name_tool -id @rpath/libdistconf.dylib distconf/python/distconf/libdistconf.dylib; \
 		cp distconf/libdistconf/libdistconf.dylib distconf/libdistconf/libdistconf.so || true; \
 	fi
 
@@ -36,7 +40,7 @@ build-dll:
 	# Requires mingw-w64 if cross-compiling from macOS/Linux
 	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 $(GOBUILD) -buildmode=c-shared -o distconf/libdistconf/libdistconf.dll ./cmd/libdistconf
 
-build-all: build build-lib build-dll
+build-all: build
 
 clean:
 	$(GOCLEAN)

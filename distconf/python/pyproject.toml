@@ -12,3 +12,6 @@ dependencies = []
 
 [tool.setuptools]
 packages = ["distconf"]
+
+[tool.setuptools.package-data]
+distconf = ["*.so", "*.dylib", "*.dll"]
