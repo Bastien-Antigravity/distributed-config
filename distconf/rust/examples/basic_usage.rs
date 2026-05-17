@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("App Name: {}", app_name);
 
     // 3. Set local state
-    cfg.set("rust_demo", "status", "ready");
+    cfg.set("rust_demo", "status", "ready")?;
     println!("Local Status: {}", cfg.get("rust_demo", "status"));
 
     // 4. Share object (Using serde_json macro)
