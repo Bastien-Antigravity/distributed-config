@@ -4,9 +4,10 @@ type: repository
 status: active
 language: go
 tags:
-- \'#service/distributed-config\'
-  - '#domain/configuration'
-  - '#domain/networking'
+- '#service/distributed-config'
+- '#domain/configuration'
+- '#domain/networking'
+- '#zone/3-fleet'
 ---
 
 # Distributed Config
