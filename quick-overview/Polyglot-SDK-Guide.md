@@ -28,12 +28,13 @@ The core logic resides in \`src/cgo_bridge/\`, which manages:
 
 Every SDK provides the following standardized interface:
 
-- \`New(profile)\`: Initialize a new session.
-- \`Get(section, key)\`: Retrieve a value.
-- \`Set(section, key, val)\`: Update a value locally and sync.
-- \`OnLiveConfUpdate(callback)\`: Listen for real-time remote updates.
-- \`ShareConfig(json_payload)\`: Broadcast local state to the ecosystem.
-- \`Decrypt(ciphertext)\`: Decrypt RSA secrets.
+- `New(profile)`: Initialize a new session.
+- `Get(section, key)`: Retrieve a value.
+- `Set(section, key, val)`: Update a value locally and sync.
+- `OnLiveConfUpdate(callback)`: Listen for real-time remote updates.
+- `ShareConfig(json_payload)`: Broadcast local state to the ecosystem.
+- `ApplyFileOverride(filename)`: Load a local YAML override and return the 'local' section as JSON.
+- `Decrypt(ciphertext)`: Decrypt RSA secrets.
 
 ## 🚀 Building the Bridge
 

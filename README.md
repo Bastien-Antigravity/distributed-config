@@ -181,6 +181,7 @@ The `distributed-config` core is exposed via a stable C ABI.
 - `DistConf_OnLiveConfUpdate(handle, callback)`: Register a live update listener.
 - `DistConf_Sync(handle)`: Force a manual refresh from the Config Server.
 - `DistConf_ShareConfig(handle, json)`: Broadcast state (flat or nested map) to the ecosystem.
+- `DistConf_ApplyFileOverride(handle, filename)`: Load a local YAML override. Returns a JSON string of the 'local' section.
 - `DistConf_ValidateMandatoryServices(handle)`: Ensure the environment satisfies mandatory services.
 - `DistConf_Decrypt(handle, ciphertext)`: Decrypt a secret.
 - `DistConf_GetLastError()`: Retrieve the last raw engine-level error message.

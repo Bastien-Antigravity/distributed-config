@@ -196,13 +196,14 @@ func DistConf_IsValid(handle uintptr) int {
 }
 
 //export DistConf_ApplyFileOverride
-func DistConf_ApplyFileOverride(handle uintptr, filename *C.char) int {
-	if err := cgo_bridge.ApplyFileOverride(handle, C.GoString(filename)); err != nil {
+func DistConf_ApplyFileOverride(handle uintptr, filename *C.char) *C.char {
+	localJSON, err := cgo_bridge.ApplyFileOverride(handle, C.GoString(filename))
+	if err != nil {
 		setLastError(mapErrorCode(err), err.Error())
-		return 0
+		return nil
 	}
 	setLastError(C.DISTCONF_SUCCESS, "")
-	return 1
+	return C.CString(localJSON)
 }
 
 //export DistConf_ValidateMandatoryServices

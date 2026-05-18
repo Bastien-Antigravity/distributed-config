@@ -114,7 +114,7 @@ extern char* DistConf_GetLastError(void);
 extern GoInt DistConf_GetLastErrorCode(void);
 extern char* DistConf_Decrypt(GoUintptr handle, char* ciphertext);
 extern GoInt DistConf_IsValid(GoUintptr handle);
-extern GoInt DistConf_ApplyFileOverride(GoUintptr handle, char* filename);
+extern char* DistConf_ApplyFileOverride(GoUintptr handle, char* filename);
 extern GoInt DistConf_ValidateMandatoryServices(GoUintptr handle);
 extern GoInt DistConf_ShareConfig(GoUintptr handle, char* jsonData);
 extern void DistConf_OnLiveConfUpdate(GoUintptr handle, config_update_cb cb);

@@ -57,13 +57,13 @@ func Sync(handle uintptr) error {
 }
 
 // ApplyFileOverride is a Go-native wrapper for DistConf_ApplyFileOverride.
-func ApplyFileOverride(handle uintptr, filePath string) error {
+func ApplyFileOverride(handle uintptr, filePath string) (string, error) {
 	FacadeMu.RLock()
 	defer FacadeMu.RUnlock()
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return nil
+		return "{}", nil
 	}
 
 	return session.Config.ApplyFileOverride(sanitizeString(filePath))
