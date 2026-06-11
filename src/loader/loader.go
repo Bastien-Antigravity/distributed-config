@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	models "github.com/Bastien-Antigravity/distributed-config/src/core"
 	"gopkg.in/yaml.v3"
 )
+
+// Regex for environment variable expansion: ${VAR} or ${VAR:default}
+var envRegex = regexp.MustCompile(`\$\{([^}]+)\}`)
 
 // -----------------------------------------------------------------------------
 
@@ -103,10 +108,12 @@ func LoadConfigFromFileSafe(config *models.Config, filePath string) error {
 // It expands env variables and forces all scalars to strings, except for booleans.
 func ProcessNode(n *yaml.Node) {
 	if n.Kind == yaml.ScalarNode {
-		// Expand Environment Variables
+		// Expand Environment Variables using Regex (more robust than os.Expand for custom syntax)
 		if strings.Contains(n.Value, "${") {
-			n.Value = os.Expand(n.Value, func(s string) string {
-				parts := strings.SplitN(s, ":", 2)
+			n.Value = envRegex.ReplaceAllStringFunc(n.Value, func(m string) string {
+				// Trim the ${ and }
+				content := m[2 : len(m)-1]
+				parts := strings.SplitN(content, ":", 2)
 				val := os.Getenv(parts[0])
 				if val == "" && len(parts) > 1 {
 					val = parts[1]
@@ -115,11 +122,15 @@ func ProcessNode(n *yaml.Node) {
 			})
 		}
 
-		// Force types: Booleans remain bool, everything else becomes string
+		// Force types: Booleans remain bool, numbers remain numbers, everything else becomes string
 		lowerVal := strings.ToLower(n.Value)
 		if lowerVal == "true" || lowerVal == "false" {
 			n.Tag = "!!bool"
 			n.Style = 0 // Plain style for booleans
+		} else if isNumber(n.Value) {
+			// Let yaml.v3 auto-detect the tag (!!int or !!float)
+			n.Tag = ""
+			n.Style = 0
 		} else {
 			n.Tag = "!!str"
 			n.Style = yaml.DoubleQuotedStyle
@@ -128,6 +139,16 @@ func ProcessNode(n *yaml.Node) {
 	for _, child := range n.Content {
 		ProcessNode(child)
 	}
+}
+
+// isNumber checks if a string is a valid integer or float
+func isNumber(s string) bool {
+	if s == "" {
+		return false
+	}
+	// Try parsing as float (covers both int and float)
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
 }
 
 // -----------------------------------------------------------------------------
@@ -148,8 +169,26 @@ func LoadYAML(filePath string, target interface{}) error {
 
 	ProcessNode(&root)
 
-	if err := root.Decode(target); err != nil {
-		return fmt.Errorf("failed to decode yaml file '%s': %w", filePath, err)
+	// If target is a Config struct, we perform a Deep Merge to preserve defaults
+	if cfg, ok := target.(*models.Config); ok {
+		var raw map[string]interface{}
+		if err := root.Decode(&raw); err != nil {
+			return fmt.Errorf("failed to decode yaml file '%s' into map: %w", filePath, err)
+		}
+
+		// 1. Decode standard sections (Common) directly
+		if err := root.Decode(cfg); err != nil {
+			return fmt.Errorf("failed to decode yaml file '%s' into config: %w", filePath, err)
+		}
+
+		// 2. Perform Deep Merge on Capabilities to ensure missing keys within sections are kept from defaults
+		if caps, ok := raw["capabilities"].(map[string]interface{}); ok {
+			cfg.Capabilities = models.DeepMerge(cfg.Capabilities, caps)
+		}
+	} else {
+		if err := root.Decode(target); err != nil {
+			return fmt.Errorf("failed to decode yaml file '%s': %w", filePath, err)
+		}
 	}
 
 	return nil

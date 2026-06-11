@@ -32,7 +32,7 @@ type Config struct {
 // -----------------------------------------------------------------------------
 
 func NewConfig(profile string) *Config {
-	cfgData := &core.Config{}
+	cfgData := core.NewDefaultConfig()
 	initialMap := make(map[string]map[string]string)
 	cfgData.LiveConfig.Store(&initialMap)
 	cfgData.Logger = utils.EnsureSafeLogger(nil) // Default to no-op if not explicitly set later
@@ -187,12 +187,7 @@ func (config *Config) ApplyFileOverride(filePath string) (string, error) {
 
 	// 2. Handle capabilities (Merge)
 	if caps, ok := raw["capabilities"].(map[string]interface{}); ok {
-		if config.Config.Capabilities == nil {
-			config.Config.Capabilities = make(map[string]interface{})
-		}
-		for k, v := range caps {
-			config.Config.Capabilities[k] = v
-		}
+		config.Config.Capabilities = core.DeepMerge(config.Config.Capabilities, caps)
 	}
 
 	// 3. Extract 'local' section (Toolbox ownership)

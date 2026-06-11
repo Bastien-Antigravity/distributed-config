@@ -23,7 +23,8 @@ A robust, strategy-based configuration management library for distributed system
 The library uses a layered approach to build the final configuration:
 
 1.  **Code Defaults**: The application initializes with a hardcoded set of "safe" defaults (defined in `src/core/defaults.go`). This ensures the application can always start, even without a config file.
-2.  **Configuration Discovery**: The library automatically searches for a YAML file in multiple locations with strict priority.
+2.  **Auto-Skeleton Generation**: If the target configuration file (e.g., `standalone.yaml`) is missing, the library **automatically recreates it** using the internal master template. This ensures a functional "Zero-Config" bootstrap out of the box.
+3.  **Configuration Discovery**: The library automatically searches for a YAML file in multiple locations with strict priority.
     *   **Profile-Based Search** (Target provided):
         1. `config/[profile].yaml` (Current Working Directory)
         2. `config/[profile].yaml` (Executable Directory)
@@ -34,14 +35,15 @@ The library uses a layered approach to build the final configuration:
         6. `[executable_name].yaml` (Executable Directory)
     
     If a profile is specified, it **must** reside in a `config/` subdirectory. The binary name acts as the final global fallback.
-3.  **Environment Variables**: Values in the YAML file can use `${VAR_NAME}` syntax. These are expanded using the system's environment variables at runtime.
-4.  **Remote Sync**: Finally, if the selected profile supports it (like `production`), the library connects to the Config Server to fetch the latest "LiveConfig" updates.
+4.  **Environment Variables**: Values in the YAML file can use `${VAR_NAME}` syntax. These are expanded using the system's environment variables at runtime.
+5.  **Remote Sync**: Finally, if the selected profile supports it (like `production`), the library connects to the Config Server to fetch the latest "LiveConfig" updates.
 
 ## Features
 
 - **Multi-Profile Strategy**: Built-in support for `production`, `staging`, `test`, and `standalone` environments.
 - **Remote Synchronization**: Automatically fetches and updates configuration from a central server using [safe-socket](https://github.com/Bastien-Antigravity/safe-socket).
 - **Secrets Management**: Native support for environment variable expansion (e.g., `${TS_PASSWORD}`).
+- **Robust Expansion Engine**: Uses a dedicated Regex-based expansion engine that supports the `${VAR:default}` syntax, ensuring reliable fallbacks even when environment variables are missing.
 - **Environment-First Flexibility**: Supports "Pure-Environment" deployments where a local config file is optional. If missing, the system uses `CF_IP`/`CF_PORT` to connect to the central server and hydrate required capabilities.
 - **Fail-Safe & Strict**: Enforces "Mandatory Service Validation" (Fail-Fast logic) to ensure critical infrastructure like `log_server` is correctly configured (via any source) before boot.
 - **Live Updates**: Support for dynamic configuration updates via callbacks. Manually calling `Set()` (bulk) or `SetSingle()` (convenience) on the facade now correctly triggers local observers and automatically synchronizes with the fleet.
