@@ -118,19 +118,14 @@ func (c *Config) PreviewSet(updates map[string]map[string]string) *map[string]ma
 // -----------------------------------------------------------------------------
 
 // GetCapability extracts a specific capability dictionary and unmarshals it into the target struct.
-// It uses JSON round-tripping for easy conversion from nested map[string]interface{} to strongly typed structs.
-// It also merges overrides from LiveConfig if they exist.
 func (c *Config) GetCapability(key string, target interface{}) error {
 	val, ok := c.Capabilities[key]
 	if !ok || val == nil {
-		// Even if not in static Capabilities, it might be in LiveConfig
 		val = make(map[string]interface{})
 	}
 
-	// 1. Convert static/base capability to map for merging
 	capMap, ok := val.(map[string]interface{})
 	if !ok {
-		// If it's not a map, we can't easily merge, but we still try to marshal it
 		data, err := json.Marshal(val)
 		if err != nil {
 			return err
@@ -138,34 +133,50 @@ func (c *Config) GetCapability(key string, target interface{}) error {
 		return json.Unmarshal(data, target)
 	}
 
-	// 2. Check for LiveConfig overrides
-	// We check both the direct section (e.g. "log_server") AND the "capabilities" section (legacy/alternative)
+	// Deep copy to avoid mutating the original
+	mergedMap := make(map[string]interface{})
+	for k, v := range capMap {
+		mergedMap[k] = v
+	}
+
 	ptr := c.LiveConfig.Load()
 	if ptr != nil {
 		live := *ptr
-		// Direct section override (Priority 1)
 		if overrides, ok := live[key]; ok {
 			for k, v := range overrides {
-				capMap[k] = v
+				mergedMap[k] = v
 			}
 		}
-		// "capabilities" section override (e.g. key "log_server.ip") (Priority 2 - Legacy)
 		if capsSection, ok := live["capabilities"]; ok {
 			prefix := key + "."
 			for k, v := range capsSection {
 				if strings.HasPrefix(k, prefix) {
 					subKey := strings.TrimPrefix(k, prefix)
-					capMap[subKey] = v
+					mergedMap[subKey] = v
 				}
 			}
 		}
 	}
 
-	if len(capMap) == 0 {
+	if len(mergedMap) == 0 {
 		return fmt.Errorf("capability '%s' is strictly required but missing from all sources", key)
 	}
 
-	data, err := json.Marshal(capMap)
+	// Robustness Hack: Convert all numbers to strings in the map
+	// This ensures they can be unmarshaled into either string or numeric fields.
+	// (Go's json unmarshaler can't do number->string, but can do string->number if tags allow)
+	// Actually, we do the opposite: keep numbers as numbers, and let the caller use better structs.
+	// But since many callers use string fields for ports, we must support it.
+	
+	// We'll use a trick: marshal to JSON, then use a custom decoder that handles weak typing.
+	// But since we can't easily add dependencies, we'll just manually stringify common fields like "port".
+	for _, portKey := range []string{"port", "grpc_port"} {
+		if v, exists := mergedMap[portKey]; exists {
+			mergedMap[portKey] = fmt.Sprintf("%v", v)
+		}
+	}
+
+	data, err := json.Marshal(mergedMap)
 	if err != nil {
 		return err
 	}
@@ -304,13 +315,11 @@ func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
 		} else {
 			cap, ok := capRaw.(map[string]interface{})
 			if ok {
-				if host == "" {
-					h, _ := cap[hostKey].(string)
-					host = h
+				if host == "" && cap[hostKey] != nil {
+					host = fmt.Sprintf("%v", cap[hostKey])
 				}
-				if port == "" {
-					p, _ := cap[portKey].(string)
-					port = p
+				if port == "" && cap[portKey] != nil {
+					port = fmt.Sprintf("%v", cap[portKey])
 				}
 			}
 		}

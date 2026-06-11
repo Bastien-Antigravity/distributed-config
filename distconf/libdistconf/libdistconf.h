@@ -31,8 +31,7 @@ extern const char *_GoStringPtr(_GoString_ s);
 typedef void (*config_update_cb)(uintptr_t handle, const char* json_data);
 
 // Helper to safely execute a C callback from Go
-static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) __attribute__((unused));
-static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) {
+static inline void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) {
     if (cb != NULL) {
         cb(handle, json_data);
     }
@@ -114,7 +113,7 @@ extern char* DistConf_GetLastError(void);
 extern GoInt DistConf_GetLastErrorCode(void);
 extern char* DistConf_Decrypt(GoUintptr handle, char* ciphertext);
 extern GoInt DistConf_IsValid(GoUintptr handle);
-extern GoInt DistConf_ApplyFileOverride(GoUintptr handle, char* filename);
+extern char* DistConf_ApplyFileOverride(GoUintptr handle, char* filename);
 extern GoInt DistConf_ValidateMandatoryServices(GoUintptr handle);
 extern GoInt DistConf_ShareConfig(GoUintptr handle, char* jsonData);
 extern void DistConf_OnLiveConfUpdate(GoUintptr handle, config_update_cb cb);

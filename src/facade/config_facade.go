@@ -1,6 +1,7 @@
 package facade
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -31,7 +32,7 @@ type Config struct {
 // -----------------------------------------------------------------------------
 
 func NewConfig(profile string) *Config {
-	cfgData := &core.Config{}
+	cfgData := core.NewDefaultConfig()
 	initialMap := make(map[string]map[string]string)
 	cfgData.LiveConfig.Store(&initialMap)
 	cfgData.Logger = utils.EnsureSafeLogger(nil) // Default to no-op if not explicitly set later
@@ -153,28 +154,28 @@ func (config *Config) ShareConfig(payload interface{}) error {
 	return config.Set(updates)
 }
 
-// ApplyFileOverride loads a YAML file, expands environment variables, and merges it
-// into the current configuration. This ensures 100% logic identity for local overrides.
+// ApplyFileOverride loads a YAML file, expands environment variables, and merges standard
+// sections into the current configuration. It returns the 'local' section as a JSON string
+// to be managed by the calling AppConfig wrapper.
 // -----------------------------------------------------------------------------
-func (config *Config) ApplyFileOverride(filePath string) error {
+func (config *Config) ApplyFileOverride(filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read override file: %w", err)
+		return "", fmt.Errorf("failed to read override file: %w", err)
 	}
 
 	var root yaml.Node
 	if err := yaml.Unmarshal(data, &root); err != nil {
-		return fmt.Errorf("failed to parse override yaml: %w", err)
+		return "", fmt.Errorf("failed to parse override yaml: %w", err)
 	}
 
 	// Apply Go-native expansion and type forcing
 	loader.ProcessNode(&root)
 
 	// Decode into core.Config to leverage existing field mapping (Common, Capabilities, etc)
-	// We use a temporary struct to capture everything, including custom sections
 	var raw map[string]interface{}
 	if err := root.Decode(&raw); err != nil {
-		return fmt.Errorf("failed to decode override map: %w", err)
+		return "", fmt.Errorf("failed to decode override map: %w", err)
 	}
 
 	// 1. Handle standard sections (Common)
@@ -186,33 +187,18 @@ func (config *Config) ApplyFileOverride(filePath string) error {
 
 	// 2. Handle capabilities (Merge)
 	if caps, ok := raw["capabilities"].(map[string]interface{}); ok {
-		if config.Config.Capabilities == nil {
-			config.Config.Capabilities = make(map[string]interface{})
-		}
-		for k, v := range caps {
-			config.Config.Capabilities[k] = v
-		}
+		config.Config.Capabilities = core.DeepMerge(config.Config.Capabilities, caps)
 	}
 
-	// 3. Handle 'local' and any other custom sections by merging them into LiveConfig
-	// To ensure they are available via Get(section, key) or GetFullConfig()
-	updates := make(map[string]map[string]string)
-	for section, content := range raw {
-		if section == "common" || section == "capabilities" {
-			continue
+	// 3. Extract 'local' section (Toolbox ownership)
+	localJSON := "{}"
+	if priv, ok := raw["local"].(map[string]interface{}); ok {
+		b, err := json.Marshal(priv)
+		if err == nil {
+			localJSON = string(b)
 		}
-		if kv, ok := content.(map[string]interface{}); ok {
-			updates[section] = make(map[string]string)
-			for k, v := range kv {
-				updates[section][k] = fmt.Sprintf("%v", v)
-			}
-		}
-	}
-
-	if len(updates) > 0 {
-		config.Config.Set(updates)
 	}
 
 	config.Logger.Info("Standardized File Override applied from: %s", filePath)
-	return nil
+	return localJSON, nil
 }

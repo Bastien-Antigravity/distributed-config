@@ -9,8 +9,7 @@ package main
 typedef void (*config_update_cb)(uintptr_t handle, const char* json_data);
 
 // Helper to safely execute a C callback from Go
-static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) __attribute__((unused));
-static void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) {
+static inline void call_config_update_cb(config_update_cb cb, uintptr_t handle, const char* json_data) {
     if (cb != NULL) {
         cb(handle, json_data);
     }
@@ -196,13 +195,14 @@ func DistConf_IsValid(handle uintptr) int {
 }
 
 //export DistConf_ApplyFileOverride
-func DistConf_ApplyFileOverride(handle uintptr, filename *C.char) int {
-	if err := cgo_bridge.ApplyFileOverride(handle, C.GoString(filename)); err != nil {
+func DistConf_ApplyFileOverride(handle uintptr, filename *C.char) *C.char {
+	localJSON, err := cgo_bridge.ApplyFileOverride(handle, C.GoString(filename))
+	if err != nil {
 		setLastError(mapErrorCode(err), err.Error())
-		return 0
+		return nil
 	}
 	setLastError(C.DISTCONF_SUCCESS, "")
-	return 1
+	return C.CString(localJSON)
 }
 
 //export DistConf_ValidateMandatoryServices

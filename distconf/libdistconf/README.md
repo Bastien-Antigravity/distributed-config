@@ -21,6 +21,7 @@ The following table maps the C ABI exports to their original Go counterparts in 
 | `DistConf_Sync(handle)` | `cfg.Sync()` | Triggers manual synchronization with server. |
 | `DistConf_OnLiveConfUpdate(h, cb)` | `cfg.OnLiveConfUpdate(f)` | Registers a dynamic update listener. |
 | `DistConf_ShareObject(h, sec, json)` | `cfg.ShareObject(sec, obj)` | Broadcasts state to the ecosystem. |
+| `DistConf_ApplyFileOverride(h, f)` | `cfg.ApplyFileOverride(f)` | Loads YAML override, returns 'local' as JSON. |
 | `DistConf_ValidateMandatoryServices(h)` | `cfg.ValidateMandatoryServices()` | Validates required infrastructure. |
 | `DistConf_GetAddress(h, cap)` | `cfg.GetAddress(cap)` | Resolves `host:port` for a capability. |
 | `DistConf_GetGRPCAddress(h, cap)` | `cfg.GetGRPCAddress(cap)` | Resolves gRPC `host:port`. |
