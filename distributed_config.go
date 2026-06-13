@@ -29,6 +29,11 @@ func ProcessNode(n *yaml.Node) {
 	loader.ProcessNode(n)
 }
 
+// ResolveConfigPath returns the absolute path to the configuration file based on platform search rules.
+func ResolveConfigPath(targetName string) string {
+	return loader.ResolveConfigPath(targetName)
+}
+
 // Decrypt decrypts a single ENC(...) ciphertext string.
 func Decrypt(ciphertext string) (string, error) {
 	return secret.Decrypt(ciphertext)

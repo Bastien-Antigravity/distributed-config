@@ -18,5 +18,8 @@ message ConfigMsg {
 
     // JSON encoded payload representing either the ConfigMap or the ServiceRegistry.
     // This removes the need for infinite Protobuf model coupling.
-    bytes Payload = 2; 
+    bytes Payload = 2;
+
+    // Internal version or heartbeat-prevention field
+    int32 Version = 3;
 }

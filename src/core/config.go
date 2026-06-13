@@ -3,6 +3,8 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -281,9 +283,32 @@ func (c *Config) GetAddress(capability string) (string, error) {
 // -----------------------------------------------------------------------------
 
 // GetGRPCAddress returns the gRPC address for a given capability.
-// Requires strict declaration of 'grpc_ip' and 'grpc_port'.
+// It follows the Shadow Port Protocol: if 'grpc_port' is not explicitly defined,
+// it defaults to 'port' + 1.
 func (c *Config) GetGRPCAddress(capability string) (string, error) {
-	return c.getAddr(capability, "grpc_ip", "grpc_port")
+	// 1. Try explicit gRPC configuration
+	addr, err := c.getAddr(capability, "grpc_ip", "grpc_port")
+	if err == nil {
+		return addr, nil
+	}
+
+	// 2. Shadow Port Fallback: Base Port + 1
+	baseAddr, err := c.GetAddress(capability)
+	if err != nil {
+		return "", fmt.Errorf("gRPC address missing and shadow port fallback failed: %w", err)
+	}
+
+	host, portStr, err := net.SplitHostPort(baseAddr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse base address for shadow port: %w", err)
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return "", fmt.Errorf("base port is not a number: %s", portStr)
+	}
+
+	return fmt.Sprintf("%s:%d", host, port+1), nil
 }
 
 // -----------------------------------------------------------------------------

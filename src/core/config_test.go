@@ -122,6 +122,45 @@ func TestConfig_ValidateMandatoryServices(t *testing.T) {
 	})
 }
 
+func TestConfig_ShadowPort(t *testing.T) {
+	cfg := &Config{
+		Capabilities: map[string]interface{}{
+			"my_service": map[string]interface{}{
+				"ip":   "127.0.0.1",
+				"port": "8000",
+			},
+			"explicit_service": map[string]interface{}{
+				"ip":        "127.0.0.1",
+				"port":      "8000",
+				"grpc_ip":   "127.0.0.1",
+				"grpc_port": "9999",
+			},
+		},
+	}
+	initialMap := make(map[string]map[string]string)
+	cfg.LiveConfig.Store(&initialMap)
+
+	t.Run("DefaultShadowPort", func(t *testing.T) {
+		addr, err := cfg.GetGRPCAddress("my_service")
+		if err != nil {
+			t.Fatalf("Expected success, got: %v", err)
+		}
+		if addr != "127.0.0.1:8001" {
+			t.Errorf("Expected 127.0.0.1:8001, got %s", addr)
+		}
+	})
+
+	t.Run("ExplicitGRPCPort", func(t *testing.T) {
+		addr, err := cfg.GetGRPCAddress("explicit_service")
+		if err != nil {
+			t.Fatalf("Expected success, got: %v", err)
+		}
+		if addr != "127.0.0.1:9999" {
+			t.Errorf("Expected 127.0.0.1:9999, got %s", addr)
+		}
+	})
+}
+
 func TestConfig_Concurrency(t *testing.T) {
 	cfg := &Config{}
 	initialMap := make(map[string]map[string]string)
