@@ -87,7 +87,11 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 		if err := json.Unmarshal(msg.Payload, &parsed); err != nil {
 			return fmt.Errorf("failed to decode JSON payload: %w", err)
 		}
-		h.updateLiveConfig(parsed)
+		// Use Set() for merging (Delta Update)
+		h.parentConfig.Set(parsed)
+		if h.onLiveConfUpdate != nil {
+			h.onLiveConfUpdate(parsed)
+		}
 
 	case pb.ConfigMsg_BROADCAST_REGISTRY:
 		var parsed map[string][]string
@@ -101,10 +105,10 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 	case pb.ConfigMsg_ACK:
 		// No-op
 
-	case pb.ConfigMsg_GET_SYNC: // Added direct sync support
+	case pb.ConfigMsg_GET_SYNC, pb.ConfigMsg_FULL_REFRESH: // Added direct sync support
 		var parsed map[string]map[string]string
 		if err := json.Unmarshal(msg.Payload, &parsed); err != nil {
-			return fmt.Errorf("failed to decode GET_SYNC JSON payload: %w", err)
+			return fmt.Errorf("failed to decode GET_SYNC/FULL_REFRESH JSON payload: %w", err)
 		}
 		h.updateLiveConfig(parsed)
 

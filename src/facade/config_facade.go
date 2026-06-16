@@ -134,6 +134,14 @@ func (config *Config) Sync() error {
 	return config.strategy.Sync(config.Config)
 }
 
+// Reload manually re-triggers the configuration loading from its primary source (e.g., file).
+func (config *Config) Reload() error {
+	if config.strategy == nil {
+		return fmt.Errorf("no strategy associated with this configuration")
+	}
+	return config.strategy.Load(config.Config)
+}
+
 // Close shuts down any active resources associated with the configuration strategy.
 // -----------------------------------------------------------------------------
 func (config *Config) Close() error {

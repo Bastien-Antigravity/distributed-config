@@ -41,6 +41,36 @@ func GetGRPCAddress(handle uintptr, capability string) (string, error) {
 
 // -------------------------------------------------------------------------
 
+// GetGRPCMgmtAddress is a Go-native wrapper for DistConf_GetGRPCMgmtAddress.
+func GetGRPCMgmtAddress(handle uintptr, capability string) (string, error) {
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
+	session, ok := FacadeStore[handle]
+
+	if !ok || session.Config == nil {
+		return "", nil
+	}
+
+	return session.Config.GetGRPCMgmtAddress(sanitizeString(capability))
+}
+
+// -------------------------------------------------------------------------
+
+// GetRESTAddress is a Go-native wrapper for DistConf_GetRESTAddress.
+func GetRESTAddress(handle uintptr, capability string) (string, error) {
+	FacadeMu.RLock()
+	defer FacadeMu.RUnlock()
+	session, ok := FacadeStore[handle]
+
+	if !ok || session.Config == nil {
+		return "", nil
+	}
+
+	return session.Config.GetRESTAddress(sanitizeString(capability))
+}
+
+// -------------------------------------------------------------------------
+
 // GetCapability is a Go-native wrapper for DistConf_GetCapability.
 func GetCapability(handle uintptr, capability string) (string, error) {
 	FacadeMu.RLock()

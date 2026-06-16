@@ -19,6 +19,7 @@ func NewDefaultConfig() *Config {
 				"port":      "${CF_PORT:3306}",
 				"grpc_ip":   "${CF_GRPC_IP:127.0.0.1}",
 				"grpc_port": "${CF_GRPC_PORT:3307}",
+				"rest_port": "${CF_REST_PORT:3308}",
 				"refresh":   "300",
 			},
 			"log_server": map[string]interface{}{
@@ -28,10 +29,12 @@ func NewDefaultConfig() *Config {
 				"grpc_port": "${LS_GRPC_PORT:9021}",
 			},
 			"notif_server": map[string]interface{}{
-				"ip":        "${NT_IP:127.0.0.1}",
-				"port":      "${NT_PORT:1026}",
-				"grpc_ip":   "${NT_GRPC_IP:127.0.0.1}",
-				"grpc_port": "${NT_GRPC_PORT:1027}",
+				"ip":             "${NT_IP:127.0.0.1}",
+				"port":           "${NT_PORT:1026}",
+				"grpc_ip":        "${NT_GRPC_IP:127.0.0.1}",
+				"grpc_port":      "${NT_GRPC_PORT:1027}",
+				"grpc_mgmt_port": "${NT_GRPC_MGMT_PORT:1028}",
+				"rest_port":      "${NT_REST_PORT:1029}",
 			},
 			"tele_remote": map[string]interface{}{
 				"ip":      "${TR_IP:127.0.0.1}",
@@ -58,6 +61,10 @@ func NewDefaultConfig() *Config {
 				"port":      "${SC_PORT:8080}",
 				"grpc_ip":   "${SC_GRPC_IP:127.0.0.1}",
 				"grpc_port": "${SC_GRPC_PORT:8081}",
+			},
+			"rag_engine": map[string]interface{}{
+				"ip":   "${RG_IP:127.0.0.1}",
+				"port": "${RG_PORT:8080}",
 			},
 			"web_interface": map[string]interface{}{
 				"ip":   "${WB_IP:127.0.0.1}",

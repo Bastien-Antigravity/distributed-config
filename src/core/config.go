@@ -172,7 +172,7 @@ func (c *Config) GetCapability(key string, target interface{}) error {
 	
 	// We'll use a trick: marshal to JSON, then use a custom decoder that handles weak typing.
 	// But since we can't easily add dependencies, we'll just manually stringify common fields like "port".
-	for _, portKey := range []string{"port", "grpc_port"} {
+	for _, portKey := range []string{"port", "grpc_port", "chat_id", "telegram_id"} {
 		if v, exists := mergedMap[portKey]; exists {
 			mergedMap[portKey] = fmt.Sprintf("%v", v)
 		}
@@ -293,9 +293,33 @@ func (c *Config) GetGRPCAddress(capability string) (string, error) {
 	}
 
 	// 2. Shadow Port Fallback: Base Port + 1
+	return c.getShadowAddr(capability, 1)
+}
+
+// GetGRPCMgmtAddress returns the gRPC management address for a given capability.
+// Follows the Shadow Port Protocol (Shadow + 2).
+func (c *Config) GetGRPCMgmtAddress(capability string) (string, error) {
+	addr, err := c.getAddr(capability, "grpc_ip", "grpc_mgmt_port")
+	if err == nil {
+		return addr, nil
+	}
+	return c.getShadowAddr(capability, 2)
+}
+
+// GetRESTAddress returns the REST management address for a given capability.
+// Follows the Shadow Port Protocol (Shadow + 3).
+func (c *Config) GetRESTAddress(capability string) (string, error) {
+	addr, err := c.getAddr(capability, "ip", "rest_port")
+	if err == nil {
+		return addr, nil
+	}
+	return c.getShadowAddr(capability, 3)
+}
+
+func (c *Config) getShadowAddr(capability string, offset int) (string, error) {
 	baseAddr, err := c.GetAddress(capability)
 	if err != nil {
-		return "", fmt.Errorf("gRPC address missing and shadow port fallback failed: %w", err)
+		return "", fmt.Errorf("address missing for %s and shadow port fallback failed: %w", capability, err)
 	}
 
 	host, portStr, err := net.SplitHostPort(baseAddr)
@@ -308,7 +332,7 @@ func (c *Config) GetGRPCAddress(capability string) (string, error) {
 		return "", fmt.Errorf("base port is not a number: %s", portStr)
 	}
 
-	return fmt.Sprintf("%s:%d", host, port+1), nil
+	return fmt.Sprintf("%s:%d", host, port+offset), nil
 }
 
 // -----------------------------------------------------------------------------

@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	models "github.com/Bastien-Antigravity/distributed-config/src/core"
+	"github.com/Bastien-Antigravity/distributed-config/src/secret"
 	"gopkg.in/yaml.v3"
 )
 
@@ -122,15 +122,19 @@ func ProcessNode(n *yaml.Node) {
 			})
 		}
 
-		// Force types: Booleans remain bool, numbers remain numbers, everything else becomes string
+		// Decrypt if value matches ENC(...)
+		if strings.HasPrefix(n.Value, "ENC(") && strings.HasSuffix(n.Value, ")") {
+			decrypted, err := secret.Decrypt(n.Value)
+			if err == nil {
+				n.Value = decrypted
+			}
+		}
+
+		// Force types: Booleans remain bool, everything else becomes string
 		lowerVal := strings.ToLower(n.Value)
 		if lowerVal == "true" || lowerVal == "false" {
 			n.Tag = "!!bool"
 			n.Style = 0 // Plain style for booleans
-		} else if isNumber(n.Value) {
-			// Let yaml.v3 auto-detect the tag (!!int or !!float)
-			n.Tag = ""
-			n.Style = 0
 		} else {
 			n.Tag = "!!str"
 			n.Style = yaml.DoubleQuotedStyle
@@ -139,16 +143,6 @@ func ProcessNode(n *yaml.Node) {
 	for _, child := range n.Content {
 		ProcessNode(child)
 	}
-}
-
-// isNumber checks if a string is a valid integer or float
-func isNumber(s string) bool {
-	if s == "" {
-		return false
-	}
-	// Try parsing as float (covers both int and float)
-	_, err := strconv.ParseFloat(s, 64)
-	return err == nil
 }
 
 // -----------------------------------------------------------------------------

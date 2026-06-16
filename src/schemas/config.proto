@@ -12,6 +12,7 @@ message ConfigMsg {
         ACK = 3;
         ERROR = 4;
         BROADCAST_REGISTRY = 5;
+        FULL_REFRESH = 6;
     }
     
     Cmd Command = 1;

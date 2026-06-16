@@ -146,8 +146,17 @@ func (c *Client) Watch() {
 
 // GetConfig fetches configuration from the server.
 func (c *Client) GetConfig() (*core.Config, error) {
+	return c.requestSync(pb.ConfigMsg_GET_SYNC)
+}
+
+// FullRefresh explicitly requests the full configuration from the server.
+func (c *Client) FullRefresh() (*core.Config, error) {
+	return c.requestSync(pb.ConfigMsg_FULL_REFRESH)
+}
+
+func (c *Client) requestSync(cmd pb.ConfigMsg_Cmd) (*core.Config, error) {
 	// Send request via Handler
-	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_GET_SYNC, nil)
+	data, err := c.Handler.HandleOutgoing(cmd, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +182,7 @@ func (c *Client) GetConfig() (*core.Config, error) {
 		}
 	} else {
 		// Mock behavior
-		c.Handler.parentConfig.Logger.Info("Mock: Client.GetConfig() simulated")
+		c.Handler.parentConfig.Logger.Info("Mock: Client.requestSync(%v) simulated", cmd)
 	}
 
 	return c.Handler.parentConfig, nil

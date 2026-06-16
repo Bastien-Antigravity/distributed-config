@@ -57,6 +57,12 @@ func getPrivateKey() (*rsa.PrivateKey, error) {
 	if !ok {
 		return nil, fmt.Errorf("not an RSA private key")
 	}
+
+	source := "file"
+	if keyContent != "" {
+		source = "environment variable"
+	}
+	fmt.Printf("DEBUG: RSA Private Key loaded successfully from %s\n", source)
 	return rsaKey, nil
 }
 
