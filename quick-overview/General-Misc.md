@@ -2,6 +2,12 @@
 tags:
 - '#ai/ignore'
 - '#zone/3-fleet'
+- '#service/distributed-config'
+- '#type/overview'
+- '#state/active'
+microservice: distributed-config
+type: overview
+status: active
 ---
 # General Project Information
 

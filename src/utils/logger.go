@@ -1,6 +1,9 @@
 package utils
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 // Logger defines the interface for structured logging.
 // This interface is structurally compatible with universal-logger and microservice-toolbox.
@@ -29,7 +32,7 @@ func EnsureSafeLogger(log Logger) Logger {
 type noOpLogger struct{}
 
 func (n *noOpLogger) Debug(string, ...any)            {}
-func (n *noOpLogger) Info(format string, args ...any) { fmt.Printf(format+"\n", args...) } // Keep basic console output if no logger provided for core config
+func (n *noOpLogger) Info(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...) } // Keep basic console output if no logger provided for core config
 func (n *noOpLogger) Warning(string, ...any)          {}
 func (n *noOpLogger) Error(string, ...any)            {}
 func (n *noOpLogger) Critical(string, ...any)         {}

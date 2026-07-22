@@ -47,7 +47,7 @@ func NewConfig(profile string) *Config {
 	profile = strings.TrimSpace(profile)
 	strategy, err := factory.NewStrategy(profile)
 	if err != nil {
-		fmt.Printf("Critical Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Critical Error: %v\n", err)
 		return configWrapper
 	}
 
@@ -57,14 +57,14 @@ func NewConfig(profile string) *Config {
 
 	// 2. Load
 	if err := strategy.Load(configWrapper.Config); err != nil {
-		fmt.Printf("Config Load Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Config Load Error: %v\n", err)
 		// Strategy might have generated a skeleton or missing file.
 		return configWrapper
 	}
 
 	// 3. Sync
 	if err := strategy.Sync(configWrapper.Config); err != nil {
-		fmt.Printf("Config Sync Warning: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Config Sync Warning: %v\n", err)
 	}
 
 	// 4. Store Handler and Strategy for manual sync/wiring

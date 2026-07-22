@@ -29,6 +29,13 @@ var (
 func New(profile string) uintptr {
 	prof := sanitizeString(profile)
 
+	switch prof {
+	case "standalone", "test", "staging", "production":
+		// Allowed profiles
+	default:
+		return 0
+	}
+
 	cfg := distributed_config.New(prof)
 	if cfg == nil {
 		return 0

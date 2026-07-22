@@ -6,39 +6,58 @@
 common:
   name: "distributed-config-service"
   reset: false
+  public_ip: "${PUBLIC_IP:127.0.0.1}"
+  retry_base_ms: "100"
+  retry_max_sec: "5"
 
 capabilities:
+  config_server:
+    ip: "${CF_IP:127.0.0.2}"
+    port: "${CF_PORT:3306}"
+    grpc_ip: "${CF_GRPC_IP:127.0.0.2}"
+    grpc_port: "${CF_GRPC_PORT:3307}"
+    rest_port: "${CF_REST_PORT:3308}"
+
   log_server:
     ip: "${LS_IP:127.0.0.2}"
     port: "${LS_PORT:9020}"
+    grpc_ip: "${LS_GRPC_IP:127.0.0.2}"
+    grpc_port: "${LS_GRPC_PORT:9021}"
     level: "${LS_LEVEL:INFO}"
-
-  # Base Connection for Distributed Mode
-  config_server:
-    ip: "${CF_IP:127.0.0.2}"         # Injected from environment
-    port: "${CF_PORT:3306}"     # Injected from environment
 
   notif_server:
     ip: "${NT_IP:127.0.0.2}"
     port: "${NT_PORT:1026}"
+    grpc_ip: "${NT_GRPC_IP:127.0.0.2}"
+    grpc_port: "${NT_GRPC_PORT:1027}"
+    rest_port: "${NT_REST_PORT:1029}"
 
   tele_remote:
-    token: "${TR_TOKEN}"
-    chat_id: "${TR_CHATID}"
     ip: "${TR_IP:127.0.0.2}"
     port: "${TR_PORT:1863}"
-    
-  # Example Capability with Secrets
-  timescale_db:
-    ip: "${TS_IP:127.0.0.2}"
-    db_name: "${TS_DBNAME:app_db}"
-    user: "${TS_USER:dbuser}"
-    password: "${TS_PASSWORD}" # RELIABLE: Loaded from system ENV (Secrets Manager)
+    grpc_ip: "${TR_GRPC_IP:127.0.0.2}"
+    grpc_port: "${TR_GRPC_PORT:1864}"
+    rest_port: "${TR_REST_PORT:1866}"
+    token: "${TR_TOKEN}"
+    chat_id: "${TR_CHATID}"
 
   web_interface:
     ip: "${WB_IP:127.0.0.2}"
     port: "${WB_PORT:8080}"
-    
+    grpc_ip: "${WB_GRPC_IP:127.0.0.2}"
+    grpc_port: "${WB_GRPC_PORT:8081}"
+    rest_port: "${WB_REST_PORT:8083}"
+
   scheduler:
     ip: "${SC_IP:127.0.0.2}"
     port: "${SC_PORT:5001}"
+    grpc_ip: "${SC_GRPC_IP:127.0.0.2}"
+    grpc_port: "${SC_GRPC_PORT:5002}"
+    rest_port: "${SC_REST_PORT:5004}"
+
+  timescale_db:
+    ip: "${TS_IP:127.0.0.2}"
+    port: "${TS_PORT:5432}"
+    db_name: "${TS_DBNAME:app_db}"
+    user: "${TS_USER:dbuser}"
+    password: "${TS_PASSWORD}"

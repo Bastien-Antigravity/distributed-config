@@ -6,6 +6,8 @@ tags:
 - '#ai/ignore'
 - '#zone/3-fleet'
 - '#type/documentation'
+- '#service/distributed-config'
+- '#state/active'
 ---
 # Architecture Overview
 

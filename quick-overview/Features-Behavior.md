@@ -7,6 +7,8 @@ tags:
 - '#zone/3-fleet'
 - '#type/documentation'
 - '#domain/configuration'
+- '#service/distributed-config'
+- '#state/active'
 ---
 # Features & Behavior
 

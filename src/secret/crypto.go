@@ -62,7 +62,7 @@ func getPrivateKey() (*rsa.PrivateKey, error) {
 	if keyContent != "" {
 		source = "environment variable"
 	}
-	fmt.Printf("DEBUG: RSA Private Key loaded successfully from %s\n", source)
+	fmt.Fprintf(os.Stderr, "DEBUG: RSA Private Key loaded successfully from %s\n", source)
 	return rsaKey, nil
 }
 
@@ -137,7 +137,7 @@ func ProcessConfigSecrets(content []byte) ([]byte, error) {
 	result := ENC_REGEX.ReplaceAllFunc(content, func(match []byte) []byte {
 		decrypted, err := Decrypt(string(match))
 		if err != nil {
-			fmt.Printf("Warning: Failed to decrypt secret: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to decrypt secret: %v\n", err)
 			return match
 		}
 		return []byte(decrypted)

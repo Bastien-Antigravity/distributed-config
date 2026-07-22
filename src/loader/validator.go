@@ -32,11 +32,16 @@ func ValidateCommonConfig(config *core.Config) error {
 	return nil
 }
 
-// CheckTestIPs ensures all defined IPs are 127.0.0.2
-// -----------------------------------------------------------------------------
-
 func CheckTestIPs(config *core.Config) error {
-	// Disabled for Docker testing scenarios
+	for name, capInterface := range config.Capabilities {
+		if m, ok := capInterface.(map[string]interface{}); ok {
+			if ipRaw, exists := m["ip"]; exists {
+				if ip, ok := ipRaw.(string); ok && ip != "127.0.0.2" && ip != "" {
+					return fmt.Errorf("test integrity failure: %s IP must be 127.0.0.2 in test mode, got %s", name, ip)
+				}
+			}
+		}
+	}
 	return nil
 }
 

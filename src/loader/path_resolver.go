@@ -39,25 +39,19 @@ func getCallerDir() string {
 }
 
 // ResolveConfigPath handles the search logic for configuration files.
-// It prioritizes the explicitly provided 'fallbackName' (usually profile or target name)
-// but also falls back to the executable name if neither is found.
+// It searches only for the targetName profile config in the binary directory (or caller source) and CWD.
 //
 // SEARCH ORDER (Locality First):
-// 1. EXE/config/[targetName].yaml
-// 2. EXE/[targetName].yaml
-// 3. CWD/config/[targetName].yaml
-// 4. CWD/[targetName].yaml
+// 1. EXE/[targetName].yaml
+// 2. CWD/[targetName].yaml
 // -----------------------------------------------------------------------------
 
 func ResolveConfigPath(targetName string) string {
 	// 1. Determine Executable Context
 	exePath, err := os.Executable()
-	exeName := ""
 	exeDir := ""
 	if err == nil {
 		exePathAbs, _ := filepath.Abs(exePath)
-		exeName = filepath.Base(exePathAbs)
-		exeName = strings.TrimSuffix(exeName, filepath.Ext(exeName))
 		exeDir = filepath.Dir(exePathAbs)
 	}
 
@@ -75,26 +69,12 @@ func ResolveConfigPath(targetName string) string {
 
 	// Local to Binary (Priority 1)
 	if targetName != "" && exeDir != "" {
-		candidates = append(candidates, filepath.Join(exeDir, "config", targetName+".yaml"))
 		candidates = append(candidates, filepath.Join(exeDir, targetName+".yaml"))
 	}
 
 	// Local to CWD (Priority 2)
 	if targetName != "" && cwd != "" && cwd != exeDir {
-		candidates = append(candidates, filepath.Join(cwd, "config", targetName+".yaml"))
 		candidates = append(candidates, filepath.Join(cwd, targetName+".yaml"))
-	}
-
-	// Fallback to EXE name in Binary Dir (Priority 3)
-	if exeName != "" && exeDir != "" {
-		candidates = append(candidates, filepath.Join(exeDir, "config", exeName+".yaml"))
-		candidates = append(candidates, filepath.Join(exeDir, exeName+".yaml"))
-	}
-
-	// Final Fallback CWD (Priority 4)
-	if exeName != "" && cwd != "" && cwd != exeDir {
-		candidates = append(candidates, filepath.Join(cwd, "config", exeName+".yaml"))
-		candidates = append(candidates, filepath.Join(cwd, exeName+".yaml"))
 	}
 
 	// 4. Search Loop
@@ -104,8 +84,7 @@ func ResolveConfigPath(targetName string) string {
 		}
 	}
 
-	// 5. Default: return targetName if provided, otherwise exeName
-	// Default to the binary directory to keep files collocated
+	// 5. Default Fallback
 	baseDir := exeDir
 	if baseDir == "" {
 		baseDir = cwd
@@ -116,12 +95,6 @@ func ResolveConfigPath(targetName string) string {
 			return filepath.Join(baseDir, targetName+".yaml")
 		}
 		return targetName + ".yaml"
-	}
-	if exeName != "" {
-		if baseDir != "" {
-			return filepath.Join(baseDir, exeName+".yaml")
-		}
-		return exeName + ".yaml"
 	}
 
 	if baseDir != "" {
