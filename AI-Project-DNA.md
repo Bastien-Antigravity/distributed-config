@@ -1,4 +1,13 @@
-# 🧬 Project DNA: distributed-config
+---
+microservice: 08-Base-Scripts
+type: note
+status: active
+tags:
+- '#service/08-Base-Scripts'
+- '#type/note'
+- '#state/active'
+- '#zone/3-fleet'
+---# 🧬 Project DNA: distributed-config
 
 ## 🎯 High-Level Intent (BDD)
 - **Goal**: Provide a client library for microservices to interact with the centralized `config-server`. 
@@ -6,7 +15,7 @@
 
 ## 🛠 Technical Constraints
 - **Language**: Go
-- **Architecture Standard**: Adheres to the ecosystem-wide standards in [[GEMINI.md]].
+- **Architecture Standard**: Adheres to the ecosystem-wide standards in .
 
 ## 👥 Roles & Responsibilities
 - **Architect**: 
@@ -14,4 +23,4 @@
     - Implement background refresh for dynamic parameters.
 - **Developer**:
     - Ensure thread-safe access to cached configurations.
-    - Reference [[GEMINI.md]] for consistent error reporting UI.
+    - Reference  for consistent error reporting UI.

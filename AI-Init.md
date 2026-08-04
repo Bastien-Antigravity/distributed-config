@@ -2,6 +2,11 @@
 microservice: distributed-config
 type: governance
 status: active
+tags:
+- '#service/distributed-config'
+- '#type/governance'
+- '#state/active'
+- '#zone/3-fleet'
 ---
 
 # ⚡ AI Initialization: distributed-config

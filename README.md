@@ -8,6 +8,8 @@ tags:
 - '#domain/configuration'
 - '#domain/networking'
 - '#zone/3-fleet'
+- '#type/repository'
+- '#state/active'
 ---
 
 # Distributed Config
@@ -51,13 +53,13 @@ The library uses a layered approach to build the final configuration:
 - **Polyglot Ecosystem (v0.0.1)**: Native support for **Python, Rust, C/C++, and VBA** via a centralized CGO-based shared library (`libdistconf`). Achieve 100% architectural parity across your entire microservice fleet with raw error transparency.
  
 ## 🛡️ Feature Specs & Governance (BDD)
-The behavior of this microservice is governed by strict specifications in the **[[business-bdd-brain|Business-Specs Brain]]**:
-- **Core Strategy**: [[FEAT-001-Configuration-Discovery|FEAT-001: Discovery]], [[FEAT-002-Environment-Expansion|FEAT-002: Env Expansion]], [[FEAT-003-Multi-Profile-Strategies|FEAT-003: Profile Strategies]]
-- **Live Sync**: [[FEAT-004-Live-Configuration-Sync|FEAT-004: Live Updates]], [[FEAT-005-Configuration-Precedence|FEAT-005: Precedence Logic]]
-- **Security**: [[FEAT-006-Secret-Decryption|FEAT-006: RSA Secret Decryption]]
-- **Polyglot & FFI**: [[FEAT-007-CGO-FFI-Bridge|FEAT-007: CGO Bridge]], [[FEAT-011-Memory-Space-Unification|FEAT-011: Memory Unification]], [[FEAT-012-Handle-Safety|FEAT-012: Handle Safety]]
-- **Resilience**: [[FEAT-008-Resilience-Backoff|FEAT-008: Backoff Strategy]], [[FEAT-009-Mandatory-Service-Validation|FEAT-009: Fail-Fast Logic]]
-- **Advanced Injection**: [[FEAT-010-Shared-Config-Injection|FEAT-010: Remote Broadcasting]]
+The behavior of this microservice is governed by strict specifications in the ****:
+- **Core Strategy**: , , 
+- **Live Sync**: , 
+- **Security**: 
+- **Polyglot & FFI**: , , 
+- **Resilience**: , 
+- **Advanced Injection**: 
 
 ## Installation
 

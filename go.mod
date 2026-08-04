@@ -22,3 +22,10 @@ require (
 	golang.org/x/sys v0.45.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
+
+replace (
+	github.com/Bastien-Antigravity/microservice-toolbox => ../microservice-toolbox
+	github.com/Bastien-Antigravity/safe-socket => ../safe-socket
+	github.com/Bastien-Antigravity/universal-logger => ../universal-logger
+	github.com/Bastien-Antigravity/flexible-logger => ../flexible-logger
+)
