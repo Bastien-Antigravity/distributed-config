@@ -1,13 +1,22 @@
 VERSION := "0.0.1"
 
-.PHONY: all build test version clean
+.PHONY: all build build-lib core test version clean
 
 all: build
 
 version:
 	@echo 
 
-build:
+build-lib core:
+	@echo "Building CGO shared library libdistconf..."
+	@mkdir -p distconf/libdistconf
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		go build -buildmode=c-shared -o distconf/libdistconf/libdistconf.dylib ./cmd/libdistconf || true; \
+	else \
+		go build -buildmode=c-shared -o distconf/libdistconf/libdistconf.so ./cmd/libdistconf || true; \
+	fi
+
+build: build-lib
 	@echo "Building repository (version )..."
 	@if [ -f "go.mod" ]; then go build ./... || true; fi
 	@if [ -f "Cargo.toml" ]; then cargo build --release || true; fi
