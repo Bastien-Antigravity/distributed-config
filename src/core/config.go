@@ -169,7 +169,7 @@ func (c *Config) GetCapability(key string, target interface{}) error {
 	// (Go's json unmarshaler can't do number->string, but can do string->number if tags allow)
 	// Actually, we do the opposite: keep numbers as numbers, and let the caller use better structs.
 	// But since many callers use string fields for ports, we must support it.
-	
+
 	// We'll use a trick: marshal to JSON, then use a custom decoder that handles weak typing.
 	// But since we can't easily add dependencies, we'll just manually stringify common fields like "port".
 	for _, portKey := range []string{"port", "grpc_port", "chat_id", "telegram_id"} {
