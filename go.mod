@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	github.com/Bastien-Antigravity/safe-socket v0.0.1
 	github.com/spf13/pflag v1.0.10
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -24,8 +24,8 @@ require (
 )
 
 replace (
+	github.com/Bastien-Antigravity/flexible-logger => ../flexible-logger
 	github.com/Bastien-Antigravity/microservice-toolbox => ../microservice-toolbox
 	github.com/Bastien-Antigravity/safe-socket => ../safe-socket
 	github.com/Bastien-Antigravity/universal-logger => ../universal-logger
-	github.com/Bastien-Antigravity/flexible-logger => ../flexible-logger
 )
