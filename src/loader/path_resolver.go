@@ -47,6 +47,25 @@ func getCallerDir() string {
 // -----------------------------------------------------------------------------
 
 func ResolveConfigPath(targetName string) string {
+	// 0. Explicit Environment Override (Highest Priority)
+	if customPath := os.Getenv("CONFIG_PATH"); customPath != "" {
+		if _, err := os.Stat(customPath); err == nil {
+			return customPath
+		}
+	}
+	if customPath := os.Getenv("SHARED_CONFIG_PATH"); customPath != "" {
+		if _, err := os.Stat(customPath); err == nil {
+			return customPath
+		}
+	}
+
+	// If targetName is already an existing absolute or relative file path, use it directly
+	if targetName != "" && (strings.HasSuffix(targetName, ".yaml") || strings.HasSuffix(targetName, ".yml")) {
+		if _, err := os.Stat(targetName); err == nil {
+			return targetName
+		}
+	}
+
 	// 1. Determine Executable Context
 	exePath, err := os.Executable()
 	exeDir := ""

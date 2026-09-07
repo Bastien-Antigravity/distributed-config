@@ -26,18 +26,22 @@ The library uses a layered approach to build the final configuration:
 
 1.  **Code Defaults**: The application initializes with a hardcoded set of "safe" defaults (defined in `src/core/defaults.go`). This ensures the application can always start, even without a config file.
 2.  **Auto-Skeleton Generation**: If the target configuration file (e.g., `standalone.yaml`) is missing, the library **automatically recreates it** using the internal master template. This ensures a functional "Zero-Config" bootstrap out of the box.
-3.  **Configuration Discovery**: The library automatically searches for a YAML file in multiple locations with strict priority.
-    *   **Profile-Based Search** (Target provided):
+3.  **Configuration Discovery**: The library automatically searches for a YAML file with strict priority:
+    *   **Priority 0 — Explicit Environment Overrides (Highest Precedence)**:
+        *   `CONFIG_PATH`: Directly specifies the absolute or relative path to the YAML configuration file (e.g., `docker-deployment/shared-config/native.yaml`).
+        *   `SHARED_CONFIG_PATH`: Alternative environment override pointing to the configuration file or root shared-config directory.
+    *   **Priority 1 — Profile-Based Search** (Target provided, e.g. `standalone`):
         1. `config/[profile].yaml` (Current Working Directory)
         2. `config/[profile].yaml` (Executable Directory)
-    *   **Default Fallbacks** (In order):
-        3. `config/[executable_name].yaml` (Current Working Directory)
-        4. `config/[executable_name].yaml` (Executable Directory)
-        5. `[executable_name].yaml` (Current Working Directory)
-        6. `[executable_name].yaml` (Executable Directory)
+        3. `[profile].yaml` (Current Working Directory)
+    *   **Priority 2 — Default Fallbacks** (In order):
+        4. `config/[executable_name].yaml` (Current Working Directory)
+        5. `config/[executable_name].yaml` (Executable Directory)
+        6. `[executable_name].yaml` (Current Working Directory)
+        7. `[executable_name].yaml` (Executable Directory)
     
-    If a profile is specified, it **must** reside in a `config/` subdirectory. The binary name acts as the final global fallback.
-4.  **Environment Variables**: Values in the YAML file can use `${VAR_NAME}` syntax. These are expanded using the system's environment variables at runtime.
+    The binary name acts as the final global fallback.
+4.  **Environment Variables**: Values in the YAML file can use `${VAR_NAME:default}` syntax. These are expanded using the system's environment variables at runtime.
 5.  **Remote Sync**: Finally, if the selected profile supports it (like `production`), the library connects to the Config Server to fetch the latest "LiveConfig" updates.
 
 ## Features
