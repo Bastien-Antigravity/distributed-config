@@ -159,7 +159,7 @@ capabilities:
 
 ## Security & Encryption (v0.0.1)
 
-`distributed-config` supports native RSA encryption for sensitive fields. If a string is wrapped in `ENC(...)`, it will be automatically decrypted at runtime using a private key.
+`distributed-config` supports native RSA encryption for sensitive fields. If a string is wrapped in `ENC(...)`, it remains encrypted in configuration memory and is decrypted on-demand by consuming microservices via `Decrypt()` / `DecryptSecret()`.
 
 ### **Key Distribution Policy**
 - **Public Key (`public.pem`)**: Non-sensitive. Used by developers to encrypt secrets. Distribute via secure internal channels; **DO NOT** commit to Git.

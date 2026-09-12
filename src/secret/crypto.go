@@ -145,3 +145,32 @@ func ProcessConfigSecrets(content []byte) ([]byte, error) {
 
 	return result, nil
 }
+
+// GenerateRSAKeypair generates a new RSA keypair and returns both keys in PEM format.
+func GenerateRSAKeypair(bits int) (string, string, error) {
+	if bits < 2048 {
+		bits = 2048
+	}
+	privKey, err := rsa.GenerateKey(rand.Reader, bits)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate RSA key: %w", err)
+	}
+
+	privBytes := x509.MarshalPKCS1PrivateKey(privKey)
+	privPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: privBytes,
+	})
+
+	pubBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal public key: %w", err)
+	}
+	pubPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pubBytes,
+	})
+
+	return string(privPEM), string(pubPEM), nil
+}
+

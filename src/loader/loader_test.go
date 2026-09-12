@@ -220,4 +220,39 @@ capabilities:
 			t.Errorf("Expected file %s to NOT be created in safe mode", configPath)
 		}
 	})
+
+	t.Run("TestSecretsRemainEncryptedAtLoadTime", func(t *testing.T) {
+		// Verify zero-knowledge boundary: secrets MUST remain ENC(...) at load time
+		encValue := "ENC(sample_encrypted_ciphertext_blob_12345)"
+		yamlContent := `
+common:
+  name: "zero-knowledge-test"
+capabilities:
+  tele_remote:
+    token: "` + encValue + `"
+`
+		configPath := filepath.Join(tempDir, "zero_knowledge.yaml")
+		if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
+		if err := LoadConfigFromFile(cfg, configPath); err != nil {
+			t.Fatalf("Failed to load config: %v", err)
+		}
+
+		trCap, ok := cfg.Capabilities["tele_remote"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("expected tele_remote capability map")
+		}
+
+		token, ok := trCap["token"].(string)
+		if !ok {
+			t.Fatalf("expected token to be string")
+		}
+
+		if token != encValue {
+			t.Errorf("Expected secret to remain encrypted '%s', got '%s'", encValue, token)
+		}
+	})
 }

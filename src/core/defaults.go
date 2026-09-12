@@ -55,12 +55,6 @@ func NewDefaultConfig() *Config {
 				"password": "${TS_PASSWORD:dbuser}",
 				"ssl_cert": "false",
 			},
-			"ontime_scheduler": map[string]interface{}{
-				"ip":        "${SC_IP:127.0.0.1}",
-				"port":      "${SC_PORT:8100}",
-				"grpc_ip":   "${SC_GRPC_IP:127.0.0.1}",
-				"grpc_port": "${SC_GRPC_PORT:8081}",
-			},
 			"rag_engine": map[string]interface{}{
 				"ip":        "${RG_IP:127.0.0.1}",
 				"port":      "${RG_PORT:8080}",

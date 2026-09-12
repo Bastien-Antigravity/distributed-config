@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	models "github.com/Bastien-Antigravity/distributed-config/src/core"
-	"github.com/Bastien-Antigravity/distributed-config/src/secret"
 	"gopkg.in/yaml.v3"
 )
 
@@ -116,18 +115,10 @@ func ProcessNode(n *yaml.Node) {
 				parts := strings.SplitN(content, ":", 2)
 				val := os.Getenv(parts[0])
 				if val == "" && len(parts) > 1 {
-					val = parts[1]
+					val = strings.TrimPrefix(parts[1], "-")
 				}
 				return strings.Trim(val, "\"")
 			})
-		}
-
-		// Decrypt if value matches ENC(...)
-		if strings.HasPrefix(n.Value, "ENC(") && strings.HasSuffix(n.Value, ")") {
-			decrypted, err := secret.Decrypt(n.Value)
-			if err == nil {
-				n.Value = decrypted
-			}
 		}
 
 		// Force types: Booleans remain bool, everything else becomes string
