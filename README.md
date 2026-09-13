@@ -28,8 +28,8 @@ The library uses a layered approach to build the final configuration:
 2.  **Auto-Skeleton Generation**: If the target configuration file (e.g., `standalone.yaml`) is missing, the library **automatically recreates it** using the internal master template. This ensures a functional "Zero-Config" bootstrap out of the box.
 3.  **Configuration Discovery**: The library automatically searches for a YAML file with strict priority:
     *   **Priority 0 — Explicit Environment Overrides (Highest Precedence)**:
-        *   `CONFIG_PATH`: Directly specifies the absolute or relative path to the YAML configuration file (e.g., `docker-deployment/shared-config/native.yaml`).
-        *   `SHARED_CONFIG_PATH`: Alternative environment override pointing to the configuration file or root shared-config directory.
+        *   `CONFIG_PATH`: Directly specifies the absolute or relative path to the YAML configuration file (e.g., `docker-deployment/modes/local/config/native.yaml`).
+        *   `SHARED_CONFIG_PATH`: Alternative environment override pointing to the configuration file or root directory.
     *   **Priority 1 — Profile-Based Search** (Target provided, e.g. `standalone`):
         1. `config/[profile].yaml` (Current Working Directory)
         2. `config/[profile].yaml` (Executable Directory)
