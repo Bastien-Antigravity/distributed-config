@@ -58,6 +58,16 @@ capabilities:
   timescale_db:
     ip: "${TS_IP:127.0.0.2}"
     port: "${TS_PORT:5432}"
-    db_name: "${TS_DBNAME:app_db}"
+    db_name: "${TS_DBNAME:maindb}"
     user: "${TS_USER:dbuser}"
     password: "${TS_PASSWORD}"
+
+  rag_engine:
+    db_name: "${RAG_DBNAME:obsidiandb}"
+    user: "${RAG_DBUSER:dbuser}"
+    password: "${RAG_DBPASSWORD}"
+    ip: "${RG_IP:127.0.0.2}"
+    port: "${RG_PORT:8080}"
+    grpc_ip: "${RG_GRPC_IP:127.0.0.2}"
+    grpc_port: "${RG_GRPC_PORT:8091}"
+    rest_port: "${RG_REST_PORT:8093}"

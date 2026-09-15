@@ -56,6 +56,9 @@ func NewDefaultConfig() *Config {
 				"ssl_cert": "false",
 			},
 			"rag_engine": map[string]interface{}{
+				"db_name":   "${RAG_DBNAME:obsidiandb}",
+				"user":      "${RAG_DBUSER:dbuser}",
+				"password":  "${RAG_DBPASSWORD:dbuser}",
 				"ip":        "${RG_IP:127.0.0.1}",
 				"port":      "${RG_PORT:8080}",
 				"grpc_port": "${RG_GRPC_PORT:8091}",
