@@ -66,7 +66,7 @@ func NewDefaultConfig() *Config {
 			},
 			"web_interface": map[string]interface{}{
 				"ip":   "${WB_IP:127.0.0.1}",
-				"port": "${WB_PORT:8000}",
+				"port": "${WB_PORT:5000}",
 			},
 			"file_system": map[string]interface{}{
 				"temp_path": "./fs_temp",

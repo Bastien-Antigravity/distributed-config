@@ -43,7 +43,7 @@ capabilities:
 
   web_interface:
     ip: "${WB_IP:127.0.0.2}"
-    port: "${WB_PORT:8080}"
+    port: "${WB_PORT:5000}"
     grpc_ip: "${WB_GRPC_IP:127.0.0.2}"
     grpc_port: "${WB_GRPC_PORT:8081}"
     rest_port: "${WB_REST_PORT:8083}"
