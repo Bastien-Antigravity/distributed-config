@@ -156,13 +156,10 @@ func TestConfig_ShadowPort(t *testing.T) {
 	initialMap := make(map[string]map[string]string)
 	cfg.LiveConfig.Store(&initialMap)
 
-	t.Run("DefaultShadowPort", func(t *testing.T) {
-		addr, err := cfg.GetGRPCAddress("my_service")
-		if err != nil {
-			t.Fatalf("Expected success, got: %v", err)
-		}
-		if addr != "127.0.0.1:8001" {
-			t.Errorf("Expected 127.0.0.1:8001, got %s", addr)
+	t.Run("MissingGRPCPortReturnsError", func(t *testing.T) {
+		_, err := cfg.GetGRPCAddress("my_service")
+		if err == nil {
+			t.Fatalf("Expected error for missing grpc_port, got nil")
 		}
 	})
 

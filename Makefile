@@ -12,6 +12,7 @@ build-lib core:
 	@mkdir -p distconf/libdistconf
 	@if [ "$$(uname -s)" = "Darwin" ]; then \
 		go build -buildmode=c-shared -o distconf/libdistconf/libdistconf.dylib ./cmd/libdistconf || true; \
+		install_name_tool -id @rpath/libdistconf.dylib distconf/libdistconf/libdistconf.dylib 2>/dev/null || true; \
 	else \
 		go build -buildmode=c-shared -o distconf/libdistconf/libdistconf.so ./cmd/libdistconf || true; \
 	fi

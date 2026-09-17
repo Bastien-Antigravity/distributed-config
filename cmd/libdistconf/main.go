@@ -156,17 +156,6 @@ func DistConf_GetGRPCAddress(handle uintptr, capability *C.char) *C.char {
 	return C.CString(addr)
 }
 
-//export DistConf_GetGRPCMgmtAddress
-func DistConf_GetGRPCMgmtAddress(handle uintptr, capability *C.char) *C.char {
-	addr, err := cgo_bridge.GetGRPCMgmtAddress(handle, C.GoString(capability))
-	if err != nil {
-		setLastError(mapErrorCode(err), err.Error())
-		return nil
-	}
-	setLastError(C.DISTCONF_SUCCESS, "")
-	return C.CString(addr)
-}
-
 //export DistConf_GetRESTAddress
 func DistConf_GetRESTAddress(handle uintptr, capability *C.char) *C.char {
 	addr, err := cgo_bridge.GetRESTAddress(handle, C.GoString(capability))

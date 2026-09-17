@@ -18,8 +18,6 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -300,57 +298,17 @@ func (c *Config) GetAddress(capability string) (string, error) {
 // -----------------------------------------------------------------------------
 
 // GetGRPCAddress returns the gRPC address for a given capability.
-// It follows the Shadow Port Protocol: if 'grpc_port' is not explicitly defined,
-// it defaults to 'port' + 1.
+// Requires explicit 'grpc_port' (and 'grpc_ip' falling back to 'ip').
 func (c *Config) GetGRPCAddress(capability string) (string, error) {
-	// 1. Try explicit gRPC configuration
-	addr, err := c.getAddr(capability, "grpc_ip", "grpc_port")
-	if err == nil {
-		return addr, nil
-	}
-
-	// 2. Shadow Port Fallback: Base Port + 1
-	return c.getShadowAddr(capability, 1)
-}
-
-// GetGRPCMgmtAddress returns the gRPC management address for a given capability.
-// Follows the Shadow Port Protocol (Shadow + 2).
-func (c *Config) GetGRPCMgmtAddress(capability string) (string, error) {
-	addr, err := c.getAddr(capability, "grpc_ip", "grpc_mgmt_port")
-	if err == nil {
-		return addr, nil
-	}
-	return c.getShadowAddr(capability, 2)
+	return c.getAddr(capability, "grpc_ip", "grpc_port")
 }
 
 // GetRESTAddress returns the REST management address for a given capability.
-// Follows the Shadow Port Protocol (Shadow + 3).
+// Requires explicit 'rest_port'.
 func (c *Config) GetRESTAddress(capability string) (string, error) {
-	addr, err := c.getAddr(capability, "ip", "rest_port")
-	if err == nil {
-		return addr, nil
-	}
-	return c.getShadowAddr(capability, 3)
+	return c.getAddr(capability, "ip", "rest_port")
 }
 
-func (c *Config) getShadowAddr(capability string, offset int) (string, error) {
-	baseAddr, err := c.GetAddress(capability)
-	if err != nil {
-		return "", fmt.Errorf("address missing for %s and shadow port fallback failed: %w", capability, err)
-	}
-
-	host, portStr, err := net.SplitHostPort(baseAddr)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse base address for shadow port: %w", err)
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return "", fmt.Errorf("base port is not a number: %s", portStr)
-	}
-
-	return fmt.Sprintf("%s:%d", host, port+offset), nil
-}
 
 // -----------------------------------------------------------------------------
 
