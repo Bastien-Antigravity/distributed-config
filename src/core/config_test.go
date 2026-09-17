@@ -1,9 +1,25 @@
 package core
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Unit and concurrency tests validating atomic pointer swapping (RCU), lock-free
+// read consistency, and capability resolution in the core Config struct.
+//
+// DATA FLOW:
+// 1. Input: Simulated configuration deltas and concurrent goroutine access.
+// 2. Logic: Executes concurrent writes and reads against atomic.Pointer LiveConfig.
+// 3. Output: Test assertion results verifying zero data races and read consistency.
+//
+// KEY PARAMETERS:
+// - t: Standard testing harness context.
+// =============================================================================
+
 import (
 	"sync"
 	"testing"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestConfig_SetAndGet(t *testing.T) {
 	cfg := &Config{}

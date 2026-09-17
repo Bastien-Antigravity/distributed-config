@@ -1,3 +1,19 @@
+"""
+=============================================================================
+ESSENTIAL PROCESS:
+FFI validation script verifying Python ctypes bindings against the exported
+libdistconf C shared library symbols.
+
+DATA FLOW:
+1. Input: libdistconf dynamic library functions.
+2. Logic: Invokes each ctypes function prototype and verifies memory safety.
+3. Output: Diagnostic validation summary.
+
+KEY PARAMETERS:
+- None
+=============================================================================
+"""
+
 import sys
 import os
 import time

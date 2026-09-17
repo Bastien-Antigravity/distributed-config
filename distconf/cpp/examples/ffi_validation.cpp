@@ -1,3 +1,16 @@
+// =============================================================================
+// ESSENTIAL PROCESS:
+// FFI validation test for the C++ distributed-config client wrapper.
+//
+// DATA FLOW:
+// 1. Input: Synthetic configuration parameters and callback triggers.
+// 2. Logic: Validates that all C FFI entrypoints function correctly without crashes.
+// 3. Output: Pass/fail diagnostic status reporting.
+//
+// KEY PARAMETERS:
+// - None
+// =============================================================================
+
 #include <iostream>
 #include <string>
 #include <dlfcn.h>

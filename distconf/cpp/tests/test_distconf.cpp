@@ -1,3 +1,16 @@
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Automated unit and regression test suite for the C++ DistConfig client.
+//
+// DATA FLOW:
+// 1. Input: Test scenarios covering getters, setters, decryption, and sync.
+// 2. Logic: Executes C++ wrapper methods and verifies expected states with assertions.
+// 3. Output: Pass/fail test results report.
+//
+// KEY PARAMETERS:
+// - None
+// =============================================================================
+
 #include "../DistConf.hpp"
 #include <cassert>
 #include <chrono>

@@ -1,10 +1,26 @@
 package cgo_bridge
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// CGO session manager tracking active library instances in thread-safe memory,
+// assigning integer uintptr handles to callers across FFI boundaries.
+//
+// DATA FLOW:
+// 1. Input: Profile string from C caller.
+// 2. Logic: Creates distributed_config.New(profile), allocates handle ID, stores session.
+// 3. Output: Opaque uintptr handle identifying the session for future C calls.
+//
+// KEY PARAMETERS:
+// - FacadeStore: In-memory map from uintptr handles to *ConfigSession structs.
+// =============================================================================
+
 /*
 #include <stdlib.h>
 #include "helpers.h"
 */
 import "C"
+
+// -----------------------------------------------------------------------------
 
 import (
 	"sync"

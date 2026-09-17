@@ -1,15 +1,20 @@
 ---
-microservice: 08-Base-Scripts
+microservice: distributed-config
 type: note
 status: active
 tags:
-- '#service/08-Base-Scripts'
+- '#service/distributed-config'
 - '#type/note'
 - '#state/active'
 - '#zone/3-fleet'
----# TODO: distributed-config
+---
+
+# TODO: distributed-config
 
 ## 🏗️ Architecture & Refactoring
+- [ ] Align CGO bridge dynamic capability reading (`session.Config.GetCapability`) with Go core.
+- [ ] Guard socket receive loop against concurrent sync calls in `network/client.go`.
+- [ ] Memoize RSA private key in `src/secret/crypto.go` to eliminate disk I/O on repeated decryption.
 
 ## 🧪 Testing & CI/CD
 - [x] Add integration tests for jittered exponential backoff.
@@ -25,3 +30,5 @@ tags:
 - [x] Initial BDD Spec migration to Obsidian Brain.
 - [x] Implement Jittered Exponential Backoff for Network Client.
 - [x] Refactor CGO bridge with RWMutex for thread safety.
+- [x] Purge tracked 10.5MB `.dylib` binaries and configure `.gitignore`.
+- [x] Realine `AGENTS.md` and `README.md` documentation and BDD spec links.

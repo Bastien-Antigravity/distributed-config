@@ -1,9 +1,25 @@
 package cgo_bridge
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// CGO networking functions providing capability lookups, endpoint address
+// resolution, and manual server synchronization for polyglot microservices.
+//
+// DATA FLOW:
+// 1. Input: Session handle (uintptr), capability keys, or JSON payload strings.
+// 2. Logic: Resolves session and calls underlying facade methods (GetAddress, GetCapability, Sync).
+// 3. Output: Resolved address strings, serialized JSON capability dictionaries, or error codes.
+//
+// KEY PARAMETERS:
+// - handle: Safe handle identifier for the active configuration session.
+// =============================================================================
+
 /*
 #include <stdlib.h>
 */
 import "C"
+
+// -----------------------------------------------------------------------------
 
 import (
 	"encoding/json"
@@ -82,12 +98,12 @@ func GetCapability(handle uintptr, capability string) (string, error) {
 	}
 
 	capKey := sanitizeString(capability)
-	val, exists := session.Config.Capabilities[capKey]
-	if !exists || val == nil {
+	var mergedMap map[string]interface{}
+	if err := session.Config.GetCapability(capKey, &mergedMap); err != nil {
 		return "", nil
 	}
 
-	jsonData, err := json.Marshal(val)
+	jsonData, err := json.Marshal(mergedMap)
 	if err != nil {
 		return "", err
 	}

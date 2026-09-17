@@ -1,11 +1,25 @@
 package cgo_bridge
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// CGO configuration accessors (Get, Set, Close) providing thread-safe session
+// retrieval and modification across language boundaries.
+//
+// DATA FLOW:
+// 1. Input: Session handle (uintptr), section names, keys, and values.
+// 2. Logic: Acquires FacadeMu read/write lock and delegates to underlying facade.Config.
+// 3. Output: Retrieved configuration values or updated in-memory state.
+//
+// KEY PARAMETERS:
+// - handle: Unique session identifier referencing an active configuration instance.
+// =============================================================================
+
 /*
 #include <stdlib.h>
 */
 import "C"
 
-// -------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 // Get is a Go-native wrapper for DistConf_Get, using string types for cross-package compatibility.
 func Get(handle uintptr, section, key string) string {

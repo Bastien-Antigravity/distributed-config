@@ -1,3 +1,18 @@
+// =============================================================================
+// ESSENTIAL PROCESS:
+// C++ RAII facade and header-only wrapper for the distributed-config library,
+// binding the libdistconf CGO shared object.
+//
+// DATA FLOW:
+// 1. Input: Profile names, section/key parameters, and override values.
+// 2. Logic: Calls C ABI functions (DistConf_Get, DistConf_Set, DistConf_Sync).
+// 3. Output: Synchronized configuration values and structured types.
+//
+// KEY PARAMETERS:
+// - profile: Target configuration profile identifier.
+// - lib_path: Filesystem path to the libdistconf dynamic library.
+// =============================================================================
+
 #ifndef DISTCONF_HPP
 #define DISTCONF_HPP
 

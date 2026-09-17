@@ -1,12 +1,25 @@
 package loader
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Configuration integrity validator ensuring required service capabilities
+// (config_server, log_server, etc.) are present and valid before service boot.
+//
+// DATA FLOW:
+// 1. Input: Populated *core.Config pointer.
+// 2. Logic: Validates presence of Common.Name and required capability endpoints.
+// 3. Output: Error if mandatory configuration keys or service definitions are missing.
+//
+// KEY PARAMETERS:
+// - Common.Name: Service name identifier.
+// =============================================================================
+
 import (
 	"fmt"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 )
 
-// ValidateCommonConfig checks if the minimal required configuration is present.
 // -----------------------------------------------------------------------------
 
 func ValidateCommonConfig(config *core.Config) error {

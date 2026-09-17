@@ -1,5 +1,19 @@
 package loader
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Unit test suite validating YAML document deserialization, environment variable
+// interpolation with defaults, and capability struct hydration.
+//
+// DATA FLOW:
+// 1. Input: Sample YAML fragments and controlled environment overrides.
+// 2. Logic: Executes LoadConfigFile, LoadConfigBytes, and node processing.
+// 3. Output: Test assertion results verifying parsed capability correctness.
+//
+// KEY PARAMETERS:
+// - t: Standard testing harness handle.
+// =============================================================================
+
 import (
 	"os"
 	"path/filepath"
@@ -8,6 +22,8 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 )
+
+// -----------------------------------------------------------------------------
 
 type MockTS struct {
 	DBName   string `json:"db_name"`

@@ -1,5 +1,20 @@
 package distributed_config
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Top-level entrypoint package and alias facade for the distributed-config
+// library, exporting constructors, profile factories, and helper utilities.
+//
+// DATA FLOW:
+// 1. Input: Profile names ("standalone", "test", "staging", "production"), YAML nodes, ciphertexts.
+// 2. Logic: Delegates initialization to facade.NewConfig and secret/loader packages.
+// 3. Output: Initialized *Config facade instance with live configuration hooks.
+//
+// KEY PARAMETERS:
+// - profile: Runtime configuration profile selecting synchronization strategy.
+// - targetName: Executable or configuration basename for path resolution.
+// =============================================================================
+
 import (
 	"github.com/Bastien-Antigravity/distributed-config/src/facade"
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"

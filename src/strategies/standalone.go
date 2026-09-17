@@ -1,10 +1,26 @@
 package strategies
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Standalone configuration strategy operating completely offline without
+// network dependencies, loading strictly from local YAML files and env vars.
+//
+// DATA FLOW:
+// 1. Input: Local YAML files and system environment variables.
+// 2. Logic: Merges local file contents into default config; sync is disabled.
+// 3. Output: Populated *core.Config instance without active network clients.
+//
+// KEY PARAMETERS:
+// - CONFIG_PATH: Optional environment override to local YAML path.
+// =============================================================================
+
 import (
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 )
+
+// -----------------------------------------------------------------------------
 
 // StandaloneStrategy: Local YAML only. No Server.
 //

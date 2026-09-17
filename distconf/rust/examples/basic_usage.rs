@@ -1,3 +1,16 @@
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Demonstration example showcasing basic usage of the Rust DistConfig crate.
+//
+// DATA FLOW:
+// 1. Input: Configuration profile name and sample section/key strings.
+// 2. Logic: Initializes DistConfig and queries configuration parameters.
+// 3. Output: Terminal stdout messages displaying loaded parameters.
+//
+// KEY PARAMETERS:
+// - None
+// =============================================================================
+
 use distconf::DistConfig;
 use serde_json::json;
 

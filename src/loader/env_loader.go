@@ -1,5 +1,20 @@
 package loader
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Environment variable extractor populating CommonConfig parameters from system
+// environment variables (e.g., NAME, RESET, PUBLIC_KEY).
+//
+// DATA FLOW:
+// 1. Input: OS environment variables via os.LookupEnv.
+// 2. Logic: Checks for variable presence and parses typed values (strings, booleans).
+// 3. Output: Updates CommonConfig fields on the target *core.Config pointer.
+//
+// KEY PARAMETERS:
+// - NAME: Service name identifier.
+// - RESET: Database/state reset flag.
+// =============================================================================
+
 import (
 	"os"
 	"strings"
@@ -7,8 +22,6 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 )
 
-// LoadCommonFromEnv populates the Common configuration from Environment Variables.
-// It maps specific ENV keys (e.g., "NAME", "RESET") to the struct.
 // -----------------------------------------------------------------------------
 
 func LoadCommonFromEnv(config *core.Config) {

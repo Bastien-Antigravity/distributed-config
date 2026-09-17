@@ -1,5 +1,19 @@
 package strategies
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Strategy integration test suite verifying standalone fallback generation,
+// cloud read-only vs writeback rules, and test environment IP enforcement.
+//
+// DATA FLOW:
+// 1. Input: Temporary directory sandboxes, simulated configs, and mock network clients.
+// 2. Logic: Invokes Strategy.Load and validates resulting config mutations.
+// 3. Output: Test assertion results verifying strategy lifecycle correctness.
+//
+// KEY PARAMETERS:
+// - t: Standard testing harness context.
+// =============================================================================
+
 import (
 	"os"
 	"testing"
@@ -7,6 +21,8 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestStandaloneStrategy(t *testing.T) {
 	tempDir := t.TempDir()

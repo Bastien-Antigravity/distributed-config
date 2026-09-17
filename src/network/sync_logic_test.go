@@ -1,5 +1,19 @@
 package network
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Regression and sync logic test suite verifying that broadcast synchronization
+// deep-merges delta updates into LiveConfig without dropping untouched sections.
+//
+// DATA FLOW:
+// 1. Input: Multi-section initial LiveConfig state and simulated delta updates.
+// 2. Logic: Feeds updates through ConfigProtoHandler and evaluates resulting atomic map.
+// 3. Output: Test assertion results verifying non-destructive merge semantics.
+//
+// KEY PARAMETERS:
+// - t: Testing harness handle.
+// =============================================================================
+
 import (
 	"encoding/json"
 	"testing"
@@ -8,6 +22,8 @@ import (
 	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
 	"google.golang.org/protobuf/proto"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestMergeBugReproduction(t *testing.T) {
 	config := &core.Config{}

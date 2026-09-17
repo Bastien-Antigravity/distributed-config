@@ -1,5 +1,21 @@
 package main
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Fleet administrative utility for RSA-2048 keypair generation and plaintext
+// token encryption into canonical ENC(...) format for configuration files.
+//
+// DATA FLOW:
+// 1. Input: CLI subcommands ("keygen", "encrypt", "help") and associated flags.
+// 2. Logic: Uses crypto/rsa and x509 for keygen; invokes secret.Encrypt for tokens.
+// 3. Output: Encrypted ENC(...) strings or public/private PEM keypair files on disk.
+//
+// KEY PARAMETERS:
+// - --dir: Destination directory for generated PEM key files.
+// - --key: Path to public key PEM for encryption.
+// - --token: Plaintext secret string to be encrypted into ENC(...) format.
+// =============================================================================
+
 import (
 	"crypto/rand"
 	"crypto/rsa"
@@ -12,6 +28,8 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/secret"
 	"github.com/spf13/pflag"
 )
+
+// -----------------------------------------------------------------------------
 
 func main() {
 	if len(os.Args) < 2 {

@@ -1,3 +1,19 @@
+"""
+=============================================================================
+ESSENTIAL PROCESS:
+Demonstration example showing basic initialization and key-value retrieval
+in the Python DistConfig client.
+
+DATA FLOW:
+1. Input: Local configuration profile and target section/key paths.
+2. Logic: Reads values and demonstrates fallback defaults.
+3. Output: Formatted stdout diagnostics.
+
+KEY PARAMETERS:
+- None
+=============================================================================
+"""
+
 import os
 import sys
 

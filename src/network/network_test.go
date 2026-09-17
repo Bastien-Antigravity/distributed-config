@@ -1,5 +1,19 @@
 package network
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Unit test suite verifying ConfigProtoHandler message parsing, atomic LiveConfig
+// store updates, and callback execution upon incoming network envelopes.
+//
+// DATA FLOW:
+// 1. Input: Synthesized protobuf ConfigMessage payloads.
+// 2. Logic: Ingests packets through handler.HandleData and asserts state changes.
+// 3. Output: Test assertion results verifying callback execution and state updates.
+//
+// KEY PARAMETERS:
+// - t: Standard testing harness handle.
+// =============================================================================
+
 import (
 	"encoding/json"
 	"testing"
@@ -8,6 +22,8 @@ import (
 	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
 	"google.golang.org/protobuf/proto"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestNetworkProtoHandler(t *testing.T) {
 	config := &core.Config{}

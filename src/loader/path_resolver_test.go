@@ -1,11 +1,27 @@
 package loader
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Unit test suite verifying configuration path resolution priority across CWD,
+// config/ subdirectory, executable directory, and fallback binary names.
+//
+// DATA FLOW:
+// 1. Input: Mock directory structures created inside os.MkdirTemp.
+// 2. Logic: Creates sample YAML files at various priority levels and invokes ResolveConfigPath.
+// 3. Output: Test assertion results verifying path resolution precedence.
+//
+// KEY PARAMETERS:
+// - t: Standard testing harness handle.
+// =============================================================================
+
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestResolveConfigPath(t *testing.T) {
 	// Create a dummy test environment in a temp directory

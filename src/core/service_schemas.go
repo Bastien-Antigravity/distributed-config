@@ -1,5 +1,20 @@
 package core
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Structural schema definitions and field validators for mandatory ecosystem
+// infrastructure capabilities (log_server, config_server).
+//
+// DATA FLOW:
+// 1. Input: Unmarshaled capability JSON/map payloads.
+// 2. Logic: Enforces non-empty IP and Port validations for required daemon connectivity.
+// 3. Output: Validation error if mandatory capability attributes are missing.
+//
+// KEY PARAMETERS:
+// - LogServerCap: Validated logging daemon endpoint descriptor.
+// - ConfigServerCap: Validated configuration registry endpoint descriptor.
+// =============================================================================
+
 import "fmt"
 
 // -----------------------------------------------------------------------------

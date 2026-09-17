@@ -1,5 +1,19 @@
 package main
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Command-line interface for inspecting initial configuration state and
+// subscribing to live dynamic updates from the fleet configuration server.
+//
+// DATA FLOW:
+// 1. Input: CLI flag `--profile` (defaults to "standalone").
+// 2. Logic: Instantiates distconf.New(profile), prints snapshot, listens for live updates.
+// 3. Output: Formatted configuration key-values rendered to stdout in real-time.
+//
+// KEY PARAMETERS:
+// - profile: Selected operational profile (standalone, test, staging, production).
+// =============================================================================
+
 import (
 	"flag"
 	"fmt"
@@ -9,6 +23,8 @@ import (
 
 	distconf "github.com/Bastien-Antigravity/distributed-config"
 )
+
+// -----------------------------------------------------------------------------
 
 func main() {
 	// Parse command line flags

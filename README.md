@@ -57,13 +57,13 @@ The library uses a layered approach to build the final configuration:
 - **Polyglot Ecosystem (v0.0.1)**: Native support for **Python, Rust, C/C++, and VBA** via a centralized CGO-based shared library (`libdistconf`). Achieve 100% architectural parity across your entire microservice fleet with raw error transparency.
  
 ## 🛡️ Feature Specs & Governance (BDD)
-The behavior of this microservice is governed by strict specifications in the ****:
-- **Core Strategy**: , , 
-- **Live Sync**: , 
-- **Security**: 
-- **Polyglot & FFI**: , , 
-- **Resilience**: , 
-- **Advanced Injection**: 
+The behavior of this microservice is governed by strict specifications in the **Obsidian Brain** (`02-Business-BDD/02-Behavior-Specs/distributed-config/`):
+- **Core Strategy**: [FEAT-001: Configuration Discovery](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-001-Configuration-Discovery.md), [FEAT-002: Environment Expansion](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-002-Environment-Expansion.md), [FEAT-003: Multi-Profile Strategies](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-003-Multi-Profile-Strategies.md)
+- **Live Sync & Precedence**: [FEAT-004: Live Sync](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-004-Live-Configuration-Sync.md), [FEAT-005: Configuration Precedence](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-005-Configuration-Precedence.md)
+- **Security**: [FEAT-006: Secret Decryption](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-006-Secret-Decryption.md)
+- **Polyglot & FFI**: [FEAT-007: CGO FFI Bridge](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-007-CGO-FFI-Bridge.md), [FEAT-011: Memory Space Unification](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-011-Memory-Space-Unification.md), [FEAT-012: Handle Safety](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-012-Handle-Safety.md)
+- **Resilience & Validation**: [FEAT-008: Resilience Backoff](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-008-Resilience-Backoff.md), [FEAT-009: Mandatory Service Validation](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-009-Mandatory-Service-Validation.md)
+- **Advanced Injection**: [FEAT-010: Shared Config Injection](file:///Users/imac/Desktop/Bastien-Antigravity/obsidian-brain/02-Business-BDD/02-Behavior-Specs/distributed-config/FEAT-010-Shared-Config-Injection.md)
 
 ## Installation
 
@@ -76,7 +76,7 @@ For Python, Rust, or C++ integration, build the centralized shared library:
 ```bash
 make build-lib
 ```
-This generates `release/libdistconf.so` (or `.dylib` on macOS), which is used by the `microservice-toolbox` facades.
+This generates `distconf/libdistconf/libdistconf.so` (or `.dylib` on macOS), which is used by polyglot consumers and the `microservice-toolbox` facades.
 
 ## Usage
 

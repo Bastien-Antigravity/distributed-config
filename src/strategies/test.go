@@ -1,5 +1,19 @@
 package strategies
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Test environment strategy enforcing strict isolated loopback bindings (127.0.0.2)
+// while replicating full production network synchronization and server push semantics.
+//
+// DATA FLOW:
+// 1. Input: Test YAML files, test defaults (127.0.0.2), and mock/local config server.
+// 2. Logic: Enforces test loopback integrity; syncs deltas to test server.
+// 3. Output: Initialized *core.Config with active test network synchronization client.
+//
+// KEY PARAMETERS:
+// - TestIP: Strict loopback address requirement (127.0.0.2).
+// =============================================================================
+
 import (
 	"fmt"
 
@@ -7,6 +21,8 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 )
+
+// -----------------------------------------------------------------------------
 
 // TestStrategy: Local YAML. Uses "Test Defaults" (127.0.0.2).
 // Runs EXACTLY like Production (Connects to Server & Syncs), but bootstraps from Defaults.

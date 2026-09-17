@@ -1,3 +1,18 @@
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Rust wrapper crate for distributed-config, providing safe idiomatic abstractions,
+// error types, configuration accessors, and FFI bindings to libdistconf.
+//
+// DATA FLOW:
+// 1. Input: Rust string slices (&str), section keys, and callback closures.
+// 2. Logic: Loads libdistconf dynamic library via libloading and marshals data.
+// 3. Output: Result types containing configuration values or DistConfError.
+//
+// KEY PARAMETERS:
+// - profile: Configuration profile to load ('standalone', 'native', etc.).
+// - lib_path: Path to the compiled libdistconf dynamic library.
+// =============================================================================
+
 use libc::{c_char, uintptr_t, c_int};
 use std::ffi::{CStr, CString};
 use libloading::{Library, Symbol};

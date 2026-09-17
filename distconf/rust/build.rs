@@ -1,3 +1,16 @@
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Cargo build script for distconf-rs, locating, compiling, and linking libdistconf.
+//
+// DATA FLOW:
+// 1. Input: Target OS and manifest directory environment variables.
+// 2. Logic: Locates libdistconf shared library and sets rustc search and link flags.
+// 3. Output: Cargo build instructions for native dynamic linking.
+
+// KEY PARAMETERS:
+// - LIBDISTCONF_PATH / LIBDISTCONF_DIR: Optional environment override paths.
+// =============================================================================
+
 use std::process::Command;
 use std::env;
 

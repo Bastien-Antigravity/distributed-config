@@ -12,11 +12,12 @@
 # Run unit tests
 go test -v ./...
 
-# Build CLI tool
-go build -o bin/distconf ./cmd/distconf
+# Build CLI tools
+go build -o bin/config-tool ./cmd/config-tool
+go build -o bin/config-cli ./cmd/config-cli
 
 # Build shared CGO engine
-make shared-lib
+make build-lib
 ```
 
 ## AI Development & Integration Guidelines

@@ -1,11 +1,24 @@
 package interfaces
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Defines the ConfigStrategy lifecycle contract governing profile behaviors
+// across standalone, test, staging, and production environments.
+//
+// DATA FLOW:
+// 1. Input: Core Config pointers and delta update maps.
+// 2. Logic: Strategy implementation dictates synchronization, caching, and network protocols.
+// 3. Output: Loaded and synchronized configuration state.
+//
+// KEY PARAMETERS:
+// - ConfigStrategy: Primary interface implemented by profile strategy structures.
+// =============================================================================
+
 import (
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 )
 
-// ConfigStrategy defines the behavior for different configuration profiles.
 // -----------------------------------------------------------------------------
 
 type ConfigStrategy interface {

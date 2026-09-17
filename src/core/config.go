@@ -1,5 +1,20 @@
 package core
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Core configuration model defining the unified Config struct, atomic LiveConfig
+// snapshot pointer swaps (RCU), and typed capability extraction helpers.
+//
+// DATA FLOW:
+// 1. Input: Static YAML map structures and dynamic LiveConfig update maps.
+// 2. Logic: Enforces atomic pointer swaps for lock-free reads; unmarshals capabilities.
+// 3. Output: Strongly typed Capability structs, raw string values, and service addresses.
+//
+// KEY PARAMETERS:
+// - LiveConfig: atomic.Pointer to map[string]map[string]string for lock-free dynamic reads.
+// - Capabilities: Map of registered ecosystem capabilities (ports, hosts, credentials).
+// =============================================================================
+
 import (
 	"encoding/json"
 	"fmt"
@@ -10,6 +25,8 @@ import (
 
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 )
+
+// -----------------------------------------------------------------------------
 
 // Common Config
 // -----------------------------------------------------------------------------

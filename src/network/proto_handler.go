@@ -1,9 +1,25 @@
 package network
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Protobuf protocol handler deserializing incoming wire messages from config-server,
+// updating local atomic configuration snapshots, and triggering client callbacks.
+//
+// DATA FLOW:
+// 1. Input: Binary serialized protobuf payloads (ConfigMessage envelope).
+// 2. Logic: Demultiplexes payload types (InitialConfig, LiveUpdate, ServiceRegistryUpdate).
+// 3. Output: Dispatches parsed configurations to parent Config and triggers registered callbacks.
+//
+// KEY PARAMETERS:
+// - Name: Identifier of the handler instance.
+// - onLiveConfUpdate: Callback triggered on dynamic config modifications.
+// =============================================================================
+
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
@@ -20,6 +36,8 @@ type ConfigProtoHandler struct {
 	// Callbacks
 	onLiveConfUpdate func(map[string]map[string]string)
 	onRegistryUpdate func(map[string][]string)
+	onSyncReceived   func()
+	mu               sync.RWMutex
 }
 
 // -----------------------------------------------------------------------------
@@ -43,6 +61,12 @@ func (h *ConfigProtoHandler) SetOnLiveConfUpdate(cb func(map[string]map[string]s
 
 func (h *ConfigProtoHandler) SetOnRegistryUpdate(cb func(map[string][]string)) {
 	h.onRegistryUpdate = cb
+}
+
+func (h *ConfigProtoHandler) SetOnSyncReceived(cb func()) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.onSyncReceived = cb
 }
 
 // HandleOutgoing implements generic outgoing message creation
@@ -111,6 +135,12 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 			return fmt.Errorf("failed to decode GET_SYNC/FULL_REFRESH JSON payload: %w", err)
 		}
 		h.updateLiveConfig(parsed)
+		h.mu.RLock()
+		syncCb := h.onSyncReceived
+		h.mu.RUnlock()
+		if syncCb != nil {
+			syncCb()
+		}
 
 	case pb.ConfigMsg_ERROR:
 		return errors.New("server reported an error: " + string(msg.Payload))

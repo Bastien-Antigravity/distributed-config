@@ -1,3 +1,16 @@
+// =============================================================================
+// ESSENTIAL PROCESS:
+// FFI validation example for the Rust DistConfig crate.
+//
+// DATA FLOW:
+// 1. Input: Synthetic configuration operations and callback handlers.
+// 2. Logic: Validates that all FFI symbols bind and execute across the Rust boundary.
+// 3. Output: Console logs confirming successful FFI symbol resolution.
+//
+// KEY PARAMETERS:
+// - None
+// =============================================================================
+
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::path::PathBuf;

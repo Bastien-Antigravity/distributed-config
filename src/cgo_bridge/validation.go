@@ -1,9 +1,25 @@
 package cgo_bridge
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// CGO validation functions providing handle liveness checks, file override
+// application, and mandatory service capability verification across the C ABI.
+//
+// DATA FLOW:
+// 1. Input: Session handle (uintptr) and local file override paths.
+// 2. Logic: Checks handle presence, applies file overrides, and validates mandatory daemons.
+// 3. Output: JSON representation of applied overrides, or error on missing services.
+//
+// KEY PARAMETERS:
+// - handle: Safe handle identifier for active session.
+// =============================================================================
+
 /*
 #include <stdlib.h>
 */
 import "C"
+
+// -----------------------------------------------------------------------------
 
 import (
 	"encoding/json"

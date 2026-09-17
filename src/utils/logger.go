@@ -1,12 +1,25 @@
 package utils
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Standardized logging abstraction compatible with universal-logger and
+// microservice-toolbox, providing fallback no-op and console sinks.
+//
+// DATA FLOW:
+// 1. Input: Log messages, formats, and arbitrary arguments across severity levels.
+// 2. Logic: Routes log calls to active Logger implementation or default stderr sink.
+// 3. Output: Formatted diagnostic messages to console or external log streams.
+//
+// KEY PARAMETERS:
+// - Logger: Interface defining standard fleet log methods.
+// =============================================================================
+
 import (
 	"fmt"
 	"os"
 )
 
-// Logger defines the interface for structured logging.
-// This interface is structurally compatible with universal-logger and microservice-toolbox.
+// -----------------------------------------------------------------------------
 type Logger interface {
 	Debug(format string, args ...any)
 	Info(format string, args ...any)

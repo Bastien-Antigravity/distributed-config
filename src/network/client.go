@@ -1,5 +1,19 @@
 package network
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// safe-socket network client managing TCP connection lifecycle, exponential
+// backoff reconnection, and real-time bidirectional synchronization with config-server.
+//
+// DATA FLOW:
+// 1. Input: TCP byte streams from config-server containing framed protobuf messages.
+// 2. Logic: Uses safe-socket client socket; deserializes payloads through ConfigProtoHandler.
+// 3. Output: Dispatches configuration updates to local atomic state and sends client update requests.
+//
+// KEY PARAMETERS:
+// - addr: Target config-server endpoint string (host:port).
+// =============================================================================
+
 import (
 	"fmt"
 	"sync"
@@ -15,12 +29,14 @@ import (
 
 // Client provides an interface to interact with the Config Server.
 type Client struct {
-	addr    string
-	sock    safesocket.Socket
-	Handler *ConfigProtoHandler
-	quit    chan struct{}
-	backoff *Backoff
-	mu      sync.RWMutex
+	addr     string
+	sock     safesocket.Socket
+	Handler  *ConfigProtoHandler
+	quit     chan struct{}
+	backoff  *Backoff
+	mu       sync.RWMutex
+	watching bool
+	syncMu   sync.Mutex
 }
 
 // -----------------------------------------------------------------------------
@@ -96,7 +112,20 @@ func (c *Client) Close() error {
 
 // Watch starts a background goroutine to handle asynchronous updates (BROADCASTs).
 func (c *Client) Watch() {
+	c.mu.Lock()
+	if c.watching {
+		c.mu.Unlock()
+		return
+	}
+	c.watching = true
+	c.mu.Unlock()
+
 	go func() {
+		defer func() {
+			c.mu.Lock()
+			c.watching = false
+			c.mu.Unlock()
+		}()
 		attempt := 0
 		for {
 			select {
@@ -115,8 +144,19 @@ func (c *Client) Watch() {
 					if err := c.connect(); err == nil {
 						c.Handler.parentConfig.Logger.Info("Client: Reconnected to %s", c.addr)
 						attempt = 0
-						// Re-sync after reconnection
-						_, _ = c.GetConfig()
+						// Re-sync after reconnection (direct synchronous exchange before entering loop)
+						c.mu.RLock()
+						reconnectedSock := c.sock
+						c.mu.RUnlock()
+						if reconnectedSock != nil {
+							if syncData, err := c.Handler.HandleOutgoing(pb.ConfigMsg_GET_SYNC, nil); err == nil {
+								if err := reconnectedSock.Send(syncData); err == nil {
+									if respData, err := reconnectedSock.Receive(); err == nil && len(respData) > 0 {
+										_ = c.Handler.HandleIncoming(respData)
+									}
+								}
+							}
+						}
 					} else {
 						attempt++
 					}
@@ -163,22 +203,51 @@ func (c *Client) requestSync(cmd pb.ConfigMsg_Cmd) (*core.Config, error) {
 
 	c.mu.RLock()
 	sock := c.sock
+	watching := c.watching
 	c.mu.RUnlock()
 
 	if sock != nil {
-		if err := sock.Send(data); err != nil {
-			return nil, err
-		}
+		c.syncMu.Lock()
+		defer c.syncMu.Unlock()
 
-		// Receive response (safe-socket handles framing)
-		data, err := sock.Receive()
-		if err != nil {
-			return nil, err
-		}
+		if watching {
+			// Watch() loop is active and is the sole reader on sock.
+			// Register a sync notification channel and wait with timeout.
+			syncDone := make(chan struct{}, 1)
+			c.Handler.SetOnSyncReceived(func() {
+				select {
+				case syncDone <- struct{}{}:
+				default:
+				}
+			})
+			defer c.Handler.SetOnSyncReceived(nil)
 
-		// Pass actual read bytes
-		if err := c.Handler.HandleIncoming(data); err != nil {
-			return nil, err
+			if err := sock.Send(data); err != nil {
+				return nil, err
+			}
+
+			select {
+			case <-syncDone:
+				return c.Handler.parentConfig, nil
+			case <-time.After(5 * time.Second):
+				return c.Handler.parentConfig, fmt.Errorf("timeout waiting for sync response from %s", c.addr)
+			case <-c.quit:
+				return nil, fmt.Errorf("client closed during sync")
+			}
+		} else {
+			// Boot-time initial sync (Watch has not started yet): safe to perform direct synchronous Receive.
+			if err := sock.Send(data); err != nil {
+				return nil, err
+			}
+
+			respData, err := sock.Receive()
+			if err != nil {
+				return nil, err
+			}
+
+			if err := c.Handler.HandleIncoming(respData); err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		// Mock behavior

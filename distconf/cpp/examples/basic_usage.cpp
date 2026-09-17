@@ -1,3 +1,16 @@
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Demonstration example showcasing basic usage of the C++ DistConfig client.
+//
+// DATA FLOW:
+// 1. Input: Configuration profile name and sample keys.
+// 2. Logic: Initializes DistConfig, reads keys, and sets runtime parameters.
+// 3. Output: Console outputs displaying retrieved configuration values.
+//
+// KEY PARAMETERS:
+// - None
+// =============================================================================
+
 #include "../DistConf.hpp"
 #include <iostream>
 #include <string>

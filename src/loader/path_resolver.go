@@ -1,11 +1,28 @@
 package loader
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Multi-tier configuration file path resolver evaluating explicit environment
+// variables (CONFIG_PATH), caller stack heuristics, working directories, and binary names.
+//
+// DATA FLOW:
+// 1. Input: Target profile/service name and environment variables.
+// 2. Logic: Checks CONFIG_PATH, SHARED_CONFIG_PATH, caller dir, CWD, and exe dir in strict priority.
+// 3. Output: Absolute or relative filepath pointing to the authoritative YAML configuration.
+//
+// KEY PARAMETERS:
+// - CONFIG_PATH: Explicit filepath override.
+// - SHARED_CONFIG_PATH: Shared configuration root or file path override.
+// =============================================================================
+
 import (
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
+
+// -----------------------------------------------------------------------------
 
 // getCallerDir attempts to find the directory of the original source file (e.g. main.go)
 // by traversing the call stack and skipping known library paths.

@@ -1,5 +1,20 @@
 package secret
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Cryptographic subsystem handling RSA-OAEP secret encryption and decryption,
+// supporting inline ENC(...) token extraction across configurations.
+//
+// DATA FLOW:
+// 1. Input: Plaintext secrets, PEM keys, or ENC(...) ciphertext strings/byte buffers.
+// 2. Logic: Uses RSA-2048 with SHA-256 OAEP padding; resolves private key from env or disk.
+// 3. Output: Decrypted plaintext strings or parsed configuration payloads.
+//
+// KEY PARAMETERS:
+// - BASTIEN_PRIVATE_KEY: Raw PEM string environment override.
+// - BASTIEN_PRIVATE_KEY_PATH: Filesystem path to private key PEM (default: /etc/bastien/private.pem).
+// =============================================================================
+
 import (
 	"crypto/rand"
 	"crypto/rsa"
@@ -12,6 +27,8 @@ import (
 	"regexp"
 	"strings"
 )
+
+// -----------------------------------------------------------------------------
 
 // ENC_REGEX matches ENC(base64_blob)
 var ENC_REGEX = regexp.MustCompile(`ENC\(([^)]+)\)`)
@@ -58,11 +75,6 @@ func getPrivateKey() (*rsa.PrivateKey, error) {
 		return nil, fmt.Errorf("not an RSA private key")
 	}
 
-	source := "file"
-	if keyContent != "" {
-		source = "environment variable"
-	}
-	fmt.Fprintf(os.Stderr, "DEBUG: RSA Private Key loaded successfully from %s\n", source)
 	return rsaKey, nil
 }
 

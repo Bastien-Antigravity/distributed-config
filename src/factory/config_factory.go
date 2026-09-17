@@ -1,5 +1,19 @@
 package factory
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Strategy factory instantiating the appropriate ConfigStrategy implementation
+// based on profile aliases (standalone, test, staging, production).
+//
+// DATA FLOW:
+// 1. Input: Profile name string (e.g. "standalone", "prod", "staging", "test").
+// 2. Logic: Maps canonical names and aliases to concrete Strategy structs.
+// 3. Output: ConfigStrategy interface instance or error on invalid profile name.
+//
+// KEY PARAMETERS:
+// - profile: Environment identifier selecting runtime configuration strategy.
+// =============================================================================
+
 import (
 	"fmt"
 	"strings"
@@ -8,8 +22,6 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/strategies"
 )
 
-// NewStrategy returns the correct ConfigStrategy based on the profile name.
-// Supports profiles: standalone (devel, dev, development), test, staging (stage), production (prod).
 // -----------------------------------------------------------------------------
 
 func NewStrategy(profile string) (interfaces.ConfigStrategy, error) {

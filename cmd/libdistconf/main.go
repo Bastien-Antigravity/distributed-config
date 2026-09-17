@@ -1,5 +1,20 @@
 package main
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// CGO entrypoint compiling into the shared library libdistconf (so/dylib),
+// exposing a stable C ABI for polyglot consumers (Python, Rust, C++, VBA).
+//
+// DATA FLOW:
+// 1. Input: C strings, handle IDs (uintptr_t), and JSON payloads from FFI callers.
+// 2. Logic: Translates C calls to Go src/cgo_bridge functions; manages callback lifecycles.
+// 3. Output: C-compatible return values (strings, int error codes) and asynchronous C callbacks.
+//
+// KEY PARAMETERS:
+// - handle: Safe handle identifier referencing an active configuration session.
+// - profile: String parameter selecting initial configuration profile.
+// =============================================================================
+
 /*
 #include <stdlib.h>
 #include <stdint.h>

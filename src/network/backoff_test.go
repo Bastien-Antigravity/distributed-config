@@ -1,9 +1,25 @@
 package network
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Unit test suite verifying exponential backoff calculation, ceiling caps,
+// and randomized jitter distribution boundaries.
+//
+// DATA FLOW:
+// 1. Input: Configured Backoff instances and iteration indices.
+// 2. Logic: Computes delay across sequential retry counts.
+// 3. Output: Test assertion results verifying mathematical correctness and jitter bounds.
+//
+// KEY PARAMETERS:
+// - t: Standard testing harness handle.
+// =============================================================================
+
 import (
 	"testing"
 	"time"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestBackoff_GetDelay(t *testing.T) {
 	b := NewBackoff(nil)

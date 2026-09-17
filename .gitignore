@@ -48,14 +48,29 @@ build/
 dist/
 *.egg-info/
 
-# C++
+# C++ & Polyglot Shared Libraries
 build/
 bin/
 obj/
 *.o
 *.a
 *.so
+*.so.*
+*.dylib
+*.dylib.*
+*.dll
 *.out
+distconf/libdistconf/*.dylib
+distconf/libdistconf/*.so
+distconf/python/distconf/*.dylib
+distconf/python/distconf/*.so
+
+# Auto-generated Test YAMLs (exclude canonical standalone.yaml symlinks)
+distconf/rust/*.yaml
+!distconf/rust/standalone.yaml
+distconf/python/*.yaml
+!distconf/python/standalone.yaml
+src/cgo_bridge/*.yaml
 
 # --- Secrets & Config ---
 .env*

@@ -1,9 +1,25 @@
 package cgo_bridge
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// FFI boundary string sanitizer stripping null bytes and trimming whitespace
+// from incoming C string pointers to prevent buffer overruns or malformed keys.
+//
+// DATA FLOW:
+// 1. Input: Raw string extracted from C char* pointer.
+// 2. Logic: Trims surrounding whitespace and removes interior \x00 null bytes.
+// 3. Output: Cleaned, safe Go string.
+//
+// KEY PARAMETERS:
+// - input: Raw string originating across the FFI boundary.
+// =============================================================================
+
 /*
 #include <stdlib.h>
 */
 import "C"
+
+// -----------------------------------------------------------------------------
 
 import (
 	"strings"

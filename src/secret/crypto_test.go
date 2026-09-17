@@ -1,5 +1,19 @@
 package secret
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Unit test suite verifying RSA keypair generation, token encryption, and
+// round-trip ciphertext decryption using temporary test keys and env overrides.
+//
+// DATA FLOW:
+// 1. Input: Randomly generated test RSA keys and plaintext test secrets.
+// 2. Logic: Encrypts with Encrypt; decrypts with Decrypt and ProcessConfigSecrets.
+// 3. Output: Test assertion results verifying plaintext integrity.
+//
+// KEY PARAMETERS:
+// - t: Testing harness handle.
+// =============================================================================
+
 import (
 	"crypto/rand"
 	"crypto/rsa"
@@ -8,6 +22,8 @@ import (
 	"os"
 	"testing"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestEncryptionRoundTrip(t *testing.T) {
 	// 1. Generate a temporary key pair for the test

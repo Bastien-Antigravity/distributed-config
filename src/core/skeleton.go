@@ -1,7 +1,19 @@
 package core
 
-// NewSkeletonConfig returns an empty/zero-value Config struct.
-// Used for generating "missing.yaml" or skeletons without polluting data.
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Instantiates a minimal skeleton configuration template for new bootstrap
+// environments where no pre-existing configuration file exists.
+//
+// DATA FLOW:
+// 1. Input: None.
+// 2. Logic: Constructs a *Config containing placeholder CHANGE_ME strings and empty capabilities.
+// 3. Output: Skeleton *Config struct ready for serialization.
+//
+// KEY PARAMETERS:
+// - CommonConfig: Minimal baseline metadata.
+// =============================================================================
+
 // -----------------------------------------------------------------------------
 
 func NewSkeletonConfig() *Config {

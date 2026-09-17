@@ -1,8 +1,24 @@
 package facade
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Unit test suite verifying facade initialization, multi-profile loading, and
+// local callback execution upon SetSingle mutations.
+//
+// DATA FLOW:
+// 1. Input: Profile names ("standalone", "test", "staging", "production").
+// 2. Logic: Initializes facade for each profile and validates callback triggers.
+// 3. Output: Test assertion results verifying strict eventing and value retention.
+//
+// KEY PARAMETERS:
+// - t: Testing context handle.
+// =============================================================================
+
 import (
 	"testing"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestNewConfig(t *testing.T) {
 	profiles := []string{"standalone", "test", "staging", "production"}

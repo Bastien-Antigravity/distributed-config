@@ -1,5 +1,20 @@
 package facade
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Primary developer-facing Config facade wrapping core data structures, active
+// strategy lifecycle, network proto handlers, and live callback dispatching.
+//
+// DATA FLOW:
+// 1. Input: Profile string ("standalone", "test", "staging", "production") and file overrides.
+// 2. Logic: Coordinates factory strategy loading, RCU atomic state, and event listener hooks.
+// 3. Output: Encapsulated *Config facade ready for client microservice consumption.
+//
+// KEY PARAMETERS:
+// - profile: Selected operational profile determining network sync and caching rules.
+// - ParentOnLiveConfUpdate: Client callback executed upon remote or local config mutations.
+// =============================================================================
+
 import (
 	"encoding/json"
 	"fmt"
@@ -14,6 +29,8 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 	"gopkg.in/yaml.v3"
 )
+
+// -----------------------------------------------------------------------------
 
 // Facade Config Struct
 // -----------------------------------------------------------------------------

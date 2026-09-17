@@ -1,5 +1,19 @@
 package loader
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// YAML configuration loader, file creator, and regex-based ${VAR:default}
+// environment variable expansion engine.
+//
+// DATA FLOW:
+// 1. Input: Filesystem YAML documents and OS environment variables.
+// 2. Logic: Parses YAML nodes, applies regex expansion on scalar values, and handles missing files.
+// 3. Output: Hydrated and unmarshaled *core.Config structs.
+//
+// KEY PARAMETERS:
+// - envRegex: Regex matching ${VAR} and ${VAR:fallback} interpolation patterns.
+// =============================================================================
+
 import (
 	"fmt"
 	"os"
@@ -10,6 +24,8 @@ import (
 	models "github.com/Bastien-Antigravity/distributed-config/src/core"
 	"gopkg.in/yaml.v3"
 )
+
+// -----------------------------------------------------------------------------
 
 // Regex for environment variable expansion: ${VAR} or ${VAR:default}
 var envRegex = regexp.MustCompile(`\$\{([^}]+)\}`)

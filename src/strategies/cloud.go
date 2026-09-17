@@ -1,5 +1,20 @@
 package strategies
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Unified cloud configuration strategy implementation for Staging and Production,
+// connecting over safe-socket to config-server for dynamic LiveConfig sync.
+//
+// DATA FLOW:
+// 1. Input: Config server network streams, local YAML files, and environment overrides.
+// 2. Logic: Merges remote and local configurations; enforces production integrity rules.
+// 3. Output: Populated *core.Config with active safe-socket synchronization loops.
+//
+// KEY PARAMETERS:
+// - Profile: "production" (full sync) or "staging" (read-only mode).
+// - ReadOnly: Flag disabling writeback/sync mutations in staging environments.
+// =============================================================================
+
 import (
 	"fmt"
 	"os"
@@ -8,6 +23,8 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 )
+
+// -----------------------------------------------------------------------------
 
 // CloudStrategy: Unified strategy for Staging and Production.
 // Connects to Config Server for remote configuration.

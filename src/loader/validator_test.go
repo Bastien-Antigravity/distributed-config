@@ -1,10 +1,26 @@
 package loader
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Unit test suite verifying common configuration validation rules and
+// mandatory service schema validation logic.
+//
+// DATA FLOW:
+// 1. Input: Incomplete and complete *core.Config test instances.
+// 2. Logic: Invokes ValidateCommonConfig and checks expected error responses.
+// 3. Output: Test assertion results verifying validation boundaries.
+//
+// KEY PARAMETERS:
+// - t: Testing harness handle.
+// =============================================================================
+
 import (
 	"testing"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestValidator(t *testing.T) {
 	t.Run("TestValidateCommonConfig", func(t *testing.T) {

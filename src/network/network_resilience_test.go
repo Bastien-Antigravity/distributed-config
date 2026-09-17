@@ -1,5 +1,19 @@
 package network
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Integration test suite validating safe-socket client resilience, server restart
+// recovery, and automatic exponential backoff reconnection behavior.
+//
+// DATA FLOW:
+// 1. Input: Ephemeral TCP server lifecycles simulating socket dropouts and restarts.
+// 2. Logic: Launches client, terminates server, restarts server, and verifies reconnection.
+// 3. Output: Test assertion results verifying automatic client recovery.
+//
+// KEY PARAMETERS:
+// - t: Standard testing harness handle.
+// =============================================================================
+
 import (
 	"fmt"
 	"testing"
@@ -9,6 +23,8 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 	safesocket "github.com/Bastien-Antigravity/safe-socket"
 )
+
+// -----------------------------------------------------------------------------
 
 func TestNetworkResilience_Reconnection(t *testing.T) {
 	addr := "127.0.0.1:9999"

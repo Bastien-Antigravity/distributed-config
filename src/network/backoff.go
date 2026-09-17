@@ -1,5 +1,20 @@
 package network
 
+// =============================================================================
+// ESSENTIAL PROCESS:
+// Exponential backoff calculator with randomized jitter for network client
+// reconnection attempts to the centralized config-server.
+//
+// DATA FLOW:
+// 1. Input: Attempt counter and base/max delay parameters from CommonConfig.
+// 2. Logic: Computes min(MaxDelay, BaseDelay * Factor^attempt) * randomized jitter factor.
+// 3. Output: Calculated time.Duration delay for backoff sleep.
+//
+// KEY PARAMETERS:
+// - BaseDelay: Initial retry delay (default: 100ms or RetryBaseMS).
+// - MaxDelay: Upper bound ceiling (default: 5s or RetryMaxSec).
+// =============================================================================
+
 import (
 	"math"
 	"math/rand"
@@ -8,6 +23,8 @@ import (
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 )
+
+// -----------------------------------------------------------------------------
 
 // Backoff implements exponential backoff with jitter
 type Backoff struct {
