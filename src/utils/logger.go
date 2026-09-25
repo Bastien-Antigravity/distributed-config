@@ -15,7 +15,6 @@ package utils
 // =============================================================================
 
 import (
-	"fmt"
 	"os"
 )
 
@@ -35,8 +34,12 @@ type Logger interface {
 }
 
 // EnsureSafeLogger provides a no-op implementation fallback.
+// In strict mode (STRICT_LOGGER=true), it panics immediately.
 func EnsureSafeLogger(log Logger) Logger {
 	if log == nil {
+		if os.Getenv("STRICT_LOGGER") == "true" {
+			panic("CRITICAL ARCHITECTURAL VIOLATION: Nil logger passed to EnsureSafeLogger in strict mode.")
+		}
 		return &noOpLogger{}
 	}
 	return log
@@ -44,9 +47,9 @@ func EnsureSafeLogger(log Logger) Logger {
 
 type noOpLogger struct{}
 
-func (n *noOpLogger) Debug(string, ...any)            {}
-func (n *noOpLogger) Info(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...) } // Keep basic console output if no logger provided for core config
-func (n *noOpLogger) Warning(string, ...any)          {}
+func (n *noOpLogger) Debug(string, ...any)    {}
+func (n *noOpLogger) Info(string, ...any)     {}
+func (n *noOpLogger) Warning(string, ...any)  {}
 func (n *noOpLogger) Error(string, ...any)            {}
 func (n *noOpLogger) Critical(string, ...any)         {}
 func (n *noOpLogger) Logon(string, ...any)            {}
