@@ -59,6 +59,13 @@ func NewDefaultConfig() *Config {
 				"servers":        []string{"nats://${NATS_IP:127.0.0.1}:4222"},
 				"client_id":      "${APP_NAME:generic_client}",
 				"subject_prefix": "bastien-antigravity",
+				"tls": map[string]interface{}{
+					"enabled":   false,
+					"cert_file": "",
+					"key_file":  "",
+					"ca_file":   "",
+					"verify":    false,
+				},
 			},
 			"timescale_db": map[string]interface{}{
 				"ip":       "${TS_IP:127.0.0.1}",
