@@ -145,11 +145,22 @@ func TestConfig_ShadowPort(t *testing.T) {
 				"ip":   "127.0.0.1",
 				"port": "8000",
 			},
+			"grpc_fallback_service": map[string]interface{}{
+				"ip":        "127.0.0.1",
+				"port":      "8000",
+				"grpc_port": "9998",
+			},
 			"explicit_service": map[string]interface{}{
 				"ip":        "127.0.0.1",
 				"port":      "8000",
-				"grpc_ip":   "127.0.0.1",
+				"grpc_ip":   "127.0.0.2",
 				"grpc_port": "9999",
+				"rest_port": "8080",
+			},
+			"explicit_rest_service": map[string]interface{}{
+				"ip":        "127.0.0.1",
+				"rest_ip":   "127.0.0.3",
+				"rest_port": "8081",
 			},
 		},
 	}
@@ -163,13 +174,50 @@ func TestConfig_ShadowPort(t *testing.T) {
 		}
 	})
 
-	t.Run("ExplicitGRPCPort", func(t *testing.T) {
+	t.Run("GRPCIPFallsBackToIP", func(t *testing.T) {
+		addr, err := cfg.GetGRPCAddress("grpc_fallback_service")
+		if err != nil {
+			t.Fatalf("Expected success, got: %v", err)
+		}
+		if addr != "127.0.0.1:9998" {
+			t.Errorf("Expected 127.0.0.1:9998, got %s", addr)
+		}
+	})
+
+	t.Run("ExplicitGRPCIPAndPort", func(t *testing.T) {
 		addr, err := cfg.GetGRPCAddress("explicit_service")
 		if err != nil {
 			t.Fatalf("Expected success, got: %v", err)
 		}
-		if addr != "127.0.0.1:9999" {
-			t.Errorf("Expected 127.0.0.1:9999, got %s", addr)
+		if addr != "127.0.0.2:9999" {
+			t.Errorf("Expected 127.0.0.2:9999, got %s", addr)
+		}
+	})
+
+	t.Run("RESTIPFallsBackToIP", func(t *testing.T) {
+		addr, err := cfg.GetRESTAddress("explicit_service")
+		if err != nil {
+			t.Fatalf("Expected success, got: %v", err)
+		}
+		if addr != "127.0.0.1:8080" {
+			t.Errorf("Expected 127.0.0.1:8080, got %s", addr)
+		}
+	})
+
+	t.Run("ExplicitRESTIPAndPort", func(t *testing.T) {
+		addr, err := cfg.GetRESTAddress("explicit_rest_service")
+		if err != nil {
+			t.Fatalf("Expected success, got: %v", err)
+		}
+		if addr != "127.0.0.3:8081" {
+			t.Errorf("Expected 127.0.0.3:8081, got %s", addr)
+		}
+	})
+
+	t.Run("MissingRESTPortReturnsError", func(t *testing.T) {
+		_, err := cfg.GetRESTAddress("my_service")
+		if err == nil {
+			t.Fatalf("Expected error for missing rest_port, got nil")
 		}
 	})
 }

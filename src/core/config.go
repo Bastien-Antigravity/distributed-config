@@ -303,58 +303,60 @@ func (c *Config) GetGRPCAddress(capability string) (string, error) {
 	return c.getAddr(capability, "grpc_ip", "grpc_port")
 }
 
+// -----------------------------------------------------------------------------
+
 // GetRESTAddress returns the REST management address for a given capability.
-// Requires explicit 'rest_port'.
+// Requires explicit 'rest_port' (and 'rest_ip' falling back to 'ip').
 func (c *Config) GetRESTAddress(capability string) (string, error) {
-	return c.getAddr(capability, "ip", "rest_port")
+	return c.getAddr(capability, "rest_ip", "rest_port")
 }
 
+// -----------------------------------------------------------------------------
+
+func (c *Config) getCapabilityField(capability, key string) string {
+	// 1. Check LiveConfig (Overrides from CLI or Server)
+	if v := c.Get(capability, key); v != "" {
+		return v
+	}
+	if v := c.Get("capabilities", capability+"."+key); v != "" {
+		return v
+	}
+
+	// 2. Check static Capabilities map
+	if c.Capabilities != nil {
+		if capRaw, ok := c.Capabilities[capability]; ok {
+			if capMap, ok := capRaw.(map[string]interface{}); ok && capMap[key] != nil {
+				return fmt.Sprintf("%v", capMap[key])
+			}
+		}
+	}
+	return ""
+}
 
 // -----------------------------------------------------------------------------
 
 func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
-	// 1. Check LiveConfig (Overrides from CLI or Server)
-	// Try direct section first (e.g. section "log_server" key "ip")
-	host := c.Get(capability, hostKey)
-	port := c.Get(capability, portKey)
-
-	// Fallback to "capabilities" section (legacy/alternative)
-	if host == "" {
-		host = c.Get("capabilities", capability+"."+hostKey)
-	}
-	if port == "" {
-		port = c.Get("capabilities", capability+"."+portKey)
-	}
-
-	// 2. Fallback to static Capabilities map if missing from LiveConfig
-	if host == "" || port == "" {
-		if c.Capabilities == nil {
-			return "", fmt.Errorf("no capabilities found and no live override for %s", capability)
+	if c.Capabilities != nil {
+		if _, ok := c.Capabilities[capability]; !ok {
+			return "", fmt.Errorf("capability %s not found", capability)
 		}
-		capRaw, ok := c.Capabilities[capability]
-		if !ok {
-			if host == "" {
-				return "", fmt.Errorf("capability %s not found", capability)
-			}
-		} else {
-			cap, ok := capRaw.(map[string]interface{})
-			if ok {
-				if host == "" && cap[hostKey] != nil {
-					host = fmt.Sprintf("%v", cap[hostKey])
-				}
-				if port == "" && cap[portKey] != nil {
-					port = fmt.Sprintf("%v", cap[portKey])
-				}
-			}
-		}
+	} else if c.getCapabilityField(capability, portKey) == "" {
+		return "", fmt.Errorf("no capabilities found and no live override for %s", capability)
 	}
 
-	if host == "" {
-		return "", fmt.Errorf("host key %s missing or empty in capability %s", hostKey, capability)
+	host := c.getCapabilityField(capability, hostKey)
+	if host == "" && hostKey != "ip" {
+		host = c.getCapabilityField(capability, "ip")
 	}
+	if host == "" {
+		return "", fmt.Errorf("host key %s (or 'ip') missing or empty in capability %s", hostKey, capability)
+	}
+
+	port := c.getCapabilityField(capability, portKey)
 	if port == "" {
 		return "", fmt.Errorf("port key %s missing or empty in capability %s", portKey, capability)
 	}
 
 	return fmt.Sprintf("%s:%s", host, port), nil
 }
+
