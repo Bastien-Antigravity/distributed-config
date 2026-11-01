@@ -50,7 +50,7 @@ func NewDefaultConfig() *Config {
 			},
 			"tele_remote": map[string]interface{}{
 				"ip":      "${TR_IP:127.0.0.1}",
-				"port":    "${TR_PORT:3312}",
+				"port":    "${TR_PORT:1863}",
 				"token":   "${TR_TOKEN}",
 				"chat_id": "${TR_CHATID}",
 				"url":     "${TR_URL:https://api.telegram.org}",
@@ -80,7 +80,7 @@ func NewDefaultConfig() *Config {
 				"user":      "${RAG_DBUSER:dbuser}",
 				"password":  "${RAG_DBPASSWORD:dbuser}",
 				"ip":        "${RG_IP:127.0.0.1}",
-				"port":      "${RG_PORT:8080}",
+				"port":      "${RG_PORT:8090}",
 				"grpc_port": "${RG_GRPC_PORT:8091}",
 				"rest_port": "${RG_REST_PORT:8093}",
 			},
