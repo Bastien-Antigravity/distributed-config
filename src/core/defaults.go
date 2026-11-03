@@ -92,10 +92,6 @@ func NewDefaultConfig() *Config {
 				"temp_path": "./fs_temp",
 				"data_path": "./fs_data",
 			},
-			"jupyter": map[string]interface{}{
-				"ip":   "127.0.0.1",
-				"port": "8888",
-			},
 		},
 	}
 }

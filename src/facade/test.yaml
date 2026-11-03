@@ -11,9 +11,6 @@ capabilities:
     file_system:
         data_path: ./fs_data
         temp_path: ./fs_temp
-    jupyter:
-        ip: 127.0.0.2
-        port: "8888"
     log_server:
         ip: ${LS_IP:127.0.0.2}
         port: ${LS_PORT:9020}
