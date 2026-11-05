@@ -23,6 +23,7 @@ import "C"
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 // -------------------------------------------------------------------------
@@ -34,7 +35,7 @@ func GetAddress(handle uintptr, capability string) (string, error) {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return "", nil
+		return "", fmt.Errorf("invalid handle")
 	}
 
 	return session.Config.GetAddress(sanitizeString(capability))
@@ -49,7 +50,7 @@ func GetGRPCAddress(handle uintptr, capability string) (string, error) {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return "", nil
+		return "", fmt.Errorf("invalid handle")
 	}
 
 	return session.Config.GetGRPCAddress(sanitizeString(capability))
@@ -64,7 +65,7 @@ func GetRESTAddress(handle uintptr, capability string) (string, error) {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return "", nil
+		return "", fmt.Errorf("invalid handle")
 	}
 
 	return session.Config.GetRESTAddress(sanitizeString(capability))
@@ -79,13 +80,13 @@ func GetCapability(handle uintptr, capability string) (string, error) {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return "", nil
+		return "", fmt.Errorf("invalid handle")
 	}
 
 	capKey := sanitizeString(capability)
 	var mergedMap map[string]interface{}
 	if err := session.Config.GetCapability(capKey, &mergedMap); err != nil {
-		return "", nil
+		return "", err
 	}
 
 	jsonData, err := json.Marshal(mergedMap)
@@ -104,7 +105,7 @@ func GetFullConfig(handle uintptr) (string, error) {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return "", nil
+		return "", fmt.Errorf("invalid handle")
 	}
 
 	// Create a combined map of all config data

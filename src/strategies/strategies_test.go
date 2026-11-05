@@ -27,25 +27,37 @@ import (
 func TestStandaloneStrategy(t *testing.T) {
 	tempDir := t.TempDir()
 	oldCwd, _ := os.Getwd()
-	_ = os.Chdir(tempDir)
-	defer func() { _ = os.Chdir(oldCwd) }()
 
-	t.Run("TestStandalone_GeneratesFileAndLoads", func(t *testing.T) {
+	t.Run("TestStandalone_FailsFastWhenFileMissing", func(t *testing.T) {
+		_ = os.Chdir(tempDir)
+		defer func() { _ = os.Chdir(oldCwd) }()
+
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
+		strategy := &StandaloneStrategy{}
+
+		err := strategy.Load(cfg)
+		if err == nil {
+			t.Errorf("Expected StandaloneStrategy Load to fail fast when standalone.yaml is missing")
+		}
+	})
+
+	t.Run("TestStandalone_LoadsCanonicalStandaloneYAML", func(t *testing.T) {
+		_ = os.Chdir(oldCwd)
+
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
 		strategy := &StandaloneStrategy{}
 
 		err := strategy.Load(cfg)
 		if err != nil {
-			t.Errorf("Expected StandaloneStrategy Load to succeed and create default, got: %v", err)
+			t.Errorf("Expected StandaloneStrategy Load to succeed from canonical standalone.yaml, got: %v", err)
 		}
 
 		if cfg.Common.Name != "common" {
-			t.Errorf("Expected fallback name 'common' from default generator, got: %v", cfg.Common.Name)
+			t.Errorf("Expected name 'common' from standalone.yaml, got: %v", cfg.Common.Name)
 		}
 
-		// Validation should still have passed because NewDefaultConfig() provides log_server and config_server!
 		if err := cfg.ValidateMandatoryServices(); err != nil {
-			t.Errorf("Expected auto-generated Standalone configuration to pass basic validation, got: %v", err)
+			t.Errorf("Expected canonical Standalone configuration to pass mandatory service validation, got: %v", err)
 		}
 	})
 }

@@ -63,6 +63,65 @@ func getCallerDir() string {
 // 2. CWD/[targetName].yaml
 // -----------------------------------------------------------------------------
 
+// collectSearchDirs returns a deduplicated list of directories starting from exeDir and cwd.
+// When inside a repository/project (detected via .git, go.mod, Cargo.toml, or pyproject.toml
+// within 4 parent levels), it walks up to the repository root so subpackage tests and nested
+// binaries discover the repository's canonical standalone.yaml symlink without escaping isolated temp dirs.
+func collectSearchDirs(exeDir, cwd string) []string {
+	var dirs []string
+	seen := make(map[string]bool)
+
+	hasProjectMarker := func(dir string) bool {
+		for _, marker := range []string{".git", "go.mod", "Cargo.toml", "pyproject.toml"} {
+			if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
+				return true
+			}
+		}
+		return false
+	}
+
+	addWithParents := func(start string) {
+		if start == "" {
+			return
+		}
+		curr, err := filepath.Abs(start)
+		if err != nil {
+			curr = start
+		}
+
+		// Check if start or an ancestor up to 4 levels up has a project root marker
+		maxDepth := 0
+		probe := curr
+		for d := 0; d <= 4 && probe != "" && probe != "/" && probe != "."; d++ {
+			if hasProjectMarker(probe) {
+				maxDepth = d
+				break
+			}
+			parent := filepath.Dir(probe)
+			if parent == probe {
+				break
+			}
+			probe = parent
+		}
+
+		for depth := 0; depth <= maxDepth && curr != "" && curr != "/" && curr != "."; depth++ {
+			if !seen[curr] {
+				seen[curr] = true
+				dirs = append(dirs, curr)
+			}
+			parent := filepath.Dir(curr)
+			if parent == curr {
+				break
+			}
+			curr = parent
+		}
+	}
+
+	addWithParents(exeDir)
+	addWithParents(cwd)
+	return dirs
+}
+
 func ResolveConfigPath(targetName string) string {
 	// 0. Explicit Environment Override (Highest Priority)
 	if customPath := os.Getenv("CONFIG_PATH"); customPath != "" {
@@ -99,18 +158,19 @@ func ResolveConfigPath(targetName string) string {
 	}
 
 	cwd, _ := os.Getwd()
+	searchDirs := collectSearchDirs(exeDir, cwd)
 
-	// 3. Build Search Candidates (STRICT ORDER: Binary directory first)
+	// 3. Build Search Candidates (STRICT ORDER: Exact targetName first, then canonical standalone.yaml)
 	var candidates []string
-
-	// Local to Binary (Priority 1)
-	if targetName != "" && exeDir != "" {
-		candidates = append(candidates, filepath.Join(exeDir, targetName+".yaml"))
+	if targetName != "" {
+		for _, dir := range searchDirs {
+			candidates = append(candidates, filepath.Join(dir, targetName+".yaml"))
+		}
 	}
-
-	// Local to CWD (Priority 2)
-	if targetName != "" && cwd != "" && cwd != exeDir {
-		candidates = append(candidates, filepath.Join(cwd, targetName+".yaml"))
+	if targetName != "standalone" {
+		for _, dir := range searchDirs {
+			candidates = append(candidates, filepath.Join(dir, "standalone.yaml"))
+		}
 	}
 
 	// 4. Search Loop

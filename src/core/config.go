@@ -179,17 +179,12 @@ func (c *Config) GetCapability(key string, target interface{}) error {
 		return fmt.Errorf("capability '%s' is strictly required but missing from all sources", key)
 	}
 
-	// Robustness Hack: Convert all numbers to strings in the map
-	// This ensures they can be unmarshaled into either string or numeric fields.
-	// (Go's json unmarshaler can't do number->string, but can do string->number if tags allow)
-	// Actually, we do the opposite: keep numbers as numbers, and let the caller use better structs.
-	// But since many callers use string fields for ports, we must support it.
-
-	// We'll use a trick: marshal to JSON, then use a custom decoder that handles weak typing.
-	// But since we can't easily add dependencies, we'll just manually stringify common fields like "port".
+	// Ensure scalar identifiers and ports are represented as strings
 	for _, portKey := range []string{"port", "grpc_port", "chat_id", "telegram_id"} {
 		if v, exists := mergedMap[portKey]; exists {
-			mergedMap[portKey] = fmt.Sprintf("%v", v)
+			if _, isStr := v.(string); !isStr {
+				mergedMap[portKey] = fmt.Sprintf("%v", v)
+			}
 		}
 	}
 
@@ -266,7 +261,11 @@ func ParseSharePayload(payload interface{}) (map[string]map[string]string, error
 				// Nested map becomes its own section
 				section := make(map[string]string)
 				for nk, nv := range nestedMap {
-					section[nk] = fmt.Sprintf("%v", nv)
+					if s, ok := nv.(string); ok {
+						section[nk] = s
+					} else {
+						section[nk] = fmt.Sprintf("%v", nv)
+					}
 				}
 				updates[k] = section
 			} else if nestedMap, ok := v.(map[string]string); ok {
@@ -277,7 +276,11 @@ func ParseSharePayload(payload interface{}) (map[string]map[string]string, error
 				if updates["shared"] == nil {
 					updates["shared"] = make(map[string]string)
 				}
-				updates["shared"][k] = fmt.Sprintf("%v", v)
+				if s, ok := v.(string); ok {
+					updates["shared"][k] = s
+				} else {
+					updates["shared"][k] = fmt.Sprintf("%v", v)
+				}
 			}
 		}
 	default:
@@ -326,6 +329,9 @@ func (c *Config) getCapabilityField(capability, key string) string {
 	if c.Capabilities != nil {
 		if capRaw, ok := c.Capabilities[capability]; ok {
 			if capMap, ok := capRaw.(map[string]interface{}); ok && capMap[key] != nil {
+				if s, ok := capMap[key].(string); ok {
+					return s
+				}
 				return fmt.Sprintf("%v", capMap[key])
 			}
 		}

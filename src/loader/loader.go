@@ -56,13 +56,11 @@ func EnsureFileExists(filePath string, payload interface{}) error {
 
 // -----------------------------------------------------------------------------
 
-// LoadConfigFromFile loads the core configuration.
-// Behavior: If the file is missing, it automatically creates it using standard
-// ecosystem Defaults (from NewDefaultConfig). This is intended for Standalone
-// and Test profiles to allow instant "Zero-Config" local bootstrap.
+// LoadConfigFromFile loads the core configuration from disk.
+// Fails fast if the file does not exist (never creates static fallback YAML files).
 func LoadConfigFromFile(config *models.Config, filePath string) error {
-	if err := EnsureFileExists(filePath, models.NewDefaultConfig()); err != nil {
-		return err
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return fmt.Errorf("config file not found: %s", filePath)
 	}
 	err := LoadYAML(filePath, config)
 	if err == nil {
@@ -170,21 +168,34 @@ func LoadYAML(filePath string, target interface{}) error {
 
 	ProcessNode(&root)
 
-	// If target is a Config struct, we perform a Deep Merge to preserve defaults
+	// If target is a Config struct, we perform a Deep Merge to preserve existing capabilities
 	if cfg, ok := target.(*models.Config); ok {
 		var raw map[string]interface{}
 		if err := root.Decode(&raw); err != nil {
 			return fmt.Errorf("failed to decode yaml file '%s' into map: %w", filePath, err)
 		}
 
-		// 1. Decode standard sections (Common) directly
+		// Preserve existing capabilities in a separate copy before root.Decode(cfg),
+		// because yaml.Node.Decode mutates non-nil maps in-place and overwrites sub-keys.
+		var existingCaps map[string]interface{}
+		if len(cfg.Capabilities) > 0 {
+			existingCaps = models.DeepMerge(make(map[string]interface{}), cfg.Capabilities)
+			cfg.Capabilities = nil
+		}
+
+		// 1. Decode standard sections (Common, Capabilities)
 		if err := root.Decode(cfg); err != nil {
 			return fmt.Errorf("failed to decode yaml file '%s' into config: %w", filePath, err)
 		}
 
-		// 2. Perform Deep Merge on Capabilities to ensure missing keys within sections are kept from defaults
+		// 2. Perform Deep Merge on Capabilities so existing sub-keys are preserved and overridden by file keys
 		if caps, ok := raw["capabilities"].(map[string]interface{}); ok {
-			cfg.Capabilities = models.DeepMerge(cfg.Capabilities, caps)
+			cfg.Capabilities = models.DeepMerge(existingCaps, caps)
+		} else if len(existingCaps) > 0 {
+			cfg.Capabilities = models.DeepMerge(existingCaps, cfg.Capabilities)
+		}
+		if cfg.Capabilities == nil {
+			cfg.Capabilities = make(map[string]interface{})
 		}
 	} else {
 		if err := root.Decode(target); err != nil {

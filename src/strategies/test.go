@@ -63,6 +63,10 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 	loader.LoadCommonFromEnv(cfg)
 
 	// 3. Server Load (Using IP from Bootstrap/Env)
+	if s.Client != nil {
+		_ = s.Client.Close()
+		s.Client = nil
+	}
 	type ConfigServerCap struct {
 		IP   string `json:"ip"`
 		Port string `json:"port"`
@@ -73,16 +77,10 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 		client, err := network.NewClient(addr, cfg)
 		if err == nil {
 			s.Client = client
-			serverConfig, err := client.GetConfig()
+			_, err := client.GetConfig()
 			s.Client.Watch() // Start background hot-reloading AFTER initial sync
 			if err == nil {
-				// Merge Server Config into current Config
 				cfg.Logger.Info("Test: Loaded from Server")
-				// Simple Manual Merge (Server Wins)
-				if serverConfig.Common.Name != "" {
-					cfg.Common.Name = serverConfig.Common.Name
-				}
-				// (In real impl, deep merge capabilities here)
 			}
 		} else {
 			cfg.Logger.Warning("Test: Warning - Could not connect to Config Server at %s (Mock/Dev?)", addr)
@@ -95,6 +93,10 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 	// We reload the file to ensure local file edits override whatever the server sent.
 	// This matches Production precedence (File > Server).
 	if err := loader.LoadConfigFromFile(cfg, fullPath); err != nil {
+		if s.Client != nil {
+			_ = s.Client.Close()
+			s.Client = nil
+		}
 		return err
 	}
 	// 5. Integrity Check (Skipped for Docker test pipelines)
@@ -104,6 +106,10 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 
 	// 6. Mandatory Service Validation
 	if err := cfg.ValidateMandatoryServices(); err != nil {
+		if s.Client != nil {
+			_ = s.Client.Close()
+			s.Client = nil
+		}
 		return fmt.Errorf("test: validation failed: %w", err)
 	}
 

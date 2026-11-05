@@ -56,10 +56,14 @@ func NewConfigHandler(name string, config *core.Config) *ConfigProtoHandler {
 // -----------------------------------------------------------------------------
 
 func (h *ConfigProtoHandler) SetOnLiveConfUpdate(cb func(map[string]map[string]string)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.onLiveConfUpdate = cb
 }
 
 func (h *ConfigProtoHandler) SetOnRegistryUpdate(cb func(map[string][]string)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.onRegistryUpdate = cb
 }
 
@@ -113,8 +117,11 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 		}
 		// Use Set() for merging (Delta Update)
 		h.parentConfig.Set(parsed)
-		if h.onLiveConfUpdate != nil {
-			h.onLiveConfUpdate(parsed)
+		h.mu.RLock()
+		liveCb := h.onLiveConfUpdate
+		h.mu.RUnlock()
+		if liveCb != nil {
+			liveCb(parsed)
 		}
 
 	case pb.ConfigMsg_BROADCAST_REGISTRY:
@@ -122,8 +129,11 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 		if err := json.Unmarshal(msg.Payload, &parsed); err != nil {
 			return fmt.Errorf("failed to decode Registry JSON payload: %w", err)
 		}
-		if h.onRegistryUpdate != nil {
-			h.onRegistryUpdate(parsed)
+		h.mu.RLock()
+		regCb := h.onRegistryUpdate
+		h.mu.RUnlock()
+		if regCb != nil {
+			regCb(parsed)
 		}
 
 	case pb.ConfigMsg_ACK:
@@ -157,7 +167,10 @@ func (h *ConfigProtoHandler) updateLiveConfig(sections map[string]map[string]str
 	// Atomically swap the entire config map pointer (Full Update from Server)
 	h.parentConfig.LiveConfig.Store(&sections)
 
-	if h.onLiveConfUpdate != nil {
-		h.onLiveConfUpdate(sections)
+	h.mu.RLock()
+	liveCb := h.onLiveConfUpdate
+	h.mu.RUnlock()
+	if liveCb != nil {
+		liveCb(sections)
 	}
 }

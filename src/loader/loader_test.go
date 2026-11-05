@@ -211,14 +211,14 @@ capabilities:
 		}
 	})
 
-	t.Run("TestDefaultGeneration", func(t *testing.T) {
+	t.Run("TestFailFastOnMissingFile", func(t *testing.T) {
 		configPath := filepath.Join(tempDir, "missing.yaml")
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
-		if err := LoadConfigFromFile(cfg, configPath); err != nil {
-			t.Errorf("LoadConfigFromFile should handle missing files: %v", err)
+		if err := LoadConfigFromFile(cfg, configPath); err == nil {
+			t.Errorf("LoadConfigFromFile should fail fast when file is missing: %s", configPath)
 		}
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			t.Errorf("Expected file %s to be created", configPath)
+		if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+			t.Errorf("Expected missing file %s to NOT be auto-created", configPath)
 		}
 	})
 

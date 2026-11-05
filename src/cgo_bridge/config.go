@@ -19,6 +19,8 @@ package cgo_bridge
 */
 import "C"
 
+import "fmt"
+
 // -----------------------------------------------------------------------------
 
 // Get is a Go-native wrapper for DistConf_Get, using string types for cross-package compatibility.
@@ -43,7 +45,7 @@ func Set(handle uintptr, section, key, value string) error {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return nil // Or handle error
+		return fmt.Errorf("invalid handle")
 	}
 
 	updates := map[string]map[string]string{
@@ -64,7 +66,7 @@ func Sync(handle uintptr) error {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return nil
+		return fmt.Errorf("invalid handle")
 	}
 
 	return session.Config.Sync()
@@ -77,7 +79,7 @@ func ApplyFileOverride(handle uintptr, filePath string) (string, error) {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return "{}", nil
+		return "", fmt.Errorf("invalid handle")
 	}
 
 	return session.Config.ApplyFileOverride(sanitizeString(filePath))

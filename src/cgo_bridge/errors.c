@@ -1,7 +1,7 @@
 #include "helpers.h"
 
-char* last_error = NULL;
-int last_error_code = 0;
+_Thread_local char* last_error = NULL;
+_Thread_local int last_error_code = 0;
 
 void set_last_error(int code, const char* err) {
     last_error_code = code;

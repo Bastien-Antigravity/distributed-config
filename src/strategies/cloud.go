@@ -65,6 +65,10 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 	loader.LoadCommonFromEnv(cfg)
 
 	// 3. Server Load
+	if s.Client != nil {
+		_ = s.Client.Close()
+		s.Client = nil
+	}
 	type ConfigServerCap struct {
 		IP   string `json:"ip"`
 		Port string `json:"port"`
@@ -75,21 +79,27 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 		client, err := network.NewClient(addr, cfg)
 		if err == nil {
 			s.Client = client
-			serverConfig, err := client.GetConfig()
+			_, err := client.GetConfig()
 			s.Client.Watch() // Start background hot-reloading AFTER initial sync
 			if err == nil {
 				cfg.Logger.Info("Cloud (%s): Loaded configuration from Server", s.Profile)
-				// Deep Merge: Name
-				if serverConfig.Common.Name != "" {
-					cfg.Common.Name = serverConfig.Common.Name
-				}
-				// Deep Merge: Capabilities (Server provides the baseline)
-				if cfg.Capabilities == nil {
-					cfg.Capabilities = make(map[string]interface{})
-				}
-				for k, v := range serverConfig.Capabilities {
-					if _, exists := cfg.Capabilities[k]; !exists {
-						cfg.Capabilities[k] = v
+				// Sync server-provided capability sections into cfg.Capabilities baseline
+				if livePtr := cfg.LiveConfig.Load(); livePtr != nil {
+					if cfg.Capabilities == nil {
+						cfg.Capabilities = make(map[string]interface{})
+					}
+					for section, kv := range *livePtr {
+						if section == "common" || section == "shared" || section == "local" {
+							continue
+						}
+						capMap, ok := cfg.Capabilities[section].(map[string]interface{})
+						if !ok {
+							capMap = make(map[string]interface{})
+							cfg.Capabilities[section] = capMap
+						}
+						for k, v := range kv {
+							capMap[k] = v
+						}
 					}
 				}
 			}
@@ -102,6 +112,10 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 	// We reload the file to ensure local file edits strictly override whatever the server sent.
 	if _, err := os.Stat(fullPath); err == nil {
 		if err := loader.LoadYAML(fullPath, cfg); err != nil {
+			if s.Client != nil {
+				_ = s.Client.Close()
+				s.Client = nil
+			}
 			return err
 		}
 	}
@@ -109,12 +123,20 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 	// 5. Integrity Check (Production only)
 	if s.Profile == "production" {
 		if err := loader.CheckProductionIPs(cfg); err != nil {
+			if s.Client != nil {
+				_ = s.Client.Close()
+				s.Client = nil
+			}
 			return err
 		}
 	}
 
 	// 6. Mandatory Service Validation
 	if err := cfg.ValidateMandatoryServices(); err != nil {
+		if s.Client != nil {
+			_ = s.Client.Close()
+			s.Client = nil
+		}
 		return fmt.Errorf("cloud strategy (%s): validation failed: %w", s.Profile, err)
 	}
 
@@ -146,7 +168,9 @@ func (s *CloudStrategy) Set(cfg *core.Config, updates map[string]map[string]stri
 	}
 
 	if s.Client == nil {
-		return fmt.Errorf("cloud strategy (%s): config server client not initialized", s.Profile)
+		// Offline fallback when config-server was not reachable at startup
+		cfg.Set(updates)
+		return nil
 	}
 
 	// 1. Prepare the full state we WANT to reach (Preview)

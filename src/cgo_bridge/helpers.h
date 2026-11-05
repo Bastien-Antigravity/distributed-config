@@ -14,8 +14,8 @@
 #define DISTCONF_ERR_DECRYPTION_FAILED   6
 #define DISTCONF_ERR_INVALID_INPUT       7
 
-extern char* last_error;
-extern int last_error_code;
+extern _Thread_local char* last_error;
+extern _Thread_local int last_error_code;
 
 void set_last_error(int code, const char* err);
 

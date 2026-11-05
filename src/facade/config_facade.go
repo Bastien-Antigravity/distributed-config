@@ -156,7 +156,15 @@ func (config *Config) Reload() error {
 	if config.strategy == nil {
 		return fmt.Errorf("no strategy associated with this configuration")
 	}
-	return config.strategy.Load(config.Config)
+	_ = config.strategy.Close()
+	if err := config.strategy.Load(config.Config); err != nil {
+		return err
+	}
+	config.handler = config.strategy.GetHandler()
+	if config.handler != nil && config.ParentOnLiveConfUpdate != nil {
+		config.handler.SetOnLiveConfUpdate(config.ParentOnLiveConfUpdate)
+	}
+	return nil
 }
 
 // Close shuts down any active resources associated with the configuration strategy.

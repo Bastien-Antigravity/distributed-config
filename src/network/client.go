@@ -29,14 +29,15 @@ import (
 
 // Client provides an interface to interact with the Config Server.
 type Client struct {
-	addr     string
-	sock     safesocket.Socket
-	Handler  *ConfigProtoHandler
-	quit     chan struct{}
-	backoff  *Backoff
-	mu       sync.RWMutex
-	watching bool
-	syncMu   sync.Mutex
+	addr      string
+	sock      safesocket.Socket
+	Handler   *ConfigProtoHandler
+	quit      chan struct{}
+	closeOnce sync.Once
+	backoff   *Backoff
+	mu        sync.RWMutex
+	watching  bool
+	syncMu    sync.Mutex
 }
 
 // -----------------------------------------------------------------------------
@@ -99,11 +100,15 @@ func (c *Client) connect() error {
 
 // Close closes the connection and stops the background listener.
 func (c *Client) Close() error {
-	close(c.quit)
+	c.closeOnce.Do(func() {
+		close(c.quit)
+	})
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.sock != nil {
-		return c.sock.Close()
+		err := c.sock.Close()
+		c.sock = nil
+		return err
 	}
 	return nil
 }
@@ -140,21 +145,21 @@ func (c *Client) Watch() {
 					// Try to reconnect
 					delay := c.backoff.GetDelay(attempt)
 					c.Handler.parentConfig.Logger.Info("Client: Connection lost. Retrying in %v...", delay)
-					time.Sleep(delay)
+					select {
+					case <-time.After(delay):
+					case <-c.quit:
+						return
+					}
 					if err := c.connect(); err == nil {
 						c.Handler.parentConfig.Logger.Info("Client: Reconnected to %s", c.addr)
 						attempt = 0
-						// Re-sync after reconnection (direct synchronous exchange before entering loop)
+						// Re-sync after reconnection (send GET_SYNC; the main Watch loop will receive and process it)
 						c.mu.RLock()
 						reconnectedSock := c.sock
 						c.mu.RUnlock()
 						if reconnectedSock != nil {
 							if syncData, err := c.Handler.HandleOutgoing(pb.ConfigMsg_GET_SYNC, nil); err == nil {
-								if err := reconnectedSock.Send(syncData); err == nil {
-									if respData, err := reconnectedSock.Receive(); err == nil && len(respData) > 0 {
-										_ = c.Handler.HandleIncoming(respData)
-									}
-								}
+								_ = reconnectedSock.Send(syncData)
 							}
 						}
 					} else {
@@ -235,18 +240,26 @@ func (c *Client) requestSync(cmd pb.ConfigMsg_Cmd) (*core.Config, error) {
 				return nil, fmt.Errorf("client closed during sync")
 			}
 		} else {
-			// Boot-time initial sync (Watch has not started yet): safe to perform direct synchronous Receive.
+			// Boot-time initial sync (Watch has not started yet): loop until GET_SYNC/FULL_REFRESH reply is received,
+			// so interleaved BROADCAST_REGISTRY or BROADCAST_SYNC frames do not cause premature return.
+			syncReceived := false
+			c.Handler.SetOnSyncReceived(func() {
+				syncReceived = true
+			})
+			defer c.Handler.SetOnSyncReceived(nil)
+
 			if err := sock.Send(data); err != nil {
 				return nil, err
 			}
 
-			respData, err := sock.Receive()
-			if err != nil {
-				return nil, err
-			}
-
-			if err := c.Handler.HandleIncoming(respData); err != nil {
-				return nil, err
+			for !syncReceived {
+				respData, err := sock.Receive()
+				if err != nil {
+					return nil, err
+				}
+				if err := c.Handler.HandleIncoming(respData); err != nil {
+					return nil, err
+				}
 			}
 		}
 	} else {

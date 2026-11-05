@@ -23,6 +23,7 @@ import "C"
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 // -------------------------------------------------------------------------
@@ -44,7 +45,7 @@ func ValidateMandatoryServices(handle uintptr) error {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return nil
+		return fmt.Errorf("invalid handle")
 	}
 
 	return session.Config.ValidateMandatoryServices()
@@ -59,7 +60,7 @@ func ShareConfig(handle uintptr, jsonData string) error {
 	session, ok := FacadeStore[handle]
 
 	if !ok || session.Config == nil {
-		return nil
+		return fmt.Errorf("invalid handle")
 	}
 
 	var payload interface{}

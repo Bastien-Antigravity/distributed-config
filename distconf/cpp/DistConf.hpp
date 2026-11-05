@@ -44,6 +44,10 @@ public:
 
     ~DistConfig() {
         if (handle_ != 0) {
+            {
+                std::lock_guard<std::mutex> lock(GetRegistryMutex());
+                GetRegistry().erase(handle_);
+            }
             DistConf_Close(handle_);
         }
     }
@@ -165,18 +169,30 @@ public:
 
 private:
     static void StaticCallbackBridge(uintptr_t handle, const char* json_data) {
-        std::lock_guard<std::mutex> lock(GetRegistryMutex());
-        auto it = GetRegistry().find(handle);
-        if (it != GetRegistry().end() && it->second->callback_) {
-            it->second->callback_(std::string(json_data));
+        std::function<void(const std::string&)> cb;
+        {
+            std::lock_guard<std::mutex> lock(GetRegistryMutex());
+            auto it = GetRegistry().find(handle);
+            if (it != GetRegistry().end() && it->second->callback_) {
+                cb = it->second->callback_;
+            }
+        }
+        if (cb && json_data) {
+            cb(std::string(json_data));
         }
     }
 
     static void StaticRegistryBridge(uintptr_t handle, const char* json_data) {
-        std::lock_guard<std::mutex> lock(GetRegistryMutex());
-        auto it = GetRegistry().find(handle);
-        if (it != GetRegistry().end() && it->second->registry_callback_) {
-            it->second->registry_callback_(std::string(json_data));
+        std::function<void(const std::string&)> cb;
+        {
+            std::lock_guard<std::mutex> lock(GetRegistryMutex());
+            auto it = GetRegistry().find(handle);
+            if (it != GetRegistry().end() && it->second->registry_callback_) {
+                cb = it->second->registry_callback_;
+            }
+        }
+        if (cb && json_data) {
+            cb(std::string(json_data));
         }
     }
 

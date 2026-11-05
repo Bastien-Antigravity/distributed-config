@@ -32,7 +32,10 @@ func TestEncryptionRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pubBytes, _ := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	pubBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	pubPEM := string(pem.EncodeToMemory(&pem.Block{
 		Type:  "PUBLIC KEY",
 		Bytes: pubBytes,
@@ -70,8 +73,14 @@ func TestEncryptionRoundTrip(t *testing.T) {
 
 func TestProcessConfigSecrets(t *testing.T) {
 	// Setup keys
-	privKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	pubBytes, _ := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	pubPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes}))
 	privPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privKey)})
 
@@ -82,7 +91,10 @@ func TestProcessConfigSecrets(t *testing.T) {
 
 	// Create encrypted value
 	secret := "my-db-password"
-	encValue, _ := Encrypt(secret, pubPEM)
+	encValue, err := Encrypt(secret, pubPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	yamlContent := []byte("database:\n  password: " + encValue + "\n  user: admin")
 
