@@ -21,7 +21,6 @@ capabilities:
   log_server:
     ip: "${LS_IP:127.0.0.2}"
     port: "${LS_PORT:9020}"
-    grpc_ip: "${LS_GRPC_IP:127.0.0.2}"
     grpc_port: "${LS_GRPC_PORT:9021}"
     level: "${LS_LEVEL:INFO}"
 
