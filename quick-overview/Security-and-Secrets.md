@@ -11,19 +11,19 @@ status: active
 ---
 # Security & Secrets
 
-\`distributed-config\` provides native support for managing sensitive information (API keys, passwords) using RSA-based encryption and environment variable expansion.
+`distributed-config` provides native support for managing sensitive information (API keys, passwords) using RSA-based encryption and environment variable expansion.
 
 ## 1. Environment Variable Expansion
 
 The simplest way to handle secrets is through environment variables. In your YAML:
 
-\`\`\`yaml
+```yaml
 capabilities:
   timescale_db:
-    password: "\${DB_PASSWORD}"
-\`\`\`
+    password: "${DB_PASSWORD}"
+```
 
-The library will automatically replace \`\${DB_PASSWORD}\` with the value of the environment variable at runtime.
+The library will automatically replace `${DB_PASSWORD}` with the value of the environment variable at runtime.
 
 ---
 

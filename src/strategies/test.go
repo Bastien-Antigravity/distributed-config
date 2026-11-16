@@ -36,7 +36,7 @@ import (
 //   - Behavior: Fetched from Server (GET).
 //
 // 3. Persistence / Dump:
-//   - On Missing File: Generates a FULL functional config file with Test Defaults.
+//   - On Missing File: Fails fast (never auto-generates skeleton files).
 //   - Sync: ACTIVE. Pushes local changes to the Server (PUT).
 // -----------------------------------------------------------------------------
 
@@ -67,11 +67,7 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 		_ = s.Client.Close()
 		s.Client = nil
 	}
-	type ConfigServerCap struct {
-		IP   string `json:"ip"`
-		Port string `json:"port"`
-	}
-	var cs ConfigServerCap
+	var cs core.ConfigServerCap
 	if err := cfg.GetCapability("config_server", &cs); err == nil {
 		addr := fmt.Sprintf("%s:%s", cs.IP, cs.Port)
 		client, err := network.NewClient(addr, cfg)
@@ -81,6 +77,25 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 			s.Client.Watch() // Start background hot-reloading AFTER initial sync
 			if err == nil {
 				cfg.Logger.Info("Test: Loaded from Server")
+				// Sync server-provided capability sections into cfg.Capabilities baseline
+				if livePtr := cfg.LiveConfig.Load(); livePtr != nil {
+					if cfg.Capabilities == nil {
+						cfg.Capabilities = make(map[string]interface{})
+					}
+					for section, kv := range *livePtr {
+						if section == "common" || section == "shared" || section == "local" {
+							continue
+						}
+						capMap, ok := cfg.Capabilities[section].(map[string]interface{})
+						if !ok {
+							capMap = make(map[string]interface{})
+							cfg.Capabilities[section] = capMap
+						}
+						for k, v := range kv {
+							capMap[k] = v
+						}
+					}
+				}
 			}
 		} else {
 			cfg.Logger.Warning("Test: Warning - Could not connect to Config Server at %s (Mock/Dev?)", addr)
@@ -151,6 +166,48 @@ func (s *TestStrategy) Set(cfg *core.Config, updates map[string]map[string]strin
 
 	// 3. Apply locally (Direct apply)
 	cfg.Apply(nextState)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// SetWithOCC pushes updates with an expected version to validate OCC.
+func (s *TestStrategy) SetWithOCC(cfg *core.Config, updates map[string]map[string]string, expectedVersion uint64) error {
+	if s.Client != nil {
+		cfg.Logger.Info("Test: Pushing OCC update request to Server (expected version: %d)...", expectedVersion)
+		if err := s.Client.UpdateConfigMapWithOCC(updates, expectedVersion); err != nil {
+			return err
+		}
+	}
+	cfg.Set(updates)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// DeleteKeys sends key deletion request to the server.
+func (s *TestStrategy) DeleteKeys(cfg *core.Config, deletions map[string][]string) error {
+	if s.Client != nil {
+		cfg.Logger.Info("Test: Pushing key deletions to Server...")
+		if err := s.Client.DeleteKeys(deletions); err != nil {
+			return err
+		}
+	}
+	cfg.Delete(deletions)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// DeleteKeysWithOCC sends key deletion request to the server with OCC validation.
+func (s *TestStrategy) DeleteKeysWithOCC(cfg *core.Config, deletions map[string][]string, expectedVersion uint64) error {
+	if s.Client != nil {
+		cfg.Logger.Info("Test: Pushing OCC key deletions to Server (expected version: %d)...", expectedVersion)
+		if err := s.Client.DeleteKeysWithOCC(deletions, expectedVersion); err != nil {
+			return err
+		}
+	}
+	cfg.Delete(deletions)
 	return nil
 }
 

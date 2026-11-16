@@ -18,9 +18,15 @@ package distributed_config
 import (
 	"github.com/Bastien-Antigravity/distributed-config/src/facade"
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
+	"github.com/Bastien-Antigravity/distributed-config/src/network"
 	"github.com/Bastien-Antigravity/distributed-config/src/secret"
 	"gopkg.in/yaml.v3"
 )
+
+// -----------------------------------------------------------------------------
+
+// ErrVersionConflict is returned when an OCC update or delete fails due to a version mismatch.
+var ErrVersionConflict = network.ErrVersionConflict
 
 // -----------------------------------------------------------------------------
 

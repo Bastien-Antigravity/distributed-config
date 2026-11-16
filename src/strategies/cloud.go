@@ -69,11 +69,7 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 		_ = s.Client.Close()
 		s.Client = nil
 	}
-	type ConfigServerCap struct {
-		IP   string `json:"ip"`
-		Port string `json:"port"`
-	}
-	var cs ConfigServerCap
+	var cs core.ConfigServerCap
 	if err := cfg.GetCapability("config_server", &cs); err == nil {
 		addr := fmt.Sprintf("%s:%s", cs.IP, cs.Port)
 		client, err := network.NewClient(addr, cfg)
@@ -187,6 +183,72 @@ func (s *CloudStrategy) Set(cfg *core.Config, updates map[string]map[string]stri
 
 	// 3. Success! Now apply locally
 	cfg.Apply(nextState)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// SetWithOCC pushes updates with an expected version to validate OCC.
+func (s *CloudStrategy) SetWithOCC(cfg *core.Config, updates map[string]map[string]string, expectedVersion uint64) error {
+	if s.ReadOnly {
+		return fmt.Errorf("cloud strategy (%s): cannot update in read-only mode", s.Profile)
+	}
+
+	if s.Client == nil {
+		cfg.Set(updates)
+		return nil
+	}
+
+	cfg.Logger.Info("Cloud (%s): Pushing OCC update request (expected version: %d)...", s.Profile, expectedVersion)
+	if err := s.Client.UpdateConfigMapWithOCC(updates, expectedVersion); err != nil {
+		return err
+	}
+
+	cfg.Set(updates)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// DeleteKeys sends key deletion request to the server.
+func (s *CloudStrategy) DeleteKeys(cfg *core.Config, deletions map[string][]string) error {
+	if s.ReadOnly {
+		return fmt.Errorf("cloud strategy (%s): cannot delete in read-only mode", s.Profile)
+	}
+
+	if s.Client == nil {
+		cfg.Delete(deletions)
+		return nil
+	}
+
+	cfg.Logger.Info("Cloud (%s): Pushing key deletions to Server...", s.Profile)
+	if err := s.Client.DeleteKeys(deletions); err != nil {
+		return err
+	}
+
+	cfg.Delete(deletions)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// DeleteKeysWithOCC sends key deletion request to the server with OCC validation.
+func (s *CloudStrategy) DeleteKeysWithOCC(cfg *core.Config, deletions map[string][]string, expectedVersion uint64) error {
+	if s.ReadOnly {
+		return fmt.Errorf("cloud strategy (%s): cannot delete in read-only mode", s.Profile)
+	}
+
+	if s.Client == nil {
+		cfg.Delete(deletions)
+		return nil
+	}
+
+	cfg.Logger.Info("Cloud (%s): Pushing OCC key deletions to Server (expected version: %d)...", s.Profile, expectedVersion)
+	if err := s.Client.DeleteKeysWithOCC(deletions, expectedVersion); err != nil {
+		return err
+	}
+
+	cfg.Delete(deletions)
 	return nil
 }
 

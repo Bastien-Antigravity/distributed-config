@@ -101,7 +101,7 @@ func (c *Config) Apply(newMap *map[string]map[string]string) {
 
 // PreviewSet calculates the resulting configuration map after applying updates
 // but DOES NOT store it. Useful for strategies that need to push to a server
-// before committing locally.
+// before committing locally. Supports "__DELETED__" sentinel values to remove keys.
 func (c *Config) PreviewSet(updates map[string]map[string]string) *map[string]map[string]string {
 	if updates == nil {
 		return c.LiveConfig.Load()
@@ -119,17 +119,61 @@ func (c *Config) PreviewSet(updates map[string]map[string]string) *map[string]ma
 		}
 	}
 
-	// 2. Apply the changes (Merge)
+	// 2. Apply the changes (Merge / Sentinel Delete)
 	for section, kv := range updates {
 		if _, ok := newMap[section]; !ok {
 			newMap[section] = make(map[string]string)
 		}
 		for k, v := range kv {
-			newMap[section][k] = v
+			if v == "__DELETED__" {
+				delete(newMap[section], k)
+			} else {
+				newMap[section][k] = v
+			}
+		}
+		if len(newMap[section]) == 0 {
+			delete(newMap, section)
 		}
 	}
 
 	return &newMap
+}
+
+// -----------------------------------------------------------------------------
+
+// Delete removes specified section keys from the live configuration.
+// If keys slice is empty, removes the entire section.
+func (c *Config) Delete(deletions map[string][]string) {
+	if len(deletions) == 0 {
+		return
+	}
+	newMap := make(map[string]map[string]string)
+	oldPtr := c.LiveConfig.Load()
+	if oldPtr != nil {
+		for s, kv := range *oldPtr {
+			newMap[s] = make(map[string]string)
+			for k, v := range kv {
+				newMap[s][k] = v
+			}
+		}
+	}
+
+	for section, keys := range deletions {
+		if secMap, ok := newMap[section]; ok {
+			if len(keys) == 0 {
+				delete(newMap, section)
+			} else {
+				for _, k := range keys {
+					delete(secMap, k)
+				}
+				if len(secMap) == 0 {
+					delete(newMap, section)
+				}
+			}
+		}
+	}
+
+	c.LiveConfig.Store(&newMap)
 }
 
 // -----------------------------------------------------------------------------

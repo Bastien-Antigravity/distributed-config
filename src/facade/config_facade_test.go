@@ -65,3 +65,82 @@ func TestNewConfig(t *testing.T) {
 		})
 	}
 }
+
+// -----------------------------------------------------------------------------
+
+func TestFacade_OCCAndDeletions(t *testing.T) {
+	cfg := NewConfig("standalone")
+	if cfg == nil {
+		t.Fatal("Failed to create standalone config")
+	}
+
+	// 1. Initial GetVersion
+	if cfg.GetVersion() != 0 {
+		t.Errorf("Expected initial version 0, got %d", cfg.GetVersion())
+	}
+
+	// 2. SetWithOCC
+	err := cfg.SetWithOCC(map[string]map[string]string{
+		"DATABASE": {
+			"HOST": "127.0.0.1",
+			"PORT": "5432",
+		},
+		"APP": {
+			"ENV": "test",
+		},
+	}, 0)
+	if err != nil {
+		t.Fatalf("SetWithOCC failed: %v", err)
+	}
+
+	if cfg.Get("DATABASE", "HOST") != "127.0.0.1" {
+		t.Errorf("Expected DATABASE.HOST=127.0.0.1, got %v", cfg.Get("DATABASE", "HOST"))
+	}
+
+	// 3. DeleteKey (single key)
+	if err := cfg.DeleteKey("DATABASE", "PORT"); err != nil {
+		t.Fatalf("DeleteKey failed: %v", err)
+	}
+	if cfg.Get("DATABASE", "PORT") != "" {
+		t.Errorf("Expected DATABASE.PORT to be empty after deletion, got %v", cfg.Get("DATABASE", "PORT"))
+	}
+	if cfg.Get("DATABASE", "HOST") != "127.0.0.1" {
+		t.Errorf("Expected DATABASE.HOST to be retained, got %v", cfg.Get("DATABASE", "HOST"))
+	}
+
+	// 4. DeleteKeys (multiple keys / entire section)
+	if err := cfg.DeleteKeys(map[string][]string{
+		"DATABASE": {"HOST"},
+		"APP":      {}, // empty slice deletes whole APP section
+	}); err != nil {
+		t.Fatalf("DeleteKeys failed: %v", err)
+	}
+
+	if cfg.Get("DATABASE", "HOST") != "" {
+		t.Errorf("Expected DATABASE.HOST to be deleted")
+	}
+	if cfg.Get("APP", "ENV") != "" {
+		t.Errorf("Expected APP section to be deleted")
+	}
+
+	// 5. DeleteKeysWithOCC
+	_ = cfg.SetSingle("SEC", "K", "V")
+	if err := cfg.DeleteKeysWithOCC(map[string][]string{"SEC": {"K"}}, 0); err != nil {
+		t.Fatalf("DeleteKeysWithOCC failed: %v", err)
+	}
+	if cfg.Get("SEC", "K") != "" {
+		t.Errorf("Expected SEC.K to be deleted via OCC delete")
+	}
+
+	// 6. ShareConfigWithOCC
+	if err := cfg.ShareConfigWithOCC(map[string]interface{}{
+		"SHARED_SEC": map[string]interface{}{
+			"PARAM": "VALUE",
+		},
+	}, 0); err != nil {
+		t.Fatalf("ShareConfigWithOCC failed: %v", err)
+	}
+	if cfg.Get("SHARED_SEC", "PARAM") != "VALUE" {
+		t.Errorf("Expected SHARED_SEC.PARAM=VALUE, got %v", cfg.Get("SHARED_SEC", "PARAM"))
+	}
+}

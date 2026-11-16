@@ -32,7 +32,7 @@ import (
 //   - Behavior: Remains empty (No Server connection).
 //
 // 3. Persistence / Dump:
-//   - On Missing File: Generates a FULL functional config file with defaults.
+//   - On Missing File: Fails fast (never auto-generates skeleton files).
 //   - Sync: Disabled.
 // -----------------------------------------------------------------------------
 
@@ -71,6 +71,27 @@ func (s *StandaloneStrategy) Sync(cfg *core.Config) error {
 
 func (s *StandaloneStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
 	cfg.Set(updates)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *StandaloneStrategy) SetWithOCC(cfg *core.Config, updates map[string]map[string]string, expectedVersion uint64) error {
+	cfg.Set(updates)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *StandaloneStrategy) DeleteKeys(cfg *core.Config, deletions map[string][]string) error {
+	cfg.Delete(deletions)
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *StandaloneStrategy) DeleteKeysWithOCC(cfg *core.Config, deletions map[string][]string, expectedVersion uint64) error {
+	cfg.Delete(deletions)
 	return nil
 }
 

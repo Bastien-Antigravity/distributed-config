@@ -125,3 +125,52 @@ func TestCloudStrategy_Staging(t *testing.T) {
 		}
 	})
 }
+
+// -----------------------------------------------------------------------------
+
+func TestTestStrategy(t *testing.T) {
+	tempDir := t.TempDir()
+	oldCwd, _ := os.Getwd()
+
+	t.Run("TestTestStrategy_FailsFastWhenFileMissing", func(t *testing.T) {
+		_ = os.Chdir(tempDir)
+		defer func() { _ = os.Chdir(oldCwd) }()
+
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
+		strategy := &TestStrategy{}
+
+		err := strategy.Load(cfg)
+		if err == nil {
+			t.Errorf("Expected TestStrategy Load to fail fast when test.yaml is missing")
+		}
+	})
+
+	t.Run("TestTestStrategy_SucceedsWithValidYAML", func(t *testing.T) {
+		_ = os.Chdir(tempDir)
+		defer func() { _ = os.Chdir(oldCwd) }()
+
+		testYaml := `
+common:
+  name: "test-service"
+capabilities:
+  log_server:
+    ip: "127.0.0.2"
+    port: "5000"
+  config_server:
+    ip: "127.0.0.2"
+    port: "3306"
+`
+		_ = os.WriteFile("test.yaml", []byte(testYaml), 0644)
+
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
+		strategy := &TestStrategy{}
+
+		err := strategy.Load(cfg)
+		if err != nil {
+			t.Errorf("Expected TestStrategy Load to succeed with valid test config, got: %v", err)
+		}
+		if cfg.Common.Name != "test-service" {
+			t.Errorf("Expected name 'test-service', got '%s'", cfg.Common.Name)
+		}
+	})
+}

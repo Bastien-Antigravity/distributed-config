@@ -41,3 +41,17 @@ type ConfigStrategy interface {
 	// Close shuts down the strategy and any associated resources (e.g. network client).
 	Close() error
 }
+
+// -----------------------------------------------------------------------------
+
+// ConfigStrategyOCC is an optional extension interface for strategies supporting Optimistic Concurrency Control.
+type ConfigStrategyOCC interface {
+	ConfigStrategy
+	SetWithOCC(cfg *core.Config, updates map[string]map[string]string, expectedVersion uint64) error
+	DeleteKeysWithOCC(cfg *core.Config, deletions map[string][]string, expectedVersion uint64) error
+}
+
+// ConfigStrategyDeleter is an optional extension interface for strategies supporting explicit key deletions.
+type ConfigStrategyDeleter interface {
+	DeleteKeys(cfg *core.Config, deletions map[string][]string) error
+}

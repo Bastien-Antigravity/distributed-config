@@ -52,6 +52,14 @@ func NewClient(addr string, config *core.Config) (*Client, error) {
 		quit:    make(chan struct{}),
 		backoff: NewBackoff(config),
 	}
+
+	h.SetOnGapDetected(func(expected, received uint64) {
+		config.Logger.Warning("Client: Sequence gap detected (expected %d, got %d). Triggering FullRefresh...", expected, received)
+		go func() {
+			_, _ = c.FullRefresh()
+		}()
+	})
+
 	if err := c.connect(); err != nil {
 		return nil, err
 	}
@@ -87,6 +95,7 @@ func (c *Client) connect() error {
 	}
 
 	if err := client.Open(); err != nil {
+		_ = client.Close()
 		return err
 	}
 
@@ -272,6 +281,16 @@ func (c *Client) requestSync(cmd pb.ConfigMsg_Cmd) (*core.Config, error) {
 
 // -----------------------------------------------------------------------------
 
+// GetVersion returns the last seen server configuration version.
+func (c *Client) GetVersion() uint64 {
+	if c.Handler != nil {
+		return c.Handler.GetLastSeenVersion()
+	}
+	return 0
+}
+
+// -----------------------------------------------------------------------------
+
 // UpdateConfig sends the entire current live configuration to the server.
 func (c *Client) UpdateConfig(cfg *core.Config) error {
 	return c.UpdateConfigMap(cfg.LiveConfig.Load())
@@ -295,6 +314,131 @@ func (c *Client) UpdateConfigMap(m *map[string]map[string]string) error {
 		return sock.Send(data)
 	}
 	return nil
+}
+
+// UpdateConfigMapWithOCC sends updates to the server with an expected version for Optimistic Concurrency Control.
+// Returns ErrVersionConflict if the server version does not match expectedVersion.
+func (c *Client) UpdateConfigMapWithOCC(updates interface{}, expectedVersion uint64) error {
+	var payloadMap map[string]map[string]string
+	var err error
+
+	switch v := updates.(type) {
+	case *map[string]map[string]string:
+		if v != nil {
+			payloadMap = *v
+		}
+	case map[string]map[string]string:
+		payloadMap = v
+	default:
+		payloadMap, err = core.ParseSharePayload(updates)
+		if err != nil {
+			return fmt.Errorf("invalid OCC updates payload: %w", err)
+		}
+	}
+
+	data, err := c.Handler.HandleOutgoingWithVersion(pb.ConfigMsg_PUT_SYNC, payloadMap, expectedVersion)
+	if err != nil {
+		return err
+	}
+
+	return c.sendWithUpdateAck(data)
+}
+
+// -----------------------------------------------------------------------------
+
+// DeleteKeys sends a deletion request for specific section keys to the server.
+func (c *Client) DeleteKeys(deletions map[string][]string) error {
+	if len(deletions) == 0 {
+		return nil
+	}
+	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_DELETE_SYNC, deletions)
+	if err != nil {
+		return err
+	}
+
+	c.mu.RLock()
+	sock := c.sock
+	c.mu.RUnlock()
+
+	if sock != nil {
+		return sock.Send(data)
+	}
+	return nil
+}
+
+// DeleteKeysWithOCC sends a deletion request with expected version for OCC validation.
+// Returns ErrVersionConflict if the server version does not match expectedVersion.
+func (c *Client) DeleteKeysWithOCC(deletions map[string][]string, expectedVersion uint64) error {
+	if len(deletions) == 0 {
+		return nil
+	}
+	data, err := c.Handler.HandleOutgoingWithVersion(pb.ConfigMsg_DELETE_SYNC, deletions, expectedVersion)
+	if err != nil {
+		return err
+	}
+
+	return c.sendWithUpdateAck(data)
+}
+
+// sendWithUpdateAck transmits a payload and waits for the server ACK or ERROR response.
+func (c *Client) sendWithUpdateAck(data []byte) error {
+	c.mu.RLock()
+	sock := c.sock
+	watching := c.watching
+	c.mu.RUnlock()
+
+	if sock == nil {
+		c.Handler.parentConfig.Logger.Info("Mock: sendWithUpdateAck simulated")
+		return nil
+	}
+
+	c.syncMu.Lock()
+	defer c.syncMu.Unlock()
+
+	if watching {
+		resChan := make(chan error, 1)
+		c.Handler.SetOnUpdateResult(func(ver uint64, err error) {
+			select {
+			case resChan <- err:
+			default:
+			}
+		})
+		defer c.Handler.SetOnUpdateResult(nil)
+
+		if err := sock.Send(data); err != nil {
+			return err
+		}
+
+		select {
+		case err := <-resChan:
+			return err
+		case <-time.After(5 * time.Second):
+			return fmt.Errorf("timeout waiting for server response from %s", c.addr)
+		case <-c.quit:
+			return fmt.Errorf("client closed during update")
+		}
+	} else {
+		resReceived := false
+		var resErr error
+		c.Handler.SetOnUpdateResult(func(ver uint64, err error) {
+			resReceived = true
+			resErr = err
+		})
+		defer c.Handler.SetOnUpdateResult(nil)
+
+		if err := sock.Send(data); err != nil {
+			return err
+		}
+
+		for !resReceived {
+			respData, err := sock.Receive()
+			if err != nil {
+				return err
+			}
+			_ = c.Handler.HandleIncoming(respData)
+		}
+		return resErr
+	}
 }
 
 // IsConnected returns true if the client is currently connected.

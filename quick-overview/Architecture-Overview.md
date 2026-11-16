@@ -34,6 +34,18 @@ To ensure 100% lock-free reads, the core configuration uses an Atomic Pointer Sw
 -   **Implementation**: `src/core/config.go` uses `atomic.Pointer[LiveConfig]`.
 -   **Benefit**: High-concurrency applications can read configuration without any lock contention, even during background updates.
 
+### Optimistic Concurrency Control (OCC)
+For sensitive read-modify-write workflows:
+-   **Per-Request Opt-in**: Call `cfg.SetWithOCC(updates, expectedVersion)` or `client.UpdateConfigMapWithOCC()`.
+-   **Conflict Handling**: Returns `ErrVersionConflict` if the server's monotonic version evolved.
+-   **Version Discovery**: `cfg.GetVersion()` exposes the current known server revision.
+
+### Clean Deletion & Convergence
+Deletions are first-class operations:
+-   **API**: `cfg.DeleteKey(section, key)`, `cfg.DeleteKeys(deletions)`, and `cfg.DeleteKeysWithOCC(deletions, expectedVersion)`.
+-   **Sentinel Support**: Delta maps containing `"__DELETED__"` sentinel are cleaned up in `PreviewSet`.
+-   **Convergence**: `DELETE_SYNC` triggers an elevated `FULL_REFRESH` from `config-server`, swapping the client's in-memory pointer to purge keys completely without tombstones.
+
 ## Major Components
 
 ### Facade (`src/facade`)
@@ -44,9 +56,10 @@ Provides a resilient client built on **safe-socket v0.0.1**. It handles:
 -   **Stability**: Uses a 30s deadline to prevent connection loops on local interfaces.
 -   **Watch**: Persistent connection for hot-reloads.
 -   **Resilience**: Automatic reconnection with jittered exponential backoff.
+-   **Sequence Gap Self-Healing**: Tracks `lastSeenVersion uint64`. If a sequence gap is detected (`received > lastSeen + 1`), it automatically triggers an out-of-band `FullRefresh()` to guarantee parity.
 
 ### Security (`src/secret`)
-Integrates RSA decryption. Values prefixed with `ENC(...)` are automatically decrypted at runtime if a valid private key is provided.
+Integrates RSA decryption. Values prefixed with `ENC(...)` remain ciphertext at load time and are decrypted on-demand via `Decrypt()` / `DecryptSecret()` when an authorized private key is present.
 
 ## Polyglot Support (FFI Bridge)
 The project exports its Go-based logic to other languages through a C-compatible ABI.

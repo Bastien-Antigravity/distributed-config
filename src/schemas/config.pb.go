@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.34.1
-// source: src/schemas/config.proto
+// source: config.proto
 
 package schemas
 
@@ -31,6 +31,7 @@ const (
 	ConfigMsg_ERROR              ConfigMsg_Cmd = 4
 	ConfigMsg_BROADCAST_REGISTRY ConfigMsg_Cmd = 5
 	ConfigMsg_FULL_REFRESH       ConfigMsg_Cmd = 6
+	ConfigMsg_DELETE_SYNC        ConfigMsg_Cmd = 7
 )
 
 // Enum value maps for ConfigMsg_Cmd.
@@ -43,6 +44,7 @@ var (
 		4: "ERROR",
 		5: "BROADCAST_REGISTRY",
 		6: "FULL_REFRESH",
+		7: "DELETE_SYNC",
 	}
 	ConfigMsg_Cmd_value = map[string]int32{
 		"GET_SYNC":           0,
@@ -52,6 +54,7 @@ var (
 		"ERROR":              4,
 		"BROADCAST_REGISTRY": 5,
 		"FULL_REFRESH":       6,
+		"DELETE_SYNC":        7,
 	}
 )
 
@@ -66,11 +69,11 @@ func (x ConfigMsg_Cmd) String() string {
 }
 
 func (ConfigMsg_Cmd) Descriptor() protoreflect.EnumDescriptor {
-	return file_src_schemas_config_proto_enumTypes[0].Descriptor()
+	return file_config_proto_enumTypes[0].Descriptor()
 }
 
 func (ConfigMsg_Cmd) Type() protoreflect.EnumType {
-	return &file_src_schemas_config_proto_enumTypes[0]
+	return &file_config_proto_enumTypes[0]
 }
 
 func (x ConfigMsg_Cmd) Number() protoreflect.EnumNumber {
@@ -79,7 +82,7 @@ func (x ConfigMsg_Cmd) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ConfigMsg_Cmd.Descriptor instead.
 func (ConfigMsg_Cmd) EnumDescriptor() ([]byte, []int) {
-	return file_src_schemas_config_proto_rawDescGZIP(), []int{0, 0}
+	return file_config_proto_rawDescGZIP(), []int{0, 0}
 }
 
 type ConfigMsg struct {
@@ -96,7 +99,7 @@ type ConfigMsg struct {
 
 func (x *ConfigMsg) Reset() {
 	*x = ConfigMsg{}
-	mi := &file_src_schemas_config_proto_msgTypes[0]
+	mi := &file_config_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -108,7 +111,7 @@ func (x *ConfigMsg) String() string {
 func (*ConfigMsg) ProtoMessage() {}
 
 func (x *ConfigMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_src_schemas_config_proto_msgTypes[0]
+	mi := &file_config_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -121,7 +124,7 @@ func (x *ConfigMsg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigMsg.ProtoReflect.Descriptor instead.
 func (*ConfigMsg) Descriptor() ([]byte, []int) {
-	return file_src_schemas_config_proto_rawDescGZIP(), []int{0}
+	return file_config_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ConfigMsg) GetCommand() ConfigMsg_Cmd {
@@ -145,15 +148,15 @@ func (x *ConfigMsg) GetVersion() int32 {
 	return 0
 }
 
-var File_src_schemas_config_proto protoreflect.FileDescriptor
+var File_config_proto protoreflect.FileDescriptor
 
-const file_src_schemas_config_proto_rawDesc = "" +
+const file_config_proto_rawDesc = "" +
 	"\n" +
-	"\x18src/schemas/config.proto\x12\x06config\"\xe5\x01\n" +
+	"\fconfig.proto\x12\x06config\"\xf7\x01\n" +
 	"\tConfigMsg\x12/\n" +
 	"\aCommand\x18\x01 \x01(\x0e2\x15.config.ConfigMsg.CmdR\aCommand\x12\x18\n" +
 	"\aPayload\x18\x02 \x01(\fR\aPayload\x12\x18\n" +
-	"\aVersion\x18\x03 \x01(\x05R\aVersion\"s\n" +
+	"\aVersion\x18\x03 \x01(\x05R\aVersion\"\x84\x01\n" +
 	"\x03Cmd\x12\f\n" +
 	"\bGET_SYNC\x10\x00\x12\f\n" +
 	"\bPUT_SYNC\x10\x01\x12\x12\n" +
@@ -161,27 +164,28 @@ const file_src_schemas_config_proto_rawDesc = "" +
 	"\x03ACK\x10\x03\x12\t\n" +
 	"\x05ERROR\x10\x04\x12\x16\n" +
 	"\x12BROADCAST_REGISTRY\x10\x05\x12\x10\n" +
-	"\fFULL_REFRESH\x10\x06B?Z=github.com/Bastien-Antigravity/distributed-config/src/schemasb\x06proto3"
+	"\fFULL_REFRESH\x10\x06\x12\x0f\n" +
+	"\vDELETE_SYNC\x10\aB?Z=github.com/Bastien-Antigravity/distributed-config/src/schemasb\x06proto3"
 
 var (
-	file_src_schemas_config_proto_rawDescOnce sync.Once
-	file_src_schemas_config_proto_rawDescData []byte
+	file_config_proto_rawDescOnce sync.Once
+	file_config_proto_rawDescData []byte
 )
 
-func file_src_schemas_config_proto_rawDescGZIP() []byte {
-	file_src_schemas_config_proto_rawDescOnce.Do(func() {
-		file_src_schemas_config_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_src_schemas_config_proto_rawDesc), len(file_src_schemas_config_proto_rawDesc)))
+func file_config_proto_rawDescGZIP() []byte {
+	file_config_proto_rawDescOnce.Do(func() {
+		file_config_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_config_proto_rawDesc), len(file_config_proto_rawDesc)))
 	})
-	return file_src_schemas_config_proto_rawDescData
+	return file_config_proto_rawDescData
 }
 
-var file_src_schemas_config_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_src_schemas_config_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_src_schemas_config_proto_goTypes = []any{
+var file_config_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_config_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_config_proto_goTypes = []any{
 	(ConfigMsg_Cmd)(0), // 0: config.ConfigMsg.Cmd
 	(*ConfigMsg)(nil),  // 1: config.ConfigMsg
 }
-var file_src_schemas_config_proto_depIdxs = []int32{
+var file_config_proto_depIdxs = []int32{
 	0, // 0: config.ConfigMsg.Command:type_name -> config.ConfigMsg.Cmd
 	1, // [1:1] is the sub-list for method output_type
 	1, // [1:1] is the sub-list for method input_type
@@ -190,27 +194,27 @@ var file_src_schemas_config_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_src_schemas_config_proto_init() }
-func file_src_schemas_config_proto_init() {
-	if File_src_schemas_config_proto != nil {
+func init() { file_config_proto_init() }
+func file_config_proto_init() {
+	if File_config_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_src_schemas_config_proto_rawDesc), len(file_src_schemas_config_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_config_proto_rawDesc), len(file_config_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   1,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_src_schemas_config_proto_goTypes,
-		DependencyIndexes: file_src_schemas_config_proto_depIdxs,
-		EnumInfos:         file_src_schemas_config_proto_enumTypes,
-		MessageInfos:      file_src_schemas_config_proto_msgTypes,
+		GoTypes:           file_config_proto_goTypes,
+		DependencyIndexes: file_config_proto_depIdxs,
+		EnumInfos:         file_config_proto_enumTypes,
+		MessageInfos:      file_config_proto_msgTypes,
 	}.Build()
-	File_src_schemas_config_proto = out.File
-	file_src_schemas_config_proto_goTypes = nil
-	file_src_schemas_config_proto_depIdxs = nil
+	File_config_proto = out.File
+	file_config_proto_goTypes = nil
+	file_config_proto_depIdxs = nil
 }

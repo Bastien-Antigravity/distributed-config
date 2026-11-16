@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
@@ -26,6 +27,11 @@ import (
 
 	"google.golang.org/protobuf/proto"
 )
+
+// -----------------------------------------------------------------------------
+
+// ErrVersionConflict is returned when an OCC update or delete fails due to a version mismatch.
+var ErrVersionConflict = errors.New("concurrent modification detected (version mismatch)")
 
 // -----------------------------------------------------------------------------
 
@@ -37,6 +43,9 @@ type ConfigProtoHandler struct {
 	onLiveConfUpdate func(map[string]map[string]string)
 	onRegistryUpdate func(map[string][]string)
 	onSyncReceived   func()
+	onUpdateResult   func(newVersion uint64, err error)
+	onGapDetected    func(expected, received uint64)
+	lastSeenVersion  uint64
 	mu               sync.RWMutex
 }
 
@@ -73,10 +82,35 @@ func (h *ConfigProtoHandler) SetOnSyncReceived(cb func()) {
 	h.onSyncReceived = cb
 }
 
+func (h *ConfigProtoHandler) SetOnGapDetected(cb func(expected, received uint64)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.onGapDetected = cb
+}
+
+func (h *ConfigProtoHandler) SetOnUpdateResult(cb func(newVersion uint64, err error)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.onUpdateResult = cb
+}
+
+func (h *ConfigProtoHandler) GetLastSeenVersion() uint64 {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.lastSeenVersion
+}
+
 // HandleOutgoing implements generic outgoing message creation
 // -----------------------------------------------------------------------------
 
 func (h *ConfigProtoHandler) HandleOutgoing(cmd pb.ConfigMsg_Cmd, payload interface{}) ([]byte, error) {
+	return h.HandleOutgoingWithVersion(cmd, payload, 0)
+}
+
+// HandleOutgoingWithVersion builds outgoing message with an explicit version for OCC
+// -----------------------------------------------------------------------------
+
+func (h *ConfigProtoHandler) HandleOutgoingWithVersion(cmd pb.ConfigMsg_Cmd, payload interface{}, version uint64) ([]byte, error) {
 	var payloadBytes []byte
 	var err error
 
@@ -96,6 +130,7 @@ func (h *ConfigProtoHandler) HandleOutgoing(cmd pb.ConfigMsg_Cmd, payload interf
 	msg := &pb.ConfigMsg{
 		Command: cmd,
 		Payload: payloadBytes,
+		Version: int32(version),
 	}
 	return proto.Marshal(msg)
 }
@@ -115,6 +150,25 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 		if err := json.Unmarshal(msg.Payload, &parsed); err != nil {
 			return fmt.Errorf("failed to decode JSON payload: %w", err)
 		}
+
+		// Sequence gap detection
+		if msg.Version > 0 {
+			h.mu.Lock()
+			if h.lastSeenVersion > 0 && uint64(msg.Version) > h.lastSeenVersion+1 {
+				gapCb := h.onGapDetected
+				expected := h.lastSeenVersion + 1
+				received := uint64(msg.Version)
+				h.lastSeenVersion = received
+				h.mu.Unlock()
+				if gapCb != nil {
+					gapCb(expected, received)
+				}
+			} else {
+				h.lastSeenVersion = uint64(msg.Version)
+				h.mu.Unlock()
+			}
+		}
+
 		// Use Set() for merging (Delta Update)
 		h.parentConfig.Set(parsed)
 		h.mu.RLock()
@@ -137,12 +191,27 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 		}
 
 	case pb.ConfigMsg_ACK:
-		// No-op
+		if msg.Version > 0 {
+			h.mu.Lock()
+			h.lastSeenVersion = uint64(msg.Version)
+			h.mu.Unlock()
+		}
+		h.mu.RLock()
+		updateCb := h.onUpdateResult
+		h.mu.RUnlock()
+		if updateCb != nil {
+			updateCb(uint64(msg.Version), nil)
+		}
 
 	case pb.ConfigMsg_GET_SYNC, pb.ConfigMsg_FULL_REFRESH: // Added direct sync support
 		var parsed map[string]map[string]string
 		if err := json.Unmarshal(msg.Payload, &parsed); err != nil {
 			return fmt.Errorf("failed to decode GET_SYNC/FULL_REFRESH JSON payload: %w", err)
+		}
+		if msg.Version > 0 {
+			h.mu.Lock()
+			h.lastSeenVersion = uint64(msg.Version)
+			h.mu.Unlock()
 		}
 		h.updateLiveConfig(parsed)
 		h.mu.RLock()
@@ -153,7 +222,25 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 		}
 
 	case pb.ConfigMsg_ERROR:
-		return errors.New("server reported an error: " + string(msg.Payload))
+		msgStr := string(msg.Payload)
+		var err error
+		if strings.Contains(strings.ToLower(msgStr), "version mismatch") {
+			err = fmt.Errorf("%w: %s", ErrVersionConflict, msgStr)
+		} else {
+			err = errors.New("server reported an error: " + msgStr)
+		}
+		if msg.Version > 0 {
+			h.mu.Lock()
+			h.lastSeenVersion = uint64(msg.Version)
+			h.mu.Unlock()
+		}
+		h.mu.RLock()
+		updateCb := h.onUpdateResult
+		h.mu.RUnlock()
+		if updateCb != nil {
+			updateCb(uint64(msg.Version), err)
+		}
+		return err
 
 	default:
 		return fmt.Errorf("unknown server response command: %v", msg.Command)

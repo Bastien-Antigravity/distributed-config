@@ -17,7 +17,6 @@ package loader
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -29,30 +28,6 @@ import (
 
 // Regex for environment variable expansion: ${VAR} or ${VAR:default}
 var envRegex = regexp.MustCompile(`\$\{([^}]+)\}`)
-
-// -----------------------------------------------------------------------------
-
-// EnsureFileExists checks if a file exists. If it doesn't, it creates it using the provided payload.
-func EnsureFileExists(filePath string, payload interface{}) error {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		configDir := filepath.Dir(filePath)
-		if _, err := os.Stat(configDir); os.IsNotExist(err) {
-			if err := os.MkdirAll(configDir, 0755); err != nil {
-				return fmt.Errorf("failed to create config directory: %w", err)
-			}
-		}
-
-		data, err := yaml.Marshal(payload)
-		if err != nil {
-			return fmt.Errorf("failed to marshal default config: %w", err)
-		}
-
-		if err := os.WriteFile(filePath, data, 0644); err != nil {
-			return fmt.Errorf("failed to write config file: %w", err)
-		}
-	}
-	return nil
-}
 
 // -----------------------------------------------------------------------------
 

@@ -134,7 +134,9 @@ func TestBridge_LiveCapabilityUpdate(t *testing.T) {
 		}
 
 		// Inject a LiveConfig update modifying port to 9999
-		Set(handle, "config_server", "port", "9999")
+		if err := Set(handle, "config_server", "port", "9999"); err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
 
 		// Query capability again
 		updatedCap, err := GetCapability(handle, "config_server")

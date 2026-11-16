@@ -25,8 +25,7 @@ A robust, strategy-based configuration management library for distributed system
 The library uses a layered approach to build the final configuration:
 
 1.  **Code Defaults**: The application initializes with a hardcoded set of "safe" defaults (defined in `src/core/defaults.go`). This ensures the application can always start, even without a config file.
-2.  **Auto-Skeleton Generation**: If the target configuration file (e.g., `standalone.yaml`) is missing, the library **automatically recreates it** using the internal master template. This ensures a functional "Zero-Config" bootstrap out of the box.
-3.  **Configuration Discovery**: The library automatically searches for a YAML file with strict priority:
+2.  **Configuration Discovery (Fail-Fast)**: The library automatically searches for a YAML configuration file with strict priority and fails fast if the required configuration file is missing:
     *   **Priority 0 — Explicit Environment Overrides (Highest Precedence)**:
         *   `CONFIG_PATH`: Directly specifies the absolute or relative path to the YAML configuration file (e.g., `docker-deployment/modes/local/config/native.yaml`).
         *   `SHARED_CONFIG_PATH`: Alternative environment override pointing to the configuration file or root directory.

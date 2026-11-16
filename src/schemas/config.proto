@@ -13,6 +13,7 @@ message ConfigMsg {
         ERROR = 4;
         BROADCAST_REGISTRY = 5;
         FULL_REFRESH = 6;
+        DELETE_SYNC = 7;
     }
     
     Cmd Command = 1;

@@ -94,6 +94,14 @@ func NewConfig(profile string) *Config {
 // Callbacks & Helpers
 // -----------------------------------------------------------------------------
 
+// GetVersion returns the last seen server configuration version.
+func (config *Config) GetVersion() uint64 {
+	if config.handler != nil {
+		return config.handler.GetLastSeenVersion()
+	}
+	return 0
+}
+
 func (config *Config) OnLiveConfUpdate(onLiveConfUpdateFn func(map[string]map[string]string)) {
 	config.ParentOnLiveConfUpdate = onLiveConfUpdateFn
 	if config.handler != nil {
@@ -142,6 +150,92 @@ func (config *Config) SetSingle(section, key, value string) error {
 	})
 }
 
+// -----------------------------------------------------------------------------
+
+// SetWithOCC updates configuration with optimistic concurrency control.
+// Returns ErrVersionConflict if expectedVersion does not match server version.
+func (config *Config) SetWithOCC(updates map[string]map[string]string, expectedVersion uint64) error {
+	if config.strategy != nil {
+		if occStrat, ok := config.strategy.(interfaces.ConfigStrategyOCC); ok {
+			if err := occStrat.SetWithOCC(config.Config, updates, expectedVersion); err != nil {
+				config.Logger.Error("Strategy.SetWithOCC failed: %v", err)
+				return err
+			}
+			name := config.strategy.Name()
+			if name == "production" || name == "test" {
+				return nil
+			}
+		} else {
+			return config.Set(updates)
+		}
+	} else {
+		config.Config.Set(updates)
+	}
+
+	if config.ParentOnLiveConfUpdate != nil {
+		config.ParentOnLiveConfUpdate(*config.LiveConfig.Load())
+	}
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// DeleteKeys removes specified section keys from live configuration and syncs to server.
+func (config *Config) DeleteKeys(deletions map[string][]string) error {
+	if config.strategy != nil {
+		if delStrat, ok := config.strategy.(interfaces.ConfigStrategyDeleter); ok {
+			if err := delStrat.DeleteKeys(config.Config, deletions); err != nil {
+				config.Logger.Error("Strategy.DeleteKeys failed: %v", err)
+				return err
+			}
+			name := config.strategy.Name()
+			if name == "production" || name == "test" {
+				return nil
+			}
+		}
+	}
+	config.Config.Delete(deletions)
+	if config.ParentOnLiveConfUpdate != nil {
+		config.ParentOnLiveConfUpdate(*config.LiveConfig.Load())
+	}
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// DeleteKeysWithOCC removes specified section keys with OCC validation.
+// Returns ErrVersionConflict if expectedVersion does not match server version.
+func (config *Config) DeleteKeysWithOCC(deletions map[string][]string, expectedVersion uint64) error {
+	if config.strategy != nil {
+		if occStrat, ok := config.strategy.(interfaces.ConfigStrategyOCC); ok {
+			if err := occStrat.DeleteKeysWithOCC(config.Config, deletions, expectedVersion); err != nil {
+				config.Logger.Error("Strategy.DeleteKeysWithOCC failed: %v", err)
+				return err
+			}
+			name := config.strategy.Name()
+			if name == "production" || name == "test" {
+				return nil
+			}
+		} else {
+			return config.DeleteKeys(deletions)
+		}
+	}
+	config.Config.Delete(deletions)
+	if config.ParentOnLiveConfUpdate != nil {
+		config.ParentOnLiveConfUpdate(*config.LiveConfig.Load())
+	}
+	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// DeleteKey removes a single key from a section.
+func (config *Config) DeleteKey(section, key string) error {
+	return config.DeleteKeys(map[string][]string{
+		section: {key},
+	})
+}
+
 // Sync manually triggers a refresh from the underlying strategy (e.g. Config Server).
 // -----------------------------------------------------------------------------
 func (config *Config) Sync() error {
@@ -185,6 +279,17 @@ func (config *Config) ShareConfig(payload interface{}) error {
 		return err
 	}
 	return config.Set(updates)
+}
+
+// -----------------------------------------------------------------------------
+
+// ShareConfigWithOCC converts payload and updates configuration with optimistic concurrency control.
+func (config *Config) ShareConfigWithOCC(payload interface{}, expectedVersion uint64) error {
+	updates, err := core.ParseSharePayload(payload)
+	if err != nil {
+		return err
+	}
+	return config.SetWithOCC(updates, expectedVersion)
 }
 
 // ApplyFileOverride loads a YAML file, expands environment variables, and merges standard

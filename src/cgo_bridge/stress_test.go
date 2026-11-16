@@ -37,12 +37,8 @@ func TestCGOBridge_StressRace(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
-				// 1. Create a new handle
-				profile := "standalone"
-				if j%2 == 0 {
-					profile = "test"
-				}
-				handle := New(profile)
+				// 1. Create a new handle using standalone to test handle lifecycle without network noise
+				handle := New("standalone")
 				if handle == 0 {
 					continue
 				}
