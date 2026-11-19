@@ -1,4 +1,5 @@
-VERSION := $(shell cat VERSION.txt 2>/dev/null || echo "0.0.1")
+VERSION := $(strip $(shell cat VERSION.txt))
+$(if $(VERSION),,$(error VERSION.txt is missing or empty))
 
 .PHONY: all build build-lib core test version clean
 
@@ -10,18 +11,22 @@ version:
 build-lib core:
 	@echo "Building CGO shared library libdistconf (version $(VERSION))..."
 	@mkdir -p distconf/libdistconf
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		go build -buildmode=c-shared -o distconf/libdistconf/libdistconf.dylib ./cmd/libdistconf || true; \
-		install_name_tool -id @rpath/libdistconf.dylib distconf/libdistconf/libdistconf.dylib 2>/dev/null || true; \
-	else \
-		go build -buildmode=c-shared -o distconf/libdistconf/libdistconf.so ./cmd/libdistconf || true; \
-	fi
+	@OS=$$(uname -s); \
+	case "$$OS" in \
+		Darwin) \
+			go build -buildmode=c-shared -o distconf/libdistconf/libdistconf.dylib ./cmd/libdistconf; \
+			install_name_tool -id @rpath/libdistconf.dylib distconf/libdistconf/libdistconf.dylib 2>/dev/null || true ;; \
+		MINGW*|MSYS*|CYGWIN*|Windows_NT) \
+			go build -buildmode=c-shared -o distconf/libdistconf/libdistconf.dll ./cmd/libdistconf ;; \
+		*) \
+			go build -buildmode=c-shared -o distconf/libdistconf/libdistconf.so ./cmd/libdistconf ;; \
+	esac
 
 build: build-lib
 	@echo "Building repository (version $(VERSION))..."
-	@if [ -f "go.mod" ]; then go build ./... || true; fi
-	@if [ -f "Cargo.toml" ]; then cargo build --release || true; fi
-	@if [ -f "setup.py" ] || [ -f "pyproject.toml" ]; then python3 -m build || true; fi
+	@if [ -f "go.mod" ]; then go build ./...; fi
+	@if [ -f "Cargo.toml" ]; then cargo build --release; fi
+	@if [ -f "setup.py" ] || [ -f "pyproject.toml" ]; then python3 -m build; fi
 
 test:
 	@echo "Running tests (version $(VERSION))..."
