@@ -351,6 +351,266 @@ capabilities:
 
 // -----------------------------------------------------------------------------
 
+func TestSyncCapabilitiesToLiveConfig_SkipsWildcardBindIPs(t *testing.T) {
+	cfg := &core.Config{
+		Logger: &strategyTestLogger{t: t},
+		Capabilities: map[string]interface{}{
+			"notif_server": map[string]interface{}{
+				"ip":        "0.0.0.0",
+				"grpc_ip":   "::",
+				"rest_ip":   " 0.0.0.0 ",
+				"port":      1027,
+				"grpc_port": 1028,
+			},
+			"log_server": map[string]string{
+				"ip":      " :: ",
+				"grpc_ip": "0.0.0.0",
+				"rest_ip": "127.0.0.2",
+				"port":    "9020",
+			},
+			"peer_service": map[string]interface{}{
+				"ip":   "notif-server",
+				"port": "5005",
+			},
+		},
+	}
+	// Pre-seed peer-routable DNS addresses as if fetched from config-server.
+	cfg.Set(map[string]map[string]string{
+		"notif_server": {
+			"ip":      "notif-server",
+			"grpc_ip": "notif-server",
+			"rest_ip": "notif-server",
+		},
+		"log_server": {
+			"ip":      "log-server",
+			"grpc_ip": "log-server",
+		},
+	})
+
+	syncCapabilitiesToLiveConfig(cfg)
+
+	if got := cfg.Get("notif_server", "ip"); got != "notif-server" {
+		t.Fatalf("expected notif_server ip to remain 'notif-server', got %q", got)
+	}
+	if got := cfg.Get("notif_server", "grpc_ip"); got != "notif-server" {
+		t.Fatalf("expected notif_server grpc_ip to remain 'notif-server', got %q", got)
+	}
+	if got := cfg.Get("notif_server", "rest_ip"); got != "notif-server" {
+		t.Fatalf("expected notif_server rest_ip to remain 'notif-server', got %q", got)
+	}
+	if got := cfg.Get("notif_server", "port"); got != "1027" {
+		t.Fatalf("expected notif_server port '1027' to be synced, got %q", got)
+	}
+	if got := cfg.Get("notif_server", "grpc_port"); got != "1028" {
+		t.Fatalf("expected notif_server grpc_port '1028' to be synced, got %q", got)
+	}
+
+	if got := cfg.Get("log_server", "ip"); got != "log-server" {
+		t.Fatalf("expected log_server ip to remain 'log-server', got %q", got)
+	}
+	if got := cfg.Get("log_server", "grpc_ip"); got != "log-server" {
+		t.Fatalf("expected log_server grpc_ip to remain 'log-server', got %q", got)
+	}
+	if got := cfg.Get("log_server", "rest_ip"); got != "127.0.0.2" {
+		t.Fatalf("expected non-wildcard log_server rest_ip '127.0.0.2' to be synced, got %q", got)
+	}
+	if got := cfg.Get("log_server", "port"); got != "9020" {
+		t.Fatalf("expected log_server port '9020' to be synced, got %q", got)
+	}
+
+	if got := cfg.Get("peer_service", "ip"); got != "notif-server" {
+		t.Fatalf("expected peer_service ip 'notif-server' to be synced, got %q", got)
+	}
+	if got := cfg.Get("peer_service", "port"); got != "5005" {
+		t.Fatalf("expected peer_service port '5005' to be synced, got %q", got)
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+func TestCloudStrategy_SkipsWildcardBindIPsOnLoadAndSync(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to allocate ephemeral port: %v", err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	serverSock, err := safesocket.CreateWithConfig("tcp-hello", addr, safesocket.SocketConfig{
+		Deadline: 5 * time.Second,
+	}, "server", false)
+	if err != nil {
+		t.Fatalf("failed to create mock config-server socket: %v", err)
+	}
+	defer func() { _ = serverSock.Close() }()
+
+	putSyncCh := make(chan map[string]map[string]string, 1)
+	serverErrCh := make(chan error, 1)
+	serverReady := make(chan struct{})
+	go func() {
+		if err := serverSock.Listen(); err != nil {
+			serverErrCh <- fmt.Errorf("mock server Listen error: %w", err)
+			return
+		}
+		close(serverReady)
+
+		conn, err := serverSock.Accept()
+		if err != nil {
+			serverErrCh <- fmt.Errorf("mock server Accept error: %w", err)
+			return
+		}
+		defer func() { _ = conn.Close() }()
+
+		reqData, err := conn.ReadMessage()
+		if err != nil {
+			serverErrCh <- fmt.Errorf("mock server ReadMessage GET_SYNC error: %w", err)
+			return
+		}
+		reqMsg := &pb.ConfigMsg{}
+		if err := proto.Unmarshal(reqData, reqMsg); err != nil {
+			serverErrCh <- fmt.Errorf("mock server Unmarshal GET_SYNC error: %w", err)
+			return
+		}
+		if reqMsg.Command != pb.ConfigMsg_GET_SYNC {
+			serverErrCh <- fmt.Errorf("expected client GET_SYNC command, got %v", reqMsg.Command)
+			return
+		}
+
+		serverState := map[string]map[string]string{
+			"notif_server": {"ip": "notif-server", "grpc_ip": "notif-server", "port": "1027"},
+			"log_server":   {"ip": "log-server", "rest_ip": "log-server", "port": "9020"},
+		}
+		payload, _ := json.Marshal(serverState)
+		resp, _ := proto.Marshal(&pb.ConfigMsg{
+			Command: pb.ConfigMsg_GET_SYNC,
+			Payload: payload,
+			Version: 1,
+		})
+		if _, err := conn.Write(resp); err != nil {
+			serverErrCh <- fmt.Errorf("mock server Write GET_SYNC resp error: %w", err)
+			return
+		}
+
+		for {
+			data, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			msg := &pb.ConfigMsg{}
+			if err := proto.Unmarshal(data, msg); err != nil {
+				return
+			}
+			if msg.Command == pb.ConfigMsg_PUT_SYNC {
+				var pushed map[string]map[string]string
+				if err := json.Unmarshal(msg.Payload, &pushed); err == nil {
+					putSyncCh <- pushed
+				}
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-serverReady:
+	case err := <-serverErrCh:
+		t.Fatalf("mock config-server error: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("mock config-server failed to listen in time")
+	}
+
+	tempDir := t.TempDir()
+	oldCwd, _ := os.Getwd()
+	_ = os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(oldCwd) }()
+
+	t.Setenv("DOCKER_ENV", "true")
+	prodYaml := fmt.Sprintf(`
+common:
+  name: "cloud-wildcard-test"
+capabilities:
+  config_server:
+    ip: "127.0.0.1"
+    port: "%d"
+  notif_server:
+    ip: "0.0.0.0"
+    grpc_ip: "::"
+    rest_ip: "0.0.0.0"
+    port: 1027
+  log_server:
+    ip: "127.0.0.2"
+    rest_ip: "::"
+    port: 9021
+  web_interface:
+    ip: "0.0.0.0"
+    port: 8080
+`, port)
+	_ = os.WriteFile("production.yaml", []byte(prodYaml), 0644)
+	t.Setenv("CONFIG_PATH", "production.yaml")
+
+	cfg := &core.Config{Logger: &strategyTestLogger{t: t}}
+	strategy := &CloudStrategy{Profile: "production", ReadOnly: false}
+	defer func() { _ = strategy.Close() }()
+
+	if err := strategy.Load(cfg); err != nil {
+		t.Fatalf("CloudStrategy.Load failed: %v", err)
+	}
+
+	if got := cfg.Get("notif_server", "ip"); got != "notif-server" {
+		t.Fatalf("expected notif_server ip 'notif-server' preserved in LiveConfig, got %q", got)
+	}
+	if got := cfg.Get("notif_server", "grpc_ip"); got != "notif-server" {
+		t.Fatalf("expected notif_server grpc_ip 'notif-server' preserved in LiveConfig, got %q", got)
+	}
+	if got := cfg.Get("notif_server", "rest_ip"); got != "" {
+		t.Fatalf("expected notif_server wildcard rest_ip not synced into LiveConfig, got %q", got)
+	}
+	if got := cfg.Get("log_server", "ip"); got != "127.0.0.2" {
+		t.Fatalf("expected non-wildcard log_server ip '127.0.0.2' synced, got %q", got)
+	}
+	if got := cfg.Get("log_server", "port"); got != "9021" {
+		t.Fatalf("expected log_server port '9021' synced, got %q", got)
+	}
+	if got := cfg.Get("web_interface", "ip"); got != "" {
+		t.Fatalf("expected wildcard web_interface ip not synced into LiveConfig, got %q", got)
+	}
+	if got := cfg.Get("web_interface", "port"); got != "8080" {
+		t.Fatalf("expected web_interface port '8080' synced into LiveConfig, got %q", got)
+	}
+
+	if err := strategy.Sync(cfg); err != nil {
+		t.Fatalf("CloudStrategy.Sync failed: %v", err)
+	}
+
+	select {
+	case pushed := <-putSyncCh:
+		if pushed["notif_server"]["ip"] != "notif-server" || pushed["notif_server"]["grpc_ip"] != "notif-server" {
+			t.Fatalf("expected PUT_SYNC to keep peer-routable notif_server addresses, got %+v", pushed["notif_server"])
+		}
+		if _, hasRestIP := pushed["notif_server"]["rest_ip"]; hasRestIP {
+			t.Fatalf("expected PUT_SYNC not to contain wildcard notif_server rest_ip, got %+v", pushed["notif_server"])
+		}
+		if pushed["log_server"]["ip"] != "127.0.0.2" || pushed["log_server"]["port"] != "9021" {
+			t.Fatalf("expected PUT_SYNC to contain non-wildcard log_server overrides, got %+v", pushed["log_server"])
+		}
+		if pushed["log_server"]["rest_ip"] != "log-server" {
+			t.Fatalf("expected PUT_SYNC to preserve log_server rest_ip 'log-server', got %+v", pushed["log_server"])
+		}
+		if _, hasWebIP := pushed["web_interface"]["ip"]; hasWebIP {
+			t.Fatalf("expected PUT_SYNC not to contain wildcard web_interface ip, got %+v", pushed["web_interface"])
+		}
+		if pushed["web_interface"]["port"] != "8080" {
+			t.Fatalf("expected PUT_SYNC to contain web_interface port '8080', got %+v", pushed["web_interface"])
+		}
+	case err := <-serverErrCh:
+		t.Fatalf("mock config-server error: %v", err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for PUT_SYNC from CloudStrategy.Sync")
+	}
+}
+
+// -----------------------------------------------------------------------------
+
 type strategyTestLogger struct {
 	t *testing.T
 }

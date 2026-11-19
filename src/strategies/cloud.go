@@ -18,6 +18,7 @@ package strategies
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
@@ -277,6 +278,19 @@ func (s *CloudStrategy) Close() error {
 
 // -----------------------------------------------------------------------------
 
+// isWildcardBindIP reports whether a capability key is a bind address field ("ip", "grpc_ip",
+// or "rest_ip") whose value is a local wildcard bind address ("0.0.0.0" or "::") that must not
+// overwrite peer-routable DNS addresses in config-server's shared LiveConfig store.
+func isWildcardBindIP(key, val string) bool {
+	if key != "ip" && key != "grpc_ip" && key != "rest_ip" {
+		return false
+	}
+	trimmed := strings.TrimSpace(val)
+	return trimmed == "0.0.0.0" || trimmed == "::"
+}
+
+// -----------------------------------------------------------------------------
+
 // syncCapabilitiesToLiveConfig extracts scalar string/number/bool fields from cfg.Capabilities
 // into a map[string]map[string]string delta and merges them into cfg.LiveConfig via cfg.Set.
 func syncCapabilitiesToLiveConfig(cfg *core.Config) {
@@ -291,7 +305,7 @@ func syncCapabilitiesToLiveConfig(cfg *core.Config) {
 			for k, v := range capMap {
 				switch typed := v.(type) {
 				case string:
-					if typed != "" {
+					if typed != "" && !isWildcardBindIP(k, typed) {
 						sec[k] = typed
 					}
 				case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
@@ -300,7 +314,7 @@ func syncCapabilitiesToLiveConfig(cfg *core.Config) {
 			}
 		case map[string]string:
 			for k, v := range capMap {
-				if v != "" {
+				if v != "" && !isWildcardBindIP(k, v) {
 					sec[k] = v
 				}
 			}
