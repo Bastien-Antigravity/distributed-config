@@ -114,6 +114,7 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 		}
 		return err
 	}
+	syncCapabilitiesToLiveConfig(cfg)
 	// 5. Integrity Check (Skipped for Docker test pipelines)
 	// if err := loader.CheckTestIPs(cfg); err != nil {
 	// 	return err

@@ -16,6 +16,7 @@ package loader
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 )
@@ -58,10 +59,14 @@ func CheckTestIPs(config *core.Config) error {
 	return nil
 }
 
-// CheckProductionIPs ensures NO IP is 127.0.0.2
+// CheckProductionIPs ensures NO IP is 127.0.0.2 in bare-metal/VPS production.
+// Inside Docker containers (DOCKER_ENV=true), 127.0.0.2 is allowed as the Docker-mode fallback IP.
 // -----------------------------------------------------------------------------
 
 func CheckProductionIPs(config *core.Config) error {
+	if os.Getenv("DOCKER_ENV") == "true" {
+		return nil
+	}
 	for name, capInterface := range config.Capabilities {
 		if m, ok := capInterface.(map[string]interface{}); ok {
 			if ipRaw, exists := m["ip"]; exists {

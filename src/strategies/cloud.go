@@ -98,7 +98,11 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 						}
 					}
 				}
+			} else {
+				cfg.Logger.Warning("Cloud (%s): Failed to load configuration from Server: %v", s.Profile, err)
 			}
+		} else {
+			cfg.Logger.Warning("Cloud (%s): Could not connect to Config Server at %s: %v", s.Profile, addr, err)
 		}
 	} else {
 		cfg.Logger.Error("Cloud (%s): Required capability 'config_server' is missing!", s.Profile)
@@ -115,6 +119,7 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 			return err
 		}
 	}
+	syncCapabilitiesToLiveConfig(cfg)
 
 	// 5. Integrity Check (Production only)
 	if s.Profile == "production" {
@@ -268,4 +273,43 @@ func (s *CloudStrategy) Close() error {
 		return s.Client.Close()
 	}
 	return nil
+}
+
+// -----------------------------------------------------------------------------
+
+// syncCapabilitiesToLiveConfig extracts scalar string/number/bool fields from cfg.Capabilities
+// into a map[string]map[string]string delta and merges them into cfg.LiveConfig via cfg.Set.
+func syncCapabilitiesToLiveConfig(cfg *core.Config) {
+	if len(cfg.Capabilities) == 0 {
+		return
+	}
+	capUpdates := make(map[string]map[string]string, len(cfg.Capabilities))
+	for capName, capVal := range cfg.Capabilities {
+		sec := make(map[string]string)
+		switch capMap := capVal.(type) {
+		case map[string]interface{}:
+			for k, v := range capMap {
+				switch typed := v.(type) {
+				case string:
+					if typed != "" {
+						sec[k] = typed
+					}
+				case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+					sec[k] = fmt.Sprintf("%v", typed)
+				}
+			}
+		case map[string]string:
+			for k, v := range capMap {
+				if v != "" {
+					sec[k] = v
+				}
+			}
+		}
+		if len(sec) > 0 {
+			capUpdates[capName] = sec
+		}
+	}
+	if len(capUpdates) > 0 {
+		cfg.Set(capUpdates)
+	}
 }

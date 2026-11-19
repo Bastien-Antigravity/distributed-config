@@ -77,10 +77,17 @@ func TestValidator(t *testing.T) {
 			t.Errorf("Expected success for production IPs, got error: %v", err)
 		}
 
-		// 2. Invalid (Test IP leaked to production)
+		// 2. Invalid (Test IP leaked to production when DOCKER_ENV != "true")
+		t.Setenv("DOCKER_ENV", "")
 		cfg.Capabilities["timescale_db"].(map[string]interface{})["ip"] = "127.0.0.2"
 		if err := CheckProductionIPs(cfg); err == nil {
 			t.Error("Expected error when test IP (127.0.0.2) is detected in production, got nil")
+		}
+
+		// 3. Allowed inside Docker container (DOCKER_ENV == "true")
+		t.Setenv("DOCKER_ENV", "true")
+		if err := CheckProductionIPs(cfg); err != nil {
+			t.Errorf("Expected 127.0.0.2 to be allowed when DOCKER_ENV=true, got error: %v", err)
 		}
 	})
 }

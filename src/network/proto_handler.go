@@ -127,6 +127,12 @@ func (h *ConfigProtoHandler) HandleOutgoingWithVersion(cmd pb.ConfigMsg_Cmd, pay
 		}
 	}
 
+	if cmd == pb.ConfigMsg_GET_SYNC && len(payloadBytes) == 0 {
+		// Proto3 marshals GET_SYNC (enum 0) with empty fields to 0 bytes, which safe-socket
+		// FramedTCPSocket treats as a heartbeat frame and skips.
+		payloadBytes = []byte("{}")
+	}
+
 	msg := &pb.ConfigMsg{
 		Command: cmd,
 		Payload: payloadBytes,

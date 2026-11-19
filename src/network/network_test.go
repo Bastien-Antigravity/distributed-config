@@ -21,6 +21,7 @@ import (
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
+
 	"google.golang.org/protobuf/proto"
 )
 
@@ -114,6 +115,9 @@ func TestNetworkProtoHandler(t *testing.T) {
 		data, err := handler.HandleOutgoing(pb.ConfigMsg_GET_SYNC, nil)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if len(data) == 0 {
+			t.Fatal("Expected non-empty wire payload for GET_SYNC so safe-socket does not treat frame as heartbeat")
 		}
 
 		msg := &pb.ConfigMsg{}
