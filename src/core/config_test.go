@@ -248,3 +248,74 @@ func TestConfig_Concurrency(t *testing.T) {
 
 	wg.Wait()
 }
+
+// -----------------------------------------------------------------------------
+
+func TestConfig_WildcardBindPreservedOverLiveConfig(t *testing.T) {
+	cfg := &Config{
+		Capabilities: map[string]interface{}{
+			"notif_server": map[string]interface{}{
+				"ip":        "0.0.0.0",
+				"port":      "1026",
+				"grpc_port": "1027",
+				"rest_port": "1029",
+			},
+			"ipv6_service": map[string]interface{}{
+				"ip":   "::",
+				"port": "7000",
+			},
+			"peer_service": map[string]interface{}{
+				"ip":        "127.0.0.1",
+				"port":      "8000",
+				"rest_port": "8080",
+			},
+		},
+	}
+	initialMap := make(map[string]map[string]string)
+	cfg.LiveConfig.Store(&initialMap)
+
+	cfg.Set(map[string]map[string]string{
+		"notif_server": {
+			"ip":      "notif-server",
+			"rest_ip": "notif-server",
+			"port":    "1026",
+		},
+		"ipv6_service": {
+			"ip": "ipv6-dns",
+		},
+		"peer_service": {
+			"ip": "peer-service",
+		},
+	})
+
+	if addr, err := cfg.GetAddress("notif_server"); err != nil || addr != "0.0.0.0:1026" {
+		t.Fatalf("Expected GetAddress to preserve wildcard 0.0.0.0:1026, got %q (err=%v)", addr, err)
+	}
+	if addr, err := cfg.GetGRPCAddress("notif_server"); err != nil || addr != "0.0.0.0:1027" {
+		t.Fatalf("Expected GetGRPCAddress to preserve wildcard 0.0.0.0:1027, got %q (err=%v)", addr, err)
+	}
+	if addr, err := cfg.GetRESTAddress("notif_server"); err != nil || addr != "0.0.0.0:1029" {
+		t.Fatalf("Expected GetRESTAddress to preserve wildcard 0.0.0.0:1029, got %q (err=%v)", addr, err)
+	}
+	if addr, err := cfg.GetAddress("ipv6_service"); err != nil || addr != ":::7000" {
+		t.Fatalf("Expected GetAddress to preserve wildcard :::7000, got %q (err=%v)", addr, err)
+	}
+	if addr, err := cfg.GetAddress("peer_service"); err != nil || addr != "peer-service:8000" {
+		t.Fatalf("Expected non-wildcard LiveConfig override to return peer-service:8000, got %q (err=%v)", addr, err)
+	}
+	if addr, err := cfg.GetRESTAddress("peer_service"); err != nil || addr != "peer-service:8080" {
+		t.Fatalf("Expected non-wildcard REST LiveConfig override to return peer-service:8080, got %q (err=%v)", addr, err)
+	}
+
+	// Peer capability lookup via GetCapability must still reflect LiveConfig DNS override
+	var notifCap struct {
+		IP   string `json:"ip"`
+		Port string `json:"port"`
+	}
+	if err := cfg.GetCapability("notif_server", &notifCap); err != nil {
+		t.Fatalf("GetCapability failed: %v", err)
+	}
+	if notifCap.IP != "notif-server" {
+		t.Fatalf("Expected GetCapability to preserve LiveConfig peer IP 'notif-server', got %q", notifCap.IP)
+	}
+}

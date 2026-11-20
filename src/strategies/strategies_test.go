@@ -615,11 +615,13 @@ type strategyTestLogger struct {
 	t *testing.T
 }
 
-func (l *strategyTestLogger) Debug(format string, args ...any)    { l.t.Logf("[DEBUG] "+format, args...) }
-func (l *strategyTestLogger) Info(format string, args ...any)     { l.t.Logf("[INFO] "+format, args...) }
-func (l *strategyTestLogger) Warning(format string, args ...any)  { l.t.Logf("[WARN] "+format, args...) }
-func (l *strategyTestLogger) Error(format string, args ...any)    { l.t.Logf("[ERROR] "+format, args...) }
-func (l *strategyTestLogger) Critical(format string, args ...any) { l.t.Logf("[CRIT] "+format, args...) }
+func (l *strategyTestLogger) Debug(format string, args ...any)   { l.t.Logf("[DEBUG] "+format, args...) }
+func (l *strategyTestLogger) Info(format string, args ...any)    { l.t.Logf("[INFO] "+format, args...) }
+func (l *strategyTestLogger) Warning(format string, args ...any) { l.t.Logf("[WARN] "+format, args...) }
+func (l *strategyTestLogger) Error(format string, args ...any)   { l.t.Logf("[ERROR] "+format, args...) }
+func (l *strategyTestLogger) Critical(format string, args ...any) {
+	l.t.Logf("[CRIT] "+format, args...)
+}
 func (l *strategyTestLogger) Logon(format string, args ...any)    {}
 func (l *strategyTestLogger) Logout(format string, args ...any)   {}
 func (l *strategyTestLogger) Trade(format string, args ...any)    {}

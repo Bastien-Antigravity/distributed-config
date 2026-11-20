@@ -60,9 +60,7 @@ func Decrypt(ciphertext string) (string, error) {
 	return secret.Decrypt(ciphertext)
 }
 
-
 // ProcessConfigSecrets is a helper that decrypts all ENC(...) blocks in a raw byte slice.
 func ProcessConfigSecrets(content []byte) ([]byte, error) {
 	return secret.ProcessConfigSecrets(content)
 }
-

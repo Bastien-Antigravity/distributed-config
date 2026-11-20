@@ -157,4 +157,3 @@ func ProcessConfigSecrets(content []byte) ([]byte, error) {
 
 	return result, nil
 }
-

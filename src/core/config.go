@@ -360,6 +360,39 @@ func (c *Config) GetRESTAddress(capability string) (string, error) {
 
 // -----------------------------------------------------------------------------
 
+func isWildcardBindIP(ip string) bool {
+	trimmed := strings.TrimSpace(ip)
+	return trimmed == "0.0.0.0" || trimmed == "::"
+}
+
+// -----------------------------------------------------------------------------
+
+func (c *Config) getStaticCapabilityField(capability, key string) string {
+	if c.Capabilities == nil {
+		return ""
+	}
+	capRaw, ok := c.Capabilities[capability]
+	if !ok {
+		return ""
+	}
+	switch capMap := capRaw.(type) {
+	case map[string]interface{}:
+		if capMap[key] != nil {
+			if s, ok := capMap[key].(string); ok {
+				return s
+			}
+			return fmt.Sprintf("%v", capMap[key])
+		}
+	case map[string]string:
+		if s, exists := capMap[key]; exists {
+			return s
+		}
+	}
+	return ""
+}
+
+// -----------------------------------------------------------------------------
+
 func (c *Config) getCapabilityField(capability, key string) string {
 	// 1. Check LiveConfig (Overrides from CLI or Server)
 	if v := c.Get(capability, key); v != "" {
@@ -370,17 +403,16 @@ func (c *Config) getCapabilityField(capability, key string) string {
 	}
 
 	// 2. Check static Capabilities map
-	if c.Capabilities != nil {
-		if capRaw, ok := c.Capabilities[capability]; ok {
-			if capMap, ok := capRaw.(map[string]interface{}); ok && capMap[key] != nil {
-				if s, ok := capMap[key].(string); ok {
-					return s
-				}
-				return fmt.Sprintf("%v", capMap[key])
-			}
-		}
+	return c.getStaticCapabilityField(capability, key)
+}
+
+// -----------------------------------------------------------------------------
+
+func (c *Config) getListenHostField(capability, key string) string {
+	if staticVal := c.getStaticCapabilityField(capability, key); isWildcardBindIP(staticVal) {
+		return strings.TrimSpace(staticVal)
 	}
-	return ""
+	return c.getCapabilityField(capability, key)
 }
 
 // -----------------------------------------------------------------------------
@@ -394,9 +426,14 @@ func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
 		return "", fmt.Errorf("no capabilities found and no live override for %s", capability)
 	}
 
-	host := c.getCapabilityField(capability, hostKey)
+	host := c.getListenHostField(capability, hostKey)
+	if hostKey != "ip" && c.getStaticCapabilityField(capability, hostKey) == "" {
+		if staticIP := c.getStaticCapabilityField(capability, "ip"); isWildcardBindIP(staticIP) {
+			host = strings.TrimSpace(staticIP)
+		}
+	}
 	if host == "" && hostKey != "ip" {
-		host = c.getCapabilityField(capability, "ip")
+		host = c.getListenHostField(capability, "ip")
 	}
 	if host == "" {
 		return "", fmt.Errorf("host key %s (or 'ip') missing or empty in capability %s", hostKey, capability)
@@ -409,4 +446,3 @@ func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
 
 	return fmt.Sprintf("%s:%s", host, port), nil
 }
-
