@@ -115,3 +115,63 @@ func TestProcessConfigSecrets(t *testing.T) {
 		}
 	}
 }
+
+// -----------------------------------------------------------------------------
+
+func TestProcessConfigSecrets_FailFastAndCaching(t *testing.T) {
+	ResetKeyCache()
+	_ = os.Remove("./private.pem")
+
+	// 1. Plain config without ENC(...) does not require a private key
+	plain := []byte("common:\n  name: plain-service\n")
+	out, err := ProcessConfigSecrets(plain)
+	if err != nil {
+		t.Fatalf("Expected plain config without ENC to succeed without key, got: %v", err)
+	}
+	if string(out) != string(plain) {
+		t.Fatalf("Expected unchanged plain content, got: %s", string(out))
+	}
+
+	// 2. Config with ENC(...) MUST fail fast when private key is missing
+	withEnc := []byte("secret: ENC(dGhpcyBpcyBub3QgYSB2YWxpZCBjaXBoZXJ0ZXh0)")
+	if _, err := ProcessConfigSecrets(withEnc); err == nil {
+		t.Fatal("Expected ProcessConfigSecrets to fail fast when ENC token is present but private key is missing")
+	}
+
+	// 3. Provide private key via BASTIEN_PRIVATE_KEY env var and verify fail-fast on bad ciphertext
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privPEM := string(pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
+	}))
+	t.Setenv("BASTIEN_PRIVATE_KEY", privPEM)
+	defer ResetKeyCache()
+
+	if _, err := ProcessConfigSecrets(withEnc); err == nil {
+		t.Fatal("Expected ProcessConfigSecrets to fail fast on invalid ENC token ciphertext")
+	}
+
+	// 4. Valid ENC token decrypts and uses cached key on repeated calls
+	pubBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes}))
+	encToken, err := Encrypt("cached-secret-val", pubPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 3; i++ {
+		dec, err := ProcessConfigSecrets([]byte("token: " + encToken))
+		if err != nil {
+			t.Fatalf("Iteration %d failed: %v", i, err)
+		}
+		if string(dec) != "token: cached-secret-val" {
+			t.Fatalf("Unexpected decrypted output: %s", string(dec))
+		}
+	}
+}

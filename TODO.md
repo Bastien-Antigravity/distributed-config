@@ -18,24 +18,20 @@ tags:
 - [ ] **Re-introduce Empty Skeleton Generation in a Clean Manner**:
   - *Context*: Auto-creating skeleton YAML files during runtime configuration loading was removed to enforce fail-fast discovery. However, skeleton templates are useful for developer onboarding and project initialization.
   - *Action*: Re-introduce empty skeleton generation via an explicit CLI command (e.g., `config-tool init` or `config-cli init --profile <name>`) or an opt-in bootstrap utility rather than implicit runtime file creation on missing configuration.
-- [ ] **Dynamic Capability Resolution (`src/core/config.go:getAddr()`)**:
-  - *Context*: When `Capabilities` map is non-nil but does not contain a requested service, `getAddr()` currently returns an error before checking dynamic overrides in `LiveConfig`.
-  - *Action*: Verify ecosystem-wide (across all microservices and capability conventions) whether dynamic overrides (`capabilities.<svc>.*` or `<svc>.*`) should serve as fallback before rejecting unknown services, or if capabilities must always be pre-registered in the static baseline.
-- [ ] **RSA Private Key Memoization (`src/secret/crypto.go`)**:
-  - *Context*: Currently, decrypting `ENC(...)` tokens parses and reads the RSA private key from disk on every invocation.
-  - *Action*: Evaluate architecture/security trade-offs of in-memory key memoization (`sync.RWMutex` + cache invalidation via mtime or explicit reload) vs ephemeral disk reads across long-running daemons and short-lived CLI invocations.
-- [ ] **Ineffectual Assignment in Test (`src/loader/path_resolver_test.go:41`)**:
-  - *Context*: `golangci-lint` flags `ineffectual assignment to exeName`.
-  - *Action*: Confirm test expectations at ecosystem level and clean up the unused reassignment.
 
 ## 🏗️ Architecture & Reliability (Audit Action Items)
-- [ ] **RCU Writer Lock & Atomic Swap Sequence (Deferred)**: Protect `Set()`, `Apply()`, and the `PreviewSet -> UpdateConfigMap -> Apply` sequence with a writer mutex or CAS retry loop to prevent concurrent writers (e.g., caller `Set()` vs background `Watch()` incoming frames) from overwriting each other's live configuration.
 - [ ] **`CheckTestIPs()` Conditional Re-Integration (`src/loader/validator.go` / `src/strategies/test.go`)**:
   - *Context*: `CheckTestIPs()` strictly enforces that all capability IPs equal `127.0.0.2`. It was commented out in `test.go` because Docker test pipelines use container IPs (`172.x.x.x`) or hostnames, and falling back to `standalone.yaml` uses `127.0.0.1`.
   - *Action*: Re-enable conditionally behind an environment flag (e.g., `CHECK_TEST_IPS=true`) or when an explicit `test.yaml` is loaded, avoiding false test failures in Docker environments while preserving local test integrity checks.
 - [ ] **Thread-Local Storage / Error Reporting Sanitization in CGO Bridge**: Address OS thread affinity in `errors.c` when accessed via Go goroutines, and guard against `strdup` memory leaks across foreign language calls.
 
 ## ✅ Completed
+- [x] **RCU Writer Lock & Atomic Swap Sequence (`src/core/config.go`, `src/network/proto_handler.go`)**: Added `writeMu` to `core.Config` to serialize `Set()`, `Delete()`, `Apply()`, and `ReplaceLive()` mutations while keeping `Get()`, `GetCapability()`, and `GetAddress()` 100% lock-free.
+- [x] **Dynamic Capability Resolution (`src/core/config.go:getAddr()`)**: Enabled `GetAddress()`, `GetGRPCAddress()`, and `GetRESTAddress()` to resolve capabilities added dynamically via `LiveConfig` even when absent from static `c.Capabilities`.
+- [x] **Revision Monotonicity & Stale Snapshot Protection (`src/network/proto_handler.go`)**: Rejected stale/duplicate `BROADCAST_SYNC` (`incoming <= lastSeenVersion`) and delayed `GET_SYNC`/`FULL_REFRESH` snapshots (`incoming < lastSeenVersion`).
+- [x] **Acknowledged Delta Commits & Reconnect Race Fix (`src/strategies/cloud.go`, `src/network/client.go`)**: Changed `CloudStrategy.Set()` and `DeleteKeys()` to push delta-only updates via `UpdateConfigMapWithOCC(updates, 0)` / `DeleteKeysWithOCC(deletions, 0)` and apply locally only after server `ACK`; guarded `Client.connect()` against concurrent `Close()`.
+- [x] **Fail-Fast Secret Decryption & Key Memoization (`src/secret/crypto.go`)**: Added thread-safe RSA private key caching (keyed by `BASTIEN_PRIVATE_KEY` SHA-256 hash or file path + mtime + size with `ResetKeyCache()`) and enforced fail-fast error returns in `ProcessConfigSecrets()` when `ENC(...)` tokens are present.
+- [x] **Directory-Aware `SHARED_CONFIG_PATH` (`src/loader/path_resolver.go`)**: Resolved `<SHARED_CONFIG_PATH>/<targetName>.yaml` (and `standalone.yaml` fallback) when `SHARED_CONFIG_PATH` points to a directory, and cleaned up ineffectual assignment in `path_resolver_test.go`.
 - [x] **Remove Dead Code `GenerateRSAKeypair()` (`src/secret/crypto.go`)**: Removed unused helper; key generation is handled directly in `cmd/config-tool/main.go`.
 - [x] **Remove Dead Code `EnsureFileExists()` (`src/loader/loader.go`)**: Removed obsolete skeleton file creation from runtime loader and cleaned up unused `path/filepath` import.
 - [x] **Fix Socket Resource Leak on Connection Failure**: Added `client.Close()` on `client.Open()` failure in `src/network/client.go:connect()`.

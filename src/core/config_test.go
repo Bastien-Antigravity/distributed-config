@@ -319,3 +319,112 @@ func TestConfig_WildcardBindPreservedOverLiveConfig(t *testing.T) {
 		t.Fatalf("Expected GetCapability to preserve LiveConfig peer IP 'notif-server', got %q", notifCap.IP)
 	}
 }
+
+// -----------------------------------------------------------------------------
+
+func TestConfig_ConcurrentWritersNoLostUpdates(t *testing.T) {
+	cfg := &Config{}
+	initialMap := make(map[string]map[string]string)
+	cfg.LiveConfig.Store(&initialMap)
+
+	const workers = 32
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func(id int) {
+			defer wg.Done()
+			key := "key_" + string(rune('A'+id))
+			cfg.Set(map[string]map[string]string{
+				"concurrent_sec": {key: "present"},
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < workers; i++ {
+		key := "key_" + string(rune('A'+i))
+		if got := cfg.Get("concurrent_sec", key); got != "present" {
+			t.Errorf("Lost update for %s: expected 'present', got %q", key, got)
+		}
+	}
+
+	// Concurrent Delete of half the keys while setting new keys
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func(id int) {
+			defer wg.Done()
+			key := "key_" + string(rune('A'+id))
+			if id%2 == 0 {
+				cfg.Delete(map[string][]string{"concurrent_sec": {key}})
+			} else {
+				cfg.Set(map[string]map[string]string{
+					"concurrent_sec": {key: "updated"},
+				})
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < workers; i++ {
+		key := "key_" + string(rune('A'+i))
+		got := cfg.Get("concurrent_sec", key)
+		if i%2 == 0 && got != "" {
+			t.Errorf("Expected key %s to be deleted, got %q", key, got)
+		}
+		if i%2 == 1 && got != "updated" {
+			t.Errorf("Expected key %s to be 'updated', got %q", key, got)
+		}
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+func TestConfig_DynamicCapabilityGetAddress(t *testing.T) {
+	cfg := &Config{
+		Capabilities: map[string]interface{}{
+			"static_service": map[string]interface{}{
+				"ip":   "127.0.0.1",
+				"port": "8000",
+			},
+		},
+	}
+	initialMap := make(map[string]map[string]string)
+	cfg.LiveConfig.Store(&initialMap)
+
+	// Unknown capability not in static or live must still fail
+	if _, err := cfg.GetAddress("dynamic_service"); err == nil {
+		t.Fatal("Expected error for unknown capability before live update")
+	}
+
+	// Add capability dynamically via LiveConfig section
+	cfg.Set(map[string]map[string]string{
+		"dynamic_service": {
+			"ip":        "10.10.0.5",
+			"port":      "9090",
+			"grpc_port": "9091",
+			"rest_port": "9092",
+		},
+		"capabilities": {
+			"prefixed_service.ip":   "10.10.0.6",
+			"prefixed_service.port": "7070",
+		},
+	})
+
+	addr, err := cfg.GetAddress("dynamic_service")
+	if err != nil || addr != "10.10.0.5:9090" {
+		t.Fatalf("Expected dynamic_service address 10.10.0.5:9090, got %q (err=%v)", addr, err)
+	}
+	grpcAddr, err := cfg.GetGRPCAddress("dynamic_service")
+	if err != nil || grpcAddr != "10.10.0.5:9091" {
+		t.Fatalf("Expected dynamic_service gRPC address 10.10.0.5:9091, got %q (err=%v)", grpcAddr, err)
+	}
+	restAddr, err := cfg.GetRESTAddress("dynamic_service")
+	if err != nil || restAddr != "10.10.0.5:9092" {
+		t.Fatalf("Expected dynamic_service REST address 10.10.0.5:9092, got %q (err=%v)", restAddr, err)
+	}
+	prefAddr, err := cfg.GetAddress("prefixed_service")
+	if err != nil || prefAddr != "10.10.0.6:7070" {
+		t.Fatalf("Expected prefixed_service address 10.10.0.6:7070, got %q (err=%v)", prefAddr, err)
+	}
+}

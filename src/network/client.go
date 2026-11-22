@@ -100,6 +100,16 @@ func (c *Client) connect() error {
 	}
 
 	c.mu.Lock()
+	select {
+	case <-c.quit:
+		c.mu.Unlock()
+		_ = client.Close()
+		return fmt.Errorf("client closed")
+	default:
+	}
+	if c.sock != nil {
+		_ = c.sock.Close()
+	}
 	c.sock = client
 	c.mu.Unlock()
 	return nil
@@ -296,24 +306,12 @@ func (c *Client) UpdateConfig(cfg *core.Config) error {
 	return c.UpdateConfigMap(cfg.LiveConfig.Load())
 }
 
-// UpdateConfigMap sends a specific configuration map to the server.
+// UpdateConfigMap sends a specific configuration map to the server and waits for ACK.
 func (c *Client) UpdateConfigMap(m *map[string]map[string]string) error {
 	if m == nil {
 		return nil
 	}
-	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_PUT_SYNC, m)
-	if err != nil {
-		return err
-	}
-
-	c.mu.RLock()
-	sock := c.sock
-	c.mu.RUnlock()
-
-	if sock != nil {
-		return sock.Send(data)
-	}
-	return nil
+	return c.UpdateConfigMapWithOCC(m, 0)
 }
 
 // UpdateConfigMapWithOCC sends updates to the server with an expected version for Optimistic Concurrency Control.
@@ -346,24 +344,9 @@ func (c *Client) UpdateConfigMapWithOCC(updates interface{}, expectedVersion uin
 
 // -----------------------------------------------------------------------------
 
-// DeleteKeys sends a deletion request for specific section keys to the server.
+// DeleteKeys sends a deletion request for specific section keys to the server and waits for ACK.
 func (c *Client) DeleteKeys(deletions map[string][]string) error {
-	if len(deletions) == 0 {
-		return nil
-	}
-	data, err := c.Handler.HandleOutgoing(pb.ConfigMsg_DELETE_SYNC, deletions)
-	if err != nil {
-		return err
-	}
-
-	c.mu.RLock()
-	sock := c.sock
-	c.mu.RUnlock()
-
-	if sock != nil {
-		return sock.Send(data)
-	}
-	return nil
+	return c.DeleteKeysWithOCC(deletions, 0)
 }
 
 // DeleteKeysWithOCC sends a deletion request with expected version for OCC validation.

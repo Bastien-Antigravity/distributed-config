@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
@@ -53,6 +54,10 @@ type Config struct {
 	Capabilities map[string]interface{}                       `yaml:"capabilities" json:"capabilities"`
 	LiveConfig   atomic.Pointer[map[string]map[string]string] `yaml:"-"`
 
+	// Writer lock serializing Set, Delete, Apply, and ReplaceLive mutations
+	// while keeping Get, GetCapability, and GetAddress 100% lock-free.
+	writeMu sync.Mutex `yaml:"-"`
+
 	// Internal state
 	Logger utils.Logger `yaml:"-"`
 }
@@ -78,13 +83,16 @@ func (c *Config) Get(section, key string) string {
 // -----------------------------------------------------------------------------
 
 // Set merges multiple configuration updates into the live configuration.
-// Performs a thread-safe atomic swap (Read-Copy-Update).
+// Performs a thread-safe atomic swap (Read-Copy-Update) serialized by writeMu.
 func (c *Config) Set(updates map[string]map[string]string) {
 	if updates == nil {
 		return
 	}
 
-	// 1. Calculate new state
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+
+	// 1. Calculate new state under writeMu
 	newMap := c.PreviewSet(updates)
 
 	// 2. Atomically swap the pointer
@@ -92,11 +100,30 @@ func (c *Config) Set(updates map[string]map[string]string) {
 }
 
 // Apply replaces the current live configuration with a pre-calculated map.
-// Use this in conjunction with PreviewSet to avoid redundant calculations.
+// Serialized by writeMu so concurrent updates do not race.
 func (c *Config) Apply(newMap *map[string]map[string]string) {
-	if newMap != nil {
-		c.LiveConfig.Store(newMap)
+	if newMap == nil {
+		return
 	}
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	c.LiveConfig.Store(newMap)
+}
+
+// ReplaceLive atomically replaces the entire live configuration snapshot under writeMu.
+func (c *Config) ReplaceLive(sections map[string]map[string]string) {
+	cp := make(map[string]map[string]string, len(sections))
+	for s, kv := range sections {
+		secCopy := make(map[string]string, len(kv))
+		for k, v := range kv {
+			secCopy[k] = v
+		}
+		cp[s] = secCopy
+	}
+
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	c.LiveConfig.Store(&cp)
 }
 
 // PreviewSet calculates the resulting configuration map after applying updates
@@ -147,6 +174,10 @@ func (c *Config) Delete(deletions map[string][]string) {
 	if len(deletions) == 0 {
 		return
 	}
+
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+
 	newMap := make(map[string]map[string]string)
 	oldPtr := c.LiveConfig.Load()
 	if oldPtr != nil {
@@ -418,12 +449,15 @@ func (c *Config) getListenHostField(capability, key string) string {
 // -----------------------------------------------------------------------------
 
 func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
-	if c.Capabilities != nil {
-		if _, ok := c.Capabilities[capability]; !ok {
-			return "", fmt.Errorf("capability %s not found", capability)
+	_, hasStatic := c.Capabilities[capability]
+	hasLivePort := c.getCapabilityField(capability, portKey) != ""
+	hasLiveHost := c.getCapabilityField(capability, hostKey) != "" || c.getCapabilityField(capability, "ip") != ""
+
+	if !hasStatic && !hasLivePort && !hasLiveHost {
+		if c.Capabilities == nil {
+			return "", fmt.Errorf("no capabilities found and no live override for %s", capability)
 		}
-	} else if c.getCapabilityField(capability, portKey) == "" {
-		return "", fmt.Errorf("no capabilities found and no live override for %s", capability)
+		return "", fmt.Errorf("capability %s not found", capability)
 	}
 
 	host := c.getListenHostField(capability, hostKey)

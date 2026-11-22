@@ -35,11 +35,6 @@ func TestResolveConfigPath(t *testing.T) {
 	_ = os.Chdir(tempDir)
 	defer func() { _ = os.Chdir(oldCwd) }()
 
-	exePath, _ := os.Executable()
-	exePathAbs, _ := filepath.Abs(exePath)
-	exeName := filepath.Base(exePathAbs)
-	exeName = strings.TrimSuffix(exeName, filepath.Ext(exeName))
-
 	t.Run("Priority-1-CWD-Target", func(t *testing.T) {
 		tempRun, _ := os.MkdirTemp(tempDir, "run-*")
 		_ = os.Chdir(tempRun)
@@ -70,6 +65,26 @@ func TestResolveConfigPath(t *testing.T) {
 		path := ResolveConfigPath("production")
 		if !strings.HasSuffix(path, "production.yaml") {
 			t.Errorf("Expected fallback to end with production.yaml, got %s", path)
+		}
+	})
+
+	t.Run("Priority-0-SharedConfigPath-Directory", func(t *testing.T) {
+		sharedDir, _ := os.MkdirTemp(tempDir, "shared-cfg-*")
+		stagingFile := filepath.Join(sharedDir, "staging.yaml")
+		standaloneFile := filepath.Join(sharedDir, "standalone.yaml")
+		_ = os.WriteFile(stagingFile, []byte("common:\n  name: staging-shared\n"), 0644)
+		_ = os.WriteFile(standaloneFile, []byte("common:\n  name: standalone-shared\n"), 0644)
+
+		t.Setenv("SHARED_CONFIG_PATH", sharedDir)
+
+		gotStaging := ResolveConfigPath("staging")
+		if gotStaging != stagingFile {
+			t.Errorf("Expected SHARED_CONFIG_PATH directory to resolve %s, got %s", stagingFile, gotStaging)
+		}
+
+		gotFallback := ResolveConfigPath("nonexistent_profile")
+		if gotFallback != standaloneFile {
+			t.Errorf("Expected SHARED_CONFIG_PATH directory fallback to resolve %s, got %s", standaloneFile, gotFallback)
 		}
 	})
 }

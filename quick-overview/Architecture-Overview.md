@@ -30,9 +30,10 @@ Configuration is resolved through a deterministic hierarchy:
 4.  **Remote Sync**: (CloudStrategy) Overlays from a remote Config Server.
 
 ### Read-Copy-Update (RCU) for Performance
-To ensure 100% lock-free reads, the core configuration uses an Atomic Pointer Swap mechanism.
--   **Implementation**: `src/core/config.go` uses `atomic.Pointer[LiveConfig]`.
--   **Benefit**: High-concurrency applications can read configuration without any lock contention, even during background updates.
+To ensure 100% lock-free reads, the core configuration uses an Atomic Pointer Swap mechanism paired with a writer lock (`writeMu`).
+-   **Implementation**: `src/core/config.go` uses `atomic.Pointer[LiveConfig]` for reads (`Get`, `GetCapability`, `GetAddress`) and `writeMu sync.Mutex` to serialize `Set()`, `Delete()`, `Apply()`, and `ReplaceLive()` mutations.
+-   **Benefit**: High-concurrency applications can read configuration without any lock contention, while concurrent writers and background full refreshes never overwrite each other.
+-   **Dynamic Capability Resolution**: `GetAddress()`, `GetGRPCAddress()`, and `GetRESTAddress()` resolve capabilities added dynamically via `LiveConfig` even when absent from static `Capabilities`.
 
 ### Optimistic Concurrency Control (OCC)
 For sensitive read-modify-write workflows:
@@ -56,10 +57,10 @@ Provides a resilient client built on **safe-socket v0.0.1**. It handles:
 -   **Stability**: Uses a 30s deadline to prevent connection loops on local interfaces.
 -   **Watch**: Persistent connection for hot-reloads.
 -   **Resilience**: Automatic reconnection with jittered exponential backoff.
--   **Sequence Gap Self-Healing**: Tracks `lastSeenVersion uint64`. If a sequence gap is detected (`received > lastSeen + 1`), it automatically triggers an out-of-band `FullRefresh()` to guarantee parity.
+-   **Sequence Gap Self-Healing & Monotonicity**: Tracks `lastSeenVersion uint64`. Stale/duplicate broadcasts (`version <= lastSeenVersion`) and delayed full-refresh snapshots (`version < lastSeenVersion`) are rejected to prevent rollback. If a sequence gap is detected (`received > lastSeen + 1`), it automatically triggers an out-of-band `FullRefresh()` to guarantee parity.
 
 ### Security (`src/secret`)
-Integrates RSA decryption. Values prefixed with `ENC(...)` remain ciphertext at load time and are decrypted on-demand via `Decrypt()` / `DecryptSecret()` when an authorized private key is present.
+Integrates RSA-OAEP decryption with in-memory private key memoization (keyed by `BASTIEN_PRIVATE_KEY` SHA-256 hash or key file path + modification time + size). Values prefixed with `ENC(...)` remain ciphertext at load time and are decrypted on-demand via `Decrypt()` / `DecryptSecret()`, while `ProcessConfigSecrets()` fails fast if any `ENC(...)` token cannot be decrypted.
 
 ## Polyglot Support (FFI Bridge)
 The project exports its Go-based logic to other languages through a C-compatible ABI.

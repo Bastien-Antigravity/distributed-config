@@ -28,7 +28,7 @@ The library uses a layered approach to build the final configuration:
 2.  **Configuration Discovery (Fail-Fast)**: The library automatically searches for a YAML configuration file with strict priority and fails fast if the required configuration file is missing:
     *   **Priority 0 — Explicit Environment Overrides (Highest Precedence)**:
         *   `CONFIG_PATH`: Directly specifies the absolute or relative path to the YAML configuration file (e.g., `docker-deployment/modes/local/config/native.yaml`).
-        *   `SHARED_CONFIG_PATH`: Alternative environment override pointing to the configuration file or root directory.
+        *   `SHARED_CONFIG_PATH`: Alternative environment override pointing to the configuration file or a shared configuration directory (resolving `<SHARED_CONFIG_PATH>/<profile>.yaml` or `<SHARED_CONFIG_PATH>/standalone.yaml`).
     *   **Priority 1 — Profile-Based Search** (Target provided, e.g. `standalone`):
         1. `config/[profile].yaml` (Current Working Directory)
         2. `config/[profile].yaml` (Executable Directory)
@@ -51,8 +51,8 @@ The library uses a layered approach to build the final configuration:
 - **Robust Expansion Engine**: Uses a dedicated Regex-based expansion engine that supports the `${VAR:default}` syntax, ensuring reliable fallbacks even when environment variables are missing.
 - **Environment-First Flexibility**: Supports "Pure-Environment" deployments where a local config file is optional. If missing, the system uses `CF_IP`/`CF_PORT` to connect to the central server and hydrate required capabilities.
 - **Fail-Safe & Strict**: Enforces "Mandatory Service Validation" (Fail-Fast logic) to ensure critical infrastructure like `log_server` is correctly configured (via any source) before boot.
-- **Live Updates**: Support for dynamic configuration updates via callbacks. Manually calling `Set()` (bulk) or `SetSingle()` (convenience) on the facade now correctly triggers local observers and automatically synchronizes with the fleet.
-- **High Performance & Lock-Free**: Uses an **Atomic Pointer Swap (RCU)** architecture. Configuration reads (`Get`) are 100% lock-free and non-blocking, ensuring zero-latency configuration access for high-frequency microservices. Even during bulk updates, readers always see a consistent snapshot.
+- **Live Updates & Acknowledged Delta Commits**: Support for dynamic configuration updates via callbacks. Calling `Set()` (bulk) or `SetSingle()` (convenience) pushes delta updates to `config-server`, waits for an authoritative `ACK` response, and applies updates locally with monotonic revision protection against stale broadcasts or delayed full refreshes.
+- **High Performance & Lock-Free**: Uses an **Atomic Pointer Swap (RCU)** architecture paired with a writer mutex (`writeMu`). Configuration reads (`Get`, `GetCapability`, `GetAddress`) are 100% lock-free and non-blocking, while concurrent writers (`Set`, `Delete`, `ReplaceLive`) are serialized to prevent lost updates. Dynamic capabilities added via `LiveConfig` resolve addresses seamlessly.
 - **Polyglot Ecosystem (v0.0.1)**: Native support for **Python, Rust, C/C++, and VBA** via a centralized CGO-based shared library (`libdistconf`). Achieve 100% architectural parity across your entire microservice fleet with raw error transparency.
  
 ## 🛡️ Feature Specs & Governance (BDD)

@@ -157,20 +157,24 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 			return fmt.Errorf("failed to decode JSON payload: %w", err)
 		}
 
-		// Sequence gap detection
+		// Monotonic version verification & sequence gap detection
 		if msg.Version > 0 {
+			incomingVer := uint64(msg.Version)
 			h.mu.Lock()
-			if h.lastSeenVersion > 0 && uint64(msg.Version) > h.lastSeenVersion+1 {
+			if h.lastSeenVersion > 0 && incomingVer <= h.lastSeenVersion {
+				h.mu.Unlock()
+				return nil
+			}
+			if h.lastSeenVersion > 0 && incomingVer > h.lastSeenVersion+1 {
 				gapCb := h.onGapDetected
 				expected := h.lastSeenVersion + 1
-				received := uint64(msg.Version)
-				h.lastSeenVersion = received
+				h.lastSeenVersion = incomingVer
 				h.mu.Unlock()
 				if gapCb != nil {
-					gapCb(expected, received)
+					gapCb(expected, incomingVer)
 				}
 			} else {
-				h.lastSeenVersion = uint64(msg.Version)
+				h.lastSeenVersion = incomingVer
 				h.mu.Unlock()
 			}
 		}
@@ -199,7 +203,9 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 	case pb.ConfigMsg_ACK:
 		if msg.Version > 0 {
 			h.mu.Lock()
-			h.lastSeenVersion = uint64(msg.Version)
+			if uint64(msg.Version) > h.lastSeenVersion {
+				h.lastSeenVersion = uint64(msg.Version)
+			}
 			h.mu.Unlock()
 		}
 		h.mu.RLock()
@@ -215,8 +221,17 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 			return fmt.Errorf("failed to decode GET_SYNC/FULL_REFRESH JSON payload: %w", err)
 		}
 		if msg.Version > 0 {
+			incomingVer := uint64(msg.Version)
 			h.mu.Lock()
-			h.lastSeenVersion = uint64(msg.Version)
+			if h.lastSeenVersion > 0 && incomingVer < h.lastSeenVersion {
+				syncCb := h.onSyncReceived
+				h.mu.Unlock()
+				if syncCb != nil {
+					syncCb()
+				}
+				return nil
+			}
+			h.lastSeenVersion = incomingVer
 			h.mu.Unlock()
 		}
 		h.updateLiveConfig(parsed)
@@ -237,7 +252,9 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 		}
 		if msg.Version > 0 {
 			h.mu.Lock()
-			h.lastSeenVersion = uint64(msg.Version)
+			if uint64(msg.Version) > h.lastSeenVersion {
+				h.lastSeenVersion = uint64(msg.Version)
+			}
 			h.mu.Unlock()
 		}
 		h.mu.RLock()
@@ -257,8 +274,8 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 // -----------------------------------------------------------------------------
 
 func (h *ConfigProtoHandler) updateLiveConfig(sections map[string]map[string]string) {
-	// Atomically swap the entire config map pointer (Full Update from Server)
-	h.parentConfig.LiveConfig.Store(&sections)
+	// Atomically swap the entire config map pointer serialized under parentConfig's writer lock
+	h.parentConfig.ReplaceLive(sections)
 
 	h.mu.RLock()
 	liveCb := h.onLiveConfUpdate

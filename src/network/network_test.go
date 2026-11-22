@@ -323,4 +323,93 @@ func TestNetworkProtoHandler(t *testing.T) {
 			t.Error("Expected SEC_B to be completely deleted")
 		}
 	})
+
+	t.Run("TestStaleBroadcastSyncRejected", func(t *testing.T) {
+		cfg := &core.Config{}
+		initial := make(map[string]map[string]string)
+		cfg.LiveConfig.Store(&initial)
+		h := NewConfigHandler("StaleBroadcastHandler", cfg)
+
+		// Apply version 5
+		p5, _ := json.Marshal(map[string]map[string]string{"SEC": {"KEY": "V5"}})
+		m5, _ := proto.Marshal(&pb.ConfigMsg{
+			Command: pb.ConfigMsg_BROADCAST_SYNC,
+			Payload: p5,
+			Version: 5,
+		})
+		if err := h.HandleIncoming(m5); err != nil {
+			t.Fatalf("HandleIncoming v5 failed: %v", err)
+		}
+		if h.GetLastSeenVersion() != 5 || cfg.Get("SEC", "KEY") != "V5" {
+			t.Fatalf("Expected version 5 and KEY=V5, got ver=%d val=%q", h.GetLastSeenVersion(), cfg.Get("SEC", "KEY"))
+		}
+
+		// Send stale version 4 and duplicate version 5 -> both must be ignored
+		for _, staleVer := range []int32{4, 5} {
+			pStale, _ := json.Marshal(map[string]map[string]string{"SEC": {"KEY": "STALE"}})
+			mStale, _ := proto.Marshal(&pb.ConfigMsg{
+				Command: pb.ConfigMsg_BROADCAST_SYNC,
+				Payload: pStale,
+				Version: staleVer,
+			})
+			if err := h.HandleIncoming(mStale); err != nil {
+				t.Fatalf("HandleIncoming stale v%d failed: %v", staleVer, err)
+			}
+			if h.GetLastSeenVersion() != 5 {
+				t.Fatalf("Expected lastSeenVersion to remain 5 after v%d, got %d", staleVer, h.GetLastSeenVersion())
+			}
+			if cfg.Get("SEC", "KEY") != "V5" {
+				t.Fatalf("Expected KEY to remain V5 after stale v%d, got %q", staleVer, cfg.Get("SEC", "KEY"))
+			}
+		}
+	})
+
+	t.Run("TestDelayedFullRefreshRejected", func(t *testing.T) {
+		cfg := &core.Config{}
+		initial := make(map[string]map[string]string)
+		cfg.LiveConfig.Store(&initial)
+		h := NewConfigHandler("StaleSnapshotHandler", cfg)
+
+		// Apply delta broadcast at version 10
+		p10, _ := json.Marshal(map[string]map[string]string{"SEC": {"KEY": "V10"}})
+		m10, _ := proto.Marshal(&pb.ConfigMsg{
+			Command: pb.ConfigMsg_BROADCAST_SYNC,
+			Payload: p10,
+			Version: 10,
+		})
+		if err := h.HandleIncoming(m10); err != nil {
+			t.Fatalf("HandleIncoming v10 failed: %v", err)
+		}
+
+		// Delayed FULL_REFRESH at version 9 arrives -> must be rejected
+		p9, _ := json.Marshal(map[string]map[string]string{"SEC": {"KEY": "V9_STALE"}})
+		m9, _ := proto.Marshal(&pb.ConfigMsg{
+			Command: pb.ConfigMsg_FULL_REFRESH,
+			Payload: p9,
+			Version: 9,
+		})
+		if err := h.HandleIncoming(m9); err != nil {
+			t.Fatalf("HandleIncoming full refresh v9 failed: %v", err)
+		}
+		if h.GetLastSeenVersion() != 10 {
+			t.Fatalf("Expected lastSeenVersion to stay 10, got %d", h.GetLastSeenVersion())
+		}
+		if cfg.Get("SEC", "KEY") != "V10" {
+			t.Fatalf("Expected KEY to stay V10, got %q", cfg.Get("SEC", "KEY"))
+		}
+
+		// Newer FULL_REFRESH at version 10 or 11 must be accepted
+		p11, _ := json.Marshal(map[string]map[string]string{"SEC": {"KEY": "V11_FRESH"}})
+		m11, _ := proto.Marshal(&pb.ConfigMsg{
+			Command: pb.ConfigMsg_FULL_REFRESH,
+			Payload: p11,
+			Version: 11,
+		})
+		if err := h.HandleIncoming(m11); err != nil {
+			t.Fatalf("HandleIncoming full refresh v11 failed: %v", err)
+		}
+		if h.GetLastSeenVersion() != 11 || cfg.Get("SEC", "KEY") != "V11_FRESH" {
+			t.Fatalf("Expected version 11 and V11_FRESH, got ver=%d val=%q", h.GetLastSeenVersion(), cfg.Get("SEC", "KEY"))
+		}
+	})
 }

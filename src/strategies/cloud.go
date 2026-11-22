@@ -175,20 +175,14 @@ func (s *CloudStrategy) Set(cfg *core.Config, updates map[string]map[string]stri
 		return nil
 	}
 
-	// 1. Prepare the full state we WANT to reach (Preview)
-	nextState := cfg.PreviewSet(updates)
-	if nextState == nil {
-		return fmt.Errorf("cloud strategy (%s): failed to calculate next configuration state", s.Profile)
-	}
-
-	// 2. Push to server (Authoritative Check)
+	// 1. Push delta to server and wait for ACK confirmation
 	cfg.Logger.Info("Cloud (%s): Pushing authoritative update request to Server...", s.Profile)
-	if err := s.Client.UpdateConfigMap(nextState); err != nil {
+	if err := s.Client.UpdateConfigMapWithOCC(updates, 0); err != nil {
 		return fmt.Errorf("cloud strategy (%s): server rejected update: %w", s.Profile, err)
 	}
 
-	// 3. Success! Now apply locally
-	cfg.Apply(nextState)
+	// 2. Success! Now apply delta locally
+	cfg.Set(updates)
 	return nil
 }
 
@@ -216,7 +210,7 @@ func (s *CloudStrategy) SetWithOCC(cfg *core.Config, updates map[string]map[stri
 
 // -----------------------------------------------------------------------------
 
-// DeleteKeys sends key deletion request to the server.
+// DeleteKeys sends key deletion request to the server and waits for ACK before deleting locally.
 func (s *CloudStrategy) DeleteKeys(cfg *core.Config, deletions map[string][]string) error {
 	if s.ReadOnly {
 		return fmt.Errorf("cloud strategy (%s): cannot delete in read-only mode", s.Profile)
@@ -228,7 +222,7 @@ func (s *CloudStrategy) DeleteKeys(cfg *core.Config, deletions map[string][]stri
 	}
 
 	cfg.Logger.Info("Cloud (%s): Pushing key deletions to Server...", s.Profile)
-	if err := s.Client.DeleteKeys(deletions); err != nil {
+	if err := s.Client.DeleteKeysWithOCC(deletions, 0); err != nil {
 		return err
 	}
 

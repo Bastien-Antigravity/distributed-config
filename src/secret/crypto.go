@@ -26,6 +26,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 )
 
 // -----------------------------------------------------------------------------
@@ -33,36 +35,32 @@ import (
 // ENC_REGEX matches ENC(base64_blob)
 var ENC_REGEX = regexp.MustCompile(`ENC\(([^)]+)\)`)
 
-func getPrivateKey() (*rsa.PrivateKey, error) {
-	// 1. Check for direct key content in environment variable (Highest Priority)
-	keyContent := os.Getenv("BASTIEN_PRIVATE_KEY")
-	var data []byte
-	var err error
+var (
+	keyCacheMu    sync.RWMutex
+	cachedKey     *rsa.PrivateKey
+	cachedEnvHash [32]byte
+	cachedPath    string
+	cachedModTime time.Time
+	cachedSize    int64
+)
 
-	if keyContent != "" {
-		data = []byte(keyContent)
-	} else {
-		// 2. Fallback to file path
-		keyPath := os.Getenv("BASTIEN_PRIVATE_KEY_PATH")
-		if keyPath == "" {
-			keyPath = "/etc/bastien/private.pem"
-			// Fallback for local sandbox testing
-			if _, err := os.Stat("./private.pem"); err == nil {
-				keyPath = "./private.pem"
-			}
-		}
-		data, err = os.ReadFile(keyPath)
-		if err != nil {
-			return nil, fmt.Errorf("private key not found in BASTIEN_PRIVATE_KEY or at %s: %w", keyPath, err)
-		}
-	}
+// ResetKeyCache clears the in-memory memoized RSA private key.
+func ResetKeyCache() {
+	keyCacheMu.Lock()
+	defer keyCacheMu.Unlock()
+	cachedKey = nil
+	cachedEnvHash = [32]byte{}
+	cachedPath = ""
+	cachedModTime = time.Time{}
+	cachedSize = 0
+}
 
+func parsePrivateKeyPEM(data []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(data)
 	if block == nil || (block.Type != "RSA PRIVATE KEY" && block.Type != "PRIVATE KEY") {
 		return nil, fmt.Errorf("failed to decode PEM block containing RSA private key")
 	}
 
-	// Try PKCS#1 first, then fallback to PKCS#8
 	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
 		return key, nil
 	}
@@ -74,6 +72,77 @@ func getPrivateKey() (*rsa.PrivateKey, error) {
 	if !ok {
 		return nil, fmt.Errorf("not an RSA private key")
 	}
+	return rsaKey, nil
+}
+
+func getPrivateKey() (*rsa.PrivateKey, error) {
+	// 1. Check for direct key content in environment variable (Highest Priority)
+	keyContent := os.Getenv("BASTIEN_PRIVATE_KEY")
+	if keyContent != "" {
+		envHash := sha256.Sum256([]byte(keyContent))
+		keyCacheMu.RLock()
+		if cachedKey != nil && cachedPath == "" && cachedEnvHash == envHash {
+			k := cachedKey
+			keyCacheMu.RUnlock()
+			return k, nil
+		}
+		keyCacheMu.RUnlock()
+
+		rsaKey, err := parsePrivateKeyPEM([]byte(keyContent))
+		if err != nil {
+			return nil, err
+		}
+
+		keyCacheMu.Lock()
+		cachedKey = rsaKey
+		cachedEnvHash = envHash
+		cachedPath = ""
+		cachedModTime = time.Time{}
+		cachedSize = 0
+		keyCacheMu.Unlock()
+		return rsaKey, nil
+	}
+
+	// 2. Fallback to file path
+	keyPath := os.Getenv("BASTIEN_PRIVATE_KEY_PATH")
+	if keyPath == "" {
+		keyPath = "/etc/bastien/private.pem"
+		// Fallback for local sandbox testing
+		if _, err := os.Stat("./private.pem"); err == nil {
+			keyPath = "./private.pem"
+		}
+	}
+
+	info, err := os.Stat(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("private key not found in BASTIEN_PRIVATE_KEY or at %s: %w", keyPath, err)
+	}
+
+	keyCacheMu.RLock()
+	if cachedKey != nil && cachedPath == keyPath && cachedModTime.Equal(info.ModTime()) && cachedSize == info.Size() {
+		k := cachedKey
+		keyCacheMu.RUnlock()
+		return k, nil
+	}
+	keyCacheMu.RUnlock()
+
+	data, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("private key not found in BASTIEN_PRIVATE_KEY or at %s: %w", keyPath, err)
+	}
+
+	rsaKey, err := parsePrivateKeyPEM(data)
+	if err != nil {
+		return nil, err
+	}
+
+	keyCacheMu.Lock()
+	cachedKey = rsaKey
+	cachedEnvHash = [32]byte{}
+	cachedPath = keyPath
+	cachedModTime = info.ModTime()
+	cachedSize = info.Size()
+	keyCacheMu.Unlock()
 
 	return rsaKey, nil
 }
@@ -115,7 +184,10 @@ func Decrypt(ciphertext string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return decryptWithKey(ciphertext, priv)
+}
 
+func decryptWithKey(ciphertext string, priv *rsa.PrivateKey) (string, error) {
 	if !strings.HasPrefix(ciphertext, "ENC(") || !strings.HasSuffix(ciphertext, ")") {
 		return "", fmt.Errorf("invalid ciphertext format")
 	}
@@ -136,24 +208,34 @@ func Decrypt(ciphertext string) (string, error) {
 
 // ProcessConfigSecrets takes the raw YAML content, finds all "ENC(...)" strings,
 // decrypts them using the RSA Private Key, and returns the modified content.
+// Fails fast if any ENC(...) token is present and the key is missing or decryption fails.
 // -----------------------------------------------------------------------------
 
 func ProcessConfigSecrets(content []byte) ([]byte, error) {
-	// We only try to process if we can find the private key
-	_, err := getPrivateKey()
-	if err != nil {
-		// If key is missing, we assume no secrets need to be decrypted
+	if !ENC_REGEX.Match(content) {
 		return content, nil
 	}
 
+	priv, err := getPrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("secret decryption failed: %w", err)
+	}
+
+	var decryptErr error
 	result := ENC_REGEX.ReplaceAllFunc(content, func(match []byte) []byte {
-		decrypted, err := Decrypt(string(match))
+		if decryptErr != nil {
+			return match
+		}
+		decrypted, err := decryptWithKey(string(match), priv)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Failed to decrypt secret: %v\n", err)
+			decryptErr = fmt.Errorf("failed to decrypt secret token: %w", err)
 			return match
 		}
 		return []byte(decrypted)
 	})
+	if decryptErr != nil {
+		return nil, decryptErr
+	}
 
 	return result, nil
 }

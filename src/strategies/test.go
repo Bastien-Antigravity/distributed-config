@@ -154,19 +154,14 @@ func (s *TestStrategy) GetHandler() *network.ConfigProtoHandler {
 // -----------------------------------------------------------------------------
 
 func (s *TestStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
-	// 1. Prepare next state (Preview)
-	nextState := cfg.PreviewSet(updates)
-
-	// 2. Push to server if client is available
 	if s.Client != nil {
 		cfg.Logger.Info("Test: Pushing update request to Server...")
-		if err := s.Client.UpdateConfigMap(nextState); err != nil {
+		if err := s.Client.UpdateConfigMapWithOCC(updates, 0); err != nil {
 			return fmt.Errorf("test: server rejected update: %w", err)
 		}
 	}
 
-	// 3. Apply locally (Direct apply)
-	cfg.Apply(nextState)
+	cfg.Set(updates)
 	return nil
 }
 
@@ -190,7 +185,7 @@ func (s *TestStrategy) SetWithOCC(cfg *core.Config, updates map[string]map[strin
 func (s *TestStrategy) DeleteKeys(cfg *core.Config, deletions map[string][]string) error {
 	if s.Client != nil {
 		cfg.Logger.Info("Test: Pushing key deletions to Server...")
-		if err := s.Client.DeleteKeys(deletions); err != nil {
+		if err := s.Client.DeleteKeysWithOCC(deletions, 0); err != nil {
 			return err
 		}
 	}

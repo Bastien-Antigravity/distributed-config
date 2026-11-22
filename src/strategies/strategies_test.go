@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
+	"github.com/Bastien-Antigravity/distributed-config/src/network"
 	pb "github.com/Bastien-Antigravity/distributed-config/src/schemas"
 
 	safesocket "github.com/Bastien-Antigravity/safe-socket"
@@ -269,6 +270,11 @@ func TestCloudStrategy_SyncsCapabilitiesToLiveConfigAndServer(t *testing.T) {
 				if err := json.Unmarshal(msg.Payload, &pushed); err == nil {
 					putSyncCh <- pushed
 				}
+				ack, _ := proto.Marshal(&pb.ConfigMsg{
+					Command: pb.ConfigMsg_ACK,
+					Version: 2,
+				})
+				_, _ = conn.Write(ack)
 				return
 			}
 		}
@@ -506,6 +512,11 @@ func TestCloudStrategy_SkipsWildcardBindIPsOnLoadAndSync(t *testing.T) {
 				if err := json.Unmarshal(msg.Payload, &pushed); err == nil {
 					putSyncCh <- pushed
 				}
+				ack, _ := proto.Marshal(&pb.ConfigMsg{
+					Command: pb.ConfigMsg_ACK,
+					Version: 2,
+				})
+				_, _ = conn.Write(ack)
 				return
 			}
 		}
@@ -607,6 +618,127 @@ capabilities:
 	case <-time.After(3 * time.Second):
 		t.Fatal("timed out waiting for PUT_SYNC from CloudStrategy.Sync")
 	}
+}
+
+// -----------------------------------------------------------------------------
+
+func TestCloudStrategy_SetAndDeleteWaitForServerAck(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to allocate ephemeral port: %v", err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	serverSock, err := safesocket.CreateWithConfig("tcp-hello", addr, safesocket.SocketConfig{
+		Deadline: 5 * time.Second,
+	}, "server", false)
+	if err != nil {
+		t.Fatalf("failed to create mock config-server socket: %v", err)
+	}
+	defer func() { _ = serverSock.Close() }()
+
+	receivedDeltaCh := make(chan map[string]map[string]string, 1)
+	serverReady := make(chan struct{})
+	go func() {
+		if err := serverSock.Listen(); err != nil {
+			return
+		}
+		close(serverReady)
+		conn, err := serverSock.Accept()
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+
+		// 1. First request: PUT_SYNC from CloudStrategy.Set -> verify delta-only and reply ACK
+		data1, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		msg1 := &pb.ConfigMsg{}
+		_ = proto.Unmarshal(data1, msg1)
+		var delta map[string]map[string]string
+		_ = json.Unmarshal(msg1.Payload, &delta)
+		receivedDeltaCh <- delta
+
+		ack1, _ := proto.Marshal(&pb.ConfigMsg{Command: pb.ConfigMsg_ACK, Version: 10})
+		_, _ = conn.Write(ack1)
+
+		// 2. Second request: PUT_SYNC that server rejects with ERROR
+		_, err = conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		errResp, _ := proto.Marshal(&pb.ConfigMsg{
+			Command: pb.ConfigMsg_ERROR,
+			Payload: []byte("rejected by policy"),
+			Version: 10,
+		})
+		_, _ = conn.Write(errResp)
+
+		// 3. Third request: DELETE_SYNC -> reply ACK
+		_, err = conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		ack3, _ := proto.Marshal(&pb.ConfigMsg{Command: pb.ConfigMsg_ACK, Version: 11})
+		_, _ = conn.Write(ack3)
+	}()
+
+	<-serverReady
+
+	cfg := &core.Config{Logger: &strategyTestLogger{t: t}}
+	cfg.Set(map[string]map[string]string{
+		"existing_section": {" untouched ": "true"},
+	})
+
+	strategy := &CloudStrategy{Profile: "production", ReadOnly: false}
+	client, err := safesocketClientForTest(addr, cfg)
+	if err != nil {
+		t.Fatalf("failed to connect client: %v", err)
+	}
+	strategy.Client = client
+	defer func() { _ = strategy.Close() }()
+
+	// 1. Set should send ONLY the delta and apply locally after ACK
+	err = strategy.Set(cfg, map[string]map[string]string{
+		"delta_sec": {"k": "v1"},
+	})
+	if err != nil {
+		t.Fatalf("expected Set to succeed on ACK, got: %v", err)
+	}
+	pushedDelta := <-receivedDeltaCh
+	if _, hasExisting := pushedDelta["existing_section"]; hasExisting {
+		t.Fatalf("expected Set to push delta only, but full state was sent: %+v", pushedDelta)
+	}
+	if cfg.Get("delta_sec", "k") != "v1" {
+		t.Fatalf("expected local config to be updated after ACK, got %q", cfg.Get("delta_sec", "k"))
+	}
+
+	// 2. Rejected Set must NOT mutate local state
+	err = strategy.Set(cfg, map[string]map[string]string{
+		"delta_sec": {"k": "v2_rejected"},
+	})
+	if err == nil {
+		t.Fatal("expected Set to return error when server replies ERROR")
+	}
+	if cfg.Get("delta_sec", "k") != "v1" {
+		t.Fatalf("expected local state to remain 'v1' after rejected Set, got %q", cfg.Get("delta_sec", "k"))
+	}
+
+	// 3. DeleteKeys waits for ACK and removes key locally
+	if err := strategy.DeleteKeys(cfg, map[string][]string{"delta_sec": {"k"}}); err != nil {
+		t.Fatalf("expected DeleteKeys to succeed on ACK, got: %v", err)
+	}
+	if cfg.Get("delta_sec", "k") != "" {
+		t.Fatalf("expected key to be deleted after ACK, got %q", cfg.Get("delta_sec", "k"))
+	}
+}
+
+func safesocketClientForTest(addr string, cfg *core.Config) (*network.Client, error) {
+	return network.NewClient(addr, cfg)
 }
 
 // -----------------------------------------------------------------------------
