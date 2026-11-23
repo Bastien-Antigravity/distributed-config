@@ -43,6 +43,8 @@ func main() {
 		handleKeygen()
 	case "encrypt":
 		handleEncrypt()
+	case "tlsgen":
+		handleTLSGen()
 	case "help":
 		printUsage()
 	default:
@@ -57,6 +59,7 @@ func printUsage() {
 	fmt.Println("\nCommands:")
 	fmt.Println("  keygen   Generate a new RSA key pair")
 	fmt.Println("  encrypt  Encrypt a secret token using a public key")
+	fmt.Println("  tlsgen   Generate Fleet Root CA and per-service mTLS certificates")
 	fmt.Println("  help     Show this help message")
 	fmt.Println("\nRun 'config-tool <command> --help' for more information on a command.")
 }
