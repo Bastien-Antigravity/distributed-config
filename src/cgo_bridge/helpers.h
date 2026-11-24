@@ -1,3 +1,16 @@
+/*
+ESSENTIAL PROCESS:
+Header definitions for distributed-config CGO error codes and thread-local error state.
+
+DATA FLOW:
+1. Input: Included by errors.c and CGO bridge files.
+2. Logic: Declares DISTCONF_* error constants and thread-local error setter prototype.
+3. Output: Shared C ABI error symbols.
+
+KEY PARAMETERS:
+- DISTCONF_SUCCESS .. DISTCONF_ERR_INVALID_INPUT: Error code constants.
+*/
+
 #ifndef HELPERS_H
 #define HELPERS_H
 

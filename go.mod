@@ -3,7 +3,7 @@ module github.com/Bastien-Antigravity/distributed-config
 go 1.25.4
 
 require (
-	github.com/Bastien-Antigravity/safe-socket v0.0.1
+	github.com/Bastien-Antigravity/safe-socket v0.0.2-0.20261123230542-2a4f4de20a0f
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.11
@@ -21,11 +21,4 @@ require (
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
-)
-
-replace (
-	github.com/Bastien-Antigravity/flexible-logger => ../flexible-logger
-	github.com/Bastien-Antigravity/microservice-toolbox => ../microservice-toolbox
-	github.com/Bastien-Antigravity/safe-socket => ../safe-socket
-	github.com/Bastien-Antigravity/universal-logger => ../universal-logger
 )
