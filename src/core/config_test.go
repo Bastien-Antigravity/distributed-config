@@ -428,3 +428,62 @@ func TestConfig_DynamicCapabilityGetAddress(t *testing.T) {
 		t.Fatalf("Expected prefixed_service address 10.10.0.6:7070, got %q (err=%v)", prefAddr, err)
 	}
 }
+
+// -----------------------------------------------------------------------------
+
+func TestConfig_ResolveCapabilityAndVersion(t *testing.T) {
+	cfg := NewDefaultConfig()
+	cfg.Capabilities["db"] = map[string]interface{}{
+		"ip":        "10.0.0.1",
+		"port":      5432,
+		"rest_port": 8080,
+		"pool":      "10",
+	}
+
+	cfg.Set(map[string]map[string]string{
+		"db": {
+			"ip":   "10.0.0.2",
+			"pool": "20",
+		},
+		"capabilities": {
+			"db.pool": "30",
+		},
+	})
+
+	resolved, err := cfg.ResolveCapability("db")
+	if err != nil {
+		t.Fatalf("ResolveCapability failed: %v", err)
+	}
+	if resolved["ip"] != "10.0.0.2" {
+		t.Errorf("Expected direct LiveConfig ip 10.0.0.2, got %v", resolved["ip"])
+	}
+	if resolved["pool"] != "30" {
+		t.Errorf("Expected dotted LiveConfig pool 30 to take precedence, got %v", resolved["pool"])
+	}
+	if resolved["port"] != "5432" || resolved["rest_port"] != "8080" {
+		t.Errorf("Expected port/rest_port normalized to strings, got port=%T(%v) rest_port=%T(%v)",
+			resolved["port"], resolved["port"], resolved["rest_port"], resolved["rest_port"])
+	}
+
+	// Mutating returned map must not affect subsequent calls
+	resolved["pool"] = "mutated"
+	resolved2, err := cfg.ResolveCapability("db")
+	if err != nil {
+		t.Fatalf("Second ResolveCapability failed: %v", err)
+	}
+	if resolved2["pool"] != "30" {
+		t.Errorf("Expected detached map, got %v", resolved2["pool"])
+	}
+
+	if _, err := cfg.ResolveCapability("nonexistent"); err == nil {
+		t.Fatal("Expected error for missing capability")
+	}
+
+	if cfg.GetVersion() != 0 {
+		t.Errorf("Expected initial version 0, got %d", cfg.GetVersion())
+	}
+	cfg.SetVersion(42)
+	if cfg.GetVersion() != 42 {
+		t.Errorf("Expected version 42, got %d", cfg.GetVersion())
+	}
+}

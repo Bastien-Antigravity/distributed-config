@@ -13,19 +13,22 @@ tags:
 
 ## 📌 Reminders: Pending Ecosystem Verification & Design Review
 - [ ] **Retain `CommonFilePath` temporarily in `CommonConfig` (`src/core/config.go`)**:
-  - *Context*: `config-server` currently references `s.AppConfig.Common.CommonFilePath` in `src/server/controller.go:120`.
-  - *Action*: Keep field in `CommonConfig` and placeholder in `NewSkeletonConfig()` for ecosystem compatibility. Schedule deprecation and removal once `config-server` has been migrated to modern configuration resolution.
+  - *Context*: `config-server` currently references `s.AppConfig.Common.CommonFilePath` in `src/server/controller.go:135`.
+  - *Action*: Keep field in `CommonConfig` for ecosystem compatibility. Schedule deprecation and removal once `config-server` has been migrated to modern configuration resolution.
 - [ ] **Re-introduce Empty Skeleton Generation in a Clean Manner**:
   - *Context*: Auto-creating skeleton YAML files during runtime configuration loading was removed to enforce fail-fast discovery. However, skeleton templates are useful for developer onboarding and project initialization.
   - *Action*: Re-introduce empty skeleton generation via an explicit CLI command (e.g., `config-tool init` or `config-cli init --profile <name>`) or an opt-in bootstrap utility rather than implicit runtime file creation on missing configuration.
 
 ## 🏗️ Architecture & Reliability (Audit Action Items)
-- [ ] **`CheckTestIPs()` Conditional Re-Integration (`src/loader/validator.go` / `src/strategies/test.go`)**:
-  - *Context*: `CheckTestIPs()` strictly enforces that all capability IPs equal `127.0.0.2`. It was commented out in `test.go` because Docker test pipelines use container IPs (`172.x.x.x`) or hostnames, and falling back to `standalone.yaml` uses `127.0.0.1`.
-  - *Action*: Re-enable conditionally behind an environment flag (e.g., `CHECK_TEST_IPS=true`) or when an explicit `test.yaml` is loaded, avoiding false test failures in Docker environments while preserving local test integrity checks.
-- [ ] **Thread-Local Storage / Error Reporting Sanitization in CGO Bridge**: Address OS thread affinity in `errors.c` when accessed via Go goroutines, and guard against `strdup` memory leaks across foreign language calls.
+- [ ] **Upgrade `ConfigMsg.Version` from `int32` to `uint64` across `distributed-config` & `config-server`**: Currently guarded with `math.MaxInt32` overflow check in `HandleOutgoingWithVersion` until synchronized across protobuf schemas.
 
 ## ✅ Completed
+- [x] **`CheckTestIPs()` Conditional Re-Integration (`src/loader/validator.go` / `src/strategies/test.go`)**: Enforced behind `CHECK_TEST_IPS=true` so Docker test pipelines remain unaffected while local test IP checks can be opted into.
+- [x] **Thread-Local & Fallback Fixed-Buffer Error Storage in CGO Bridge (`src/cgo_bridge/errors.c`, `helpers.h`, `cmd/libdistconf/main.go`)**: Replaced `strdup`/`free` heap allocations with fixed `512`-byte thread-local + mutex-guarded global buffers (`get_last_error()`, `get_last_error_code()`), eliminating leaks and Go thread-migration `NULL` errors.
+- [x] **Centralized `Config.ResolveCapability()` & `Config.GetVersion()` (`src/core/config.go`, `src/facade/config_facade.go`)**: Consolidated capability merge logic in `ResolveCapability()` and synchronized `atomic.Uint64` version state across `ConfigProtoHandler` and `core.Config`.
+- [x] **Explicit `CONFIG_PATH` Fail-Fast (`src/loader/path_resolver.go`, `src/loader/loader.go`)**: Removed silent fallback when explicit `CONFIG_PATH` is missing so invalid explicit paths fail fast.
+- [x] **Private Key Precedence & Production Hardening (`src/secret/crypto.go`)**: Prioritized `/etc/bastien/private.pem` over `./private.pem` and disabled `./private.pem` fallback when `APP_ENV=production`.
+- [x] **Dead Code Removal & Strategy Consolidation**: Removed unused `src/core/skeleton.go` (`NewSkeletonConfig`), `Config.Apply()`, and `loader.ValidateCommonConfig()`; consolidated `ConfigStrategy` interface methods, fixed double-delete in `facade.Config.DeleteKeys`/`DeleteKeysWithOCC`, deduplicated `hydrateCapabilitiesFromLiveConfig()`, and added `GetRESTAddress` / Bastien Python import parity across polyglot wrappers.
 - [x] **RCU Writer Lock & Atomic Swap Sequence (`src/core/config.go`, `src/network/proto_handler.go`)**: Added `writeMu` to `core.Config` to serialize `Set()`, `Delete()`, `Apply()`, and `ReplaceLive()` mutations while keeping `Get()`, `GetCapability()`, and `GetAddress()` 100% lock-free.
 - [x] **Dynamic Capability Resolution (`src/core/config.go:getAddr()`)**: Enabled `GetAddress()`, `GetGRPCAddress()`, and `GetRESTAddress()` to resolve capabilities added dynamically via `LiveConfig` even when absent from static `c.Capabilities`.
 - [x] **Revision Monotonicity & Stale Snapshot Protection (`src/network/proto_handler.go`)**: Rejected stale/duplicate `BROADCAST_SYNC` (`incoming <= lastSeenVersion`) and delayed `GET_SYNC`/`FULL_REFRESH` snapshots (`incoming < lastSeenVersion`).

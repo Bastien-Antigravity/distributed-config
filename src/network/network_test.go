@@ -17,6 +17,7 @@ package network
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
@@ -410,6 +411,17 @@ func TestNetworkProtoHandler(t *testing.T) {
 		}
 		if h.GetLastSeenVersion() != 11 || cfg.Get("SEC", "KEY") != "V11_FRESH" {
 			t.Fatalf("Expected version 11 and V11_FRESH, got ver=%d val=%q", h.GetLastSeenVersion(), cfg.Get("SEC", "KEY"))
+		}
+		if cfg.GetVersion() != 11 {
+			t.Fatalf("Expected parent Config.GetVersion() to stay synchronized at 11, got %d", cfg.GetVersion())
+		}
+	})
+
+	t.Run("TestOutgoingVersionOverflowRejected", func(t *testing.T) {
+		h := NewConfigHandler("OverflowHandler", config)
+		_, err := h.HandleOutgoingWithVersion(pb.ConfigMsg_PUT_SYNC, map[string]map[string]string{"S": {"K": "V"}}, uint64(math.MaxInt32)+1)
+		if err == nil {
+			t.Fatal("Expected error when outgoing version exceeds protobuf int32 maximum")
 		}
 	})
 }

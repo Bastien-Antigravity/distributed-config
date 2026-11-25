@@ -96,7 +96,7 @@ func TestCloudStrategy_Production(t *testing.T) {
 
 	t.Run("TestProduction_IPSanityFailure", func(t *testing.T) {
 		// Mock out a bad production file containing a test IP.
-		_ = os.MkdirAll("config", 0755)
+		t.Setenv("DOCKER_ENV", "")
 		badProdYaml := `
 capabilities:
   log_server:
@@ -106,7 +106,7 @@ capabilities:
     ip: "192.168.1.100"
     port: "3306"
 `
-		_ = os.WriteFile("config/production.yaml", []byte(badProdYaml), 0644)
+		_ = os.WriteFile("production.yaml", []byte(badProdYaml), 0644)
 
 		cfg := &core.Config{Logger: &strategyTestLogger{t: t}}
 		strategy := &CloudStrategy{Profile: "production", ReadOnly: false}

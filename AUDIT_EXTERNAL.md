@@ -1,1210 +1,310 @@
-Deep technical review — distributed-config
-Repository: Bastien-Antigravity/distributed-config · Branch: develop · Focus: configuration discovery, precedence, merging, profiles, live synchronization, concurrency, encryption and cross-language integration
 
-This repository is arguably even more important than config-server.
+Initial high-priority findings
+One security issue stands out immediately: the RSA key-generation command does not protect the generated private key file.
 
-Why? Because config-server distributes configuration, whereas distributed-config decides what configuration each microservice actually uses.
+In cmd/config-tool/main.go, handleKeygen() creates private.pem with os.Create(), which uses permissions of 0666 filtered by the process umask. On a typical Unix system with umask 022, that produces a file readable by other local users (0644). The command labels the key “KEEP THIS SECRET”, but does not enforce that protection.
 
-It is effectively the configuration runtime shared by the entire ecosystem.
+This is inconsistent with the newer tlsgen implementation, which writes private keys with 0600 permissions and has tests verifying those permissions.
 
-I see a fairly ambitious design:
-- Multiple configuration sources.
-- Profile-based loading.
-- Environment-variable expansion.
-- Remote configuration synchronization.
-- Atomic pointer swaps.
-- Dynamic callbacks.
-- RSA-based secret handling.
-- A C ABI for Python, Rust, C/C++ and other consumers.
-The biggest architectural question is whether all these sources have a clearly defined and deterministic precedence, and whether the same precedence is respected by the Go implementation, the remote server and the polyglot interfaces.
+There is also a concrete networking defect: GetAddress() builds addresses using fmt.Sprintf("%s:%s", host, port). For an IPv6 wildcard address, it returns :::7000; the existing test explicitly expects that malformed address instead of a valid bracketed address such as [::]:7000. IPv6 service endpoints therefore need correction, not just additional documentation.
 
-That is where I would concentrate the review.
-1. Understanding the architecture
-The library has two distinct configuration domains:
-- Static configuration: Common, Capabilities, profile settings, YAML and environment-derived values.
-- Live configuration: dynamic key/value overrides received from the configuration server or changed at runtime.
-This distinction is important because the two domains are merged at different points.
-Configuration sources
+Sources: config-tool/main.go · tlsgen.go · config.go · config_test.go
 
-Defaults · YAML · Environment · Remote server · Runtime updates
+A further important finding concerns the new certificate tooling: tlsgen can generate per-service certificates, and safe-socket supports TLS and mTLS configuration fields. However, the inspected distributed-config client still connects using the tcp-hello profile and supplies no certificate, key or CA configuration.
 
+So certificate generation is not the same as securing the configuration channel. I cannot establish mTLS protection on this client path from the current implementation. The TLS tooling needs to be connected to the actual client/server transport configuration, with peer verification and service identity checks.
 
-Static Config
+Sources: network/client.go · safe-socket/socket_config.go · tlsgen.go
+distributed-config — repository audit
+Repository: Bastien-Antigravity/distributed-config · Branch: develop · Reviewed commit: 695bfba · 24 November 2026
 
-CommonConfig + Capabilities
+Strong architecture
+ Live-sync reliability and security gaps
 
+The overall design is ambitious and generally well structured. This is more than a YAML loader: it is the configuration foundation for the wider microservice fleet, with dynamic updates, optimistic concurrency, service discovery, secret handling and a cross-language API.
 
-LiveConfig
+The recent work on atomic configuration snapshots, serialized writers, stale-revision protection and acknowledged updates is particularly valuable.
 
-Atomic pointer to nested maps
+My assessment is that the architecture is stronger than the current operational guarantees. The most important concerns are the disconnected-client behavior, missing acknowledgement correlation, and the fact that the newly generated certificates are not yet wired into the configuration client's transport.
 
+1. Detailed findings
+   P1 — Disconnected writes can be reported as successful
+   This is one of the most important defects in the current implementation.
 
-
-
-Config access and merge layer
-
-Get · GetCapability · GetAddress · GetGRPCAddress
-
-
-Go services
-
-
-C ABI / FFI
-
-Python · Rust · C++ · VBA
-
-
-
-
-The separation is reasonable. It also makes lock-free reads possible without repeatedly parsing YAML or contacting the configuration server.
-
-The main implementation files I examined include:
-- core/config.go
-- strategies/cloud.go
-- strategies/test.go
-- network/client.go
-- network/proto_handler.go
-
-2. Configuration precedence: the first thing to clarify
-This is one of the most important aspects of the library.
-
-The project documentation describes a layered configuration system, but the precedence is not expressed consistently everywhere.
-
-For example:
-
-The project DNA describes:
-CLI flags
-    >
-Local YAML
-    >
-Config Server
-    >
-Environment variables
-
-
-However, the CloudStrategy implementation does something more nuanced.
-A. Actual production loading sequence
-Looking at CloudStrategy.Load():
-1. Load local YAML
-
-   Initial static configuration and capabilities
-2. Apply environment overrides
-
-   Common settings such as name and public IP
-3. Connect to config-server
-
-   Retrieve dynamic LiveConfig
-4. Merge server capabilities into static capabilities
-
-   Populate capability baseline
-5. Reload local YAML
-
-   Local file wins for static configuration
-6. Synchronize capabilities into LiveConfig
-
-   Create the final live capability representation
-7. Validate mandatory services
-
-   Check log_server and config_server
-
-Source: cloud.go.
-GitHub+2
-
-B. What does this mean in practice?
-Suppose we have the following values:
-Source	database.host
-Default	127.0.0.1
-YAML	database.local
-Config server	database.remote
-Environment interpolation	database.env
-
-The final value depends on which configuration domain is being read.
-
-For static capabilities, the local YAML takes precedence over the remote capability baseline.
-
-For live configuration, remote values are stored in LiveConfig, and GetCapability() merges them over static capability values.
-
-Environment interpolation occurs while loading YAML, whereas LoadCommonFromEnv() separately overrides selected common fields.
-
-Therefore, there isn't one universal precedence chain.
-
-My recommendation: define precedence independently for:
-1. Common configuration.
-2. Static capabilities.
-3. Dynamic LiveConfig.
-4. Secret resolution.
-Then expose one documented precedence table.
-
-This will prevent different parts of the ecosystem from implementing their own interpretations.
-3. The merging mechanism inside Config.GetCapability()
-This is where the library becomes interesting.
-
-The method:
-func (c *Config) GetCapability(
-    key string,
-    target interface{},
-) error
-
-
-does not simply return a capability from YAML.
-
-It constructs a merged representation.
-
-Imagine the static YAML:
-capabilities:
-  database:
-    ip: 192.168.1.10
-    port: "5432"
-    max_connections: "100"
-
-
-And the remote server provides:
-database:
-  ip: 10.0.0.20
-  max_connections: "200"
-
-
-The method first copies the static capability map.
-
-Then it applies the live overrides.
-Static capability
-ip: 192.168.1.10
-port: "5432"
-max_connections: "100"
-
-
-
-Live override
-ip: 10.0.0.20
-max_connections: "200"
-
-
-
-Merged result
-ip: 10.0.0.20
-port: "5432"
-max_connections: "200"
-
-
-Live values win
-
-There is another feature: the method also supports dotted capability keys in the capabilities LiveConfig section.
-
-For example:
-capabilities:
-    database.ip = 10.0.0.20
-
-
-The method extracts the database. prefix and merges the remaining keys into the database capability.
-
-This is useful for backward compatibility and flexible updates.
-
-GitHub+2
-A. A potential weakness: duplicated merge logic
-The library currently has several places where capability values are merged:
-- GetCapability()
-- getCapabilityField()
-- syncCapabilitiesToLiveConfig()
-- CloudStrategy.Load()
-- TestStrategy.Load()
-This creates a risk of precedence drift.
-
-For example, GetCapability() and getCapabilityField() both prioritize live values, but they have different implementations for extracting them.
-
-I would introduce a single internal function:
-func (c *Config) ResolveCapability(
-    name string,
-) (map[string]interface{}, error)
-
-
-Its responsibilities:
-1. Read static capability.
-2. Read direct LiveConfig overrides.
-3. Read dotted LiveConfig overrides.
-4. Apply the documented precedence.
-5. Return a detached merged representation.
-Then GetCapability(), GetAddress() and other accessors can reuse it.
-
-This would remove duplicated merging logic and make future changes much safer.
-B. The missing-capability problem
-There is a particularly interesting issue in getAddr().
-
-The current implementation checks:
-if c.Capabilities != nil {
-    if _, ok := c.Capabilities[capability]; !ok {
-        return "", fmt.Errorf(
-            "capability %s not found",
-            capability,
-        )
-    }
-}
-
-
-This occurs before attempting to resolve the live override.
-
-Imagine:
-# Static configuration
-capabilities:
-  database:
-    ip: localhost
-    port: "5432"
-
-
-Then the remote server introduces:
-analytics.ip = 10.0.0.20
-analytics.port = 9000
-
-
-The live configuration contains a perfectly valid analytics capability.
-
-But because Capabilities is non-nil and does not contain analytics, getAddr() rejects it.
-Confirmed code-level issue
-The TODO file explicitly recognizes this limitation.
-
-Recommendation: resolve the merged capability first, then check whether its host and port are available. Do not require the capability to exist in the static baseline if dynamic capabilities are intended to be supported.
-
-GitHub+1
-4. The most serious issue: concurrent writers can overwrite each other
-This is the first thing I would fix.
-
-The library uses an atomic pointer for reads, which is good.
-
-However, atomic pointer replacement does not automatically make a read-modify-write operation atomic.
-
-Look at Config.Set():
-func (c *Config) Set(
-    updates map[string]map[string]string,
-) {
-    if updates == nil {
-        return
-    }
-
-    newMap := c.PreviewSet(updates)
-    c.LiveConfig.Store(newMap)
-}
-
-
-PreviewSet() performs:
-1. Load current snapshot.
-2. Deep-copy current map.
-3. Apply updates.
-4. Return new map.
-Then Set() stores it.
-
-The problem is that two writers can perform those steps simultaneously.
-A. Concrete example
-Initial state:
-database:
-  host: localhost
-
-
-Two goroutines execute:
-// Goroutine A
-cfg.Set(map[string]map[string]string{
-    "database": {"host": "db.internal"},
-})
-
-// Goroutine B
-cfg.Set(map[string]map[string]string{
-    "redis": {"host": "redis.internal"},
-})
-
-
-Possible execution:
-Lost update scenario
-Initial snapshot
-database.host = localhost
-
-
-Goroutine A
-
-Reads snapshot 100.
-
-Creates snapshot 101:
-database.host = db.internal
-
-
-
-Goroutine B
-
-Reads snapshot 100.
-
-Creates snapshot 102:
-database.host = localhost
-redis.host = redis.internal
-
-
-
-
-
-Final atomic pointer swap
-
-Goroutine A stores 101.
-
-Goroutine B stores 102.
-
-The database update is lost.
-
-The atomic operation guarantees that readers never see a partially written map. It does not guarantee that concurrent modifications are merged.
-
-The same fundamental problem exists in Delete() and in the PreviewSet() → Apply() pattern.
-
-The repository's TODO actually identifies this exact issue as a deferred architecture improvement.
-GitHub+2
-
-B. My preferred correction
-Use a writer mutex while retaining lock-free reads.
-type Config struct {
-    // Existing configuration fields
-
-    writeMu sync.Mutex
-}
-
-
-Then:
-func (c *Config) Set(
-    updates map[string]map[string]string,
-) {
-    if updates == nil {
-        return
-    }
-
-    c.writeMu.Lock()
-    defer c.writeMu.Unlock()
-
-    next := c.PreviewSet(updates)
-    c.LiveConfig.Store(next)
-}
-
-
-This ensures that each writer reads the snapshot produced by the previous writer.
-
-The result:
-Initial
-   |
-   v
-Update A
-   |
-   v
-Update B
-   |
-   v
-Final snapshot containing A + B
-
-
-Reads remain lock-free.
-
-One important detail: the public PreviewSet() and Apply() methods should not be treated as a transaction by themselves. The strategy-level operations must also serialize their read/preview/remote-commit/local-apply lifecycle, or use revision-based compare-and-swap.
-
-Otherwise, the race simply moves into CloudStrategy.Set().
-
-I would use a mutex first rather than a CAS loop. Configuration updates are relatively infrequent, and correctness is more important than optimizing write contention.
-
-5. CloudStrategy.Set(): a problem with remote synchronization
-This is another important finding.
-
-Consider the current method:
-func (s *CloudStrategy) Set(
-    cfg *core.Config,
-    updates map[string]map[string]string,
-) error {
-
-    nextState := cfg.PreviewSet(updates)
-
-    if err := s.Client.UpdateConfigMap(nextState); err != nil {
-        return err
-    }
-
-    cfg.Apply(nextState)
+In src/network/client.go, sendWithUpdateAck() contains a branch that returns nil when the socket is absent:
+if sock == nil {
+    c.Handler.parentConfig.Logger.Info("Mock: sendWithUpdateAck simulated")
     return nil
 }
 
+The same principle appears in requestSync().
 
-At first glance, this looks like a transactional operation:
-1. Calculate the next state.
-2. Push it to the authoritative server.
-3. Apply locally if successful.
-But the network method being called is not actually waiting for server acceptance.
-A. UpdateConfigMap only sends the message
-Inside network/client.go:
-func (c *Client) UpdateConfigMap(
-    m *map[string]map[string]string,
-) error {
+The problem is that this behavior is not isolated to a test implementation. A real client can lose its socket while its Client object still exists. The Watch() goroutine sets c.sock to nil while it tries to reconnect.
 
-    data, err := c.Handler.HandleOutgoing(
-        pb.ConfigMsg_PUT_SYNC,
-        m,
-    )
+During that period:
 
-    if err != nil {
-        return err
-    }
+1. The application calls Set().
+2. CloudStrategy sends the update through the existing client.
+3. The client finds no socket and returns success.
+4. CloudStrategy applies the update locally.
+5. The caller receives no indication that the remote server never acknowledged the change.
+   When the connection recovers, the next full synchronization may overwrite the local-only update.
 
-    if sock != nil {
-        return sock.Send(data)
-    }
+There is a second problem: if the initial NewClient() connection fails, CloudStrategy.Load() does not start a Watch() loop. The application remains in local-only mode, with no automatic client reconstruction.
 
-    return nil
+Recommendation: remove the mock-success behavior from production network code. A disconnected live client must return an explicit error or an explicit offline status. If offline writes are allowed, queue them with durable status and reconcile them after reconnecting. Distinguish LOCAL_ONLY, PENDING, ACKNOWLEDGED and REJECTED.
+
+Source: client.go · cloud.go
+P1 — Server ACKs have no request correlation ID
+The current protocol uses:
+message ConfigMsg {
+    Cmd Command = 1;
+    bytes Payload = 2;
+    int32 Version = 3;
 }
 
+There is no request ID.
 
-It returns success when the socket accepts the outgoing data.
+The client serializes outstanding synchronization and update operations using syncMu, which is useful. However, consider this sequence:
 
-It does not wait for the server's ACK or ERROR response.
+1. Update A is sent.
+2. It times out after five seconds.
+3. The callback for A is removed.
+4. Update B is sent, installing a new callback.
+5. A delayed ACK for A arrives.
+6. The handler invokes the currently installed callback, which belongs to B.
+   The client can therefore interpret an acknowledgement for A as confirmation of B.
 
-The client has a separate sendWithUpdateAck() method that does wait for the response.
+That is a serious consistency problem for configuration changes involving service endpoints, credentials or operational policies.
 
-This means CloudStrategy.Set() can apply a local configuration that the server has subsequently rejected.
-Important consistency issue
-Source: cloud.go and client.go.
-GitHub+2
+Recommendation: add a unique request_id to the protocol and echo it in ACK and ERROR messages. Maintain a pending-request map keyed by ID. A late response must never satisfy a newer operation.
 
-B. How I would correct it
-Use an acknowledged update operation:
-if err := s.Client.UpdateConfigMapWithOCC(
-    updates,
-    expectedVersion,
-); err != nil {
-    return err
-}
+Also, consider changing Version from int32 to uint64: the public API uses uint64, but outgoing messages cast it to int32, which creates an eventual overflow/truncation problem.
 
+Sources: config.proto · proto_handler.go · client.go
+P1 — TLS certificate generation is not integrated into this client
+The new tlsgen command is a good addition. It generates a fleet CA and per-service certificates. The tests verify certificate chains, distinct keys and private-key permissions.
 
-Then commit locally only after acceptance.
+However, the actual distributed-config client still creates its socket using:
+profile := fmt.Sprintf("tcp-hello:%s", identity)
 
-However, I would go further.
+And the SocketConfig passed to safe-socket contains only PublicIP and Deadline. It does not provide CertFile, KeyFile, CAFile or ServerName.
 
-The ideal operation should return the committed server revision:
-type UpdateResult struct {
-    Revision uint64
-}
+The underlying safe-socket library supports TLS profiles and those certificate fields, but the inspected configuration client does not use them.
 
+Consequently, the presence of tlsgen does not establish that the config-server connection is protected by mTLS.
 
-Then the local store can associate its snapshot with the exact server revision that accepted it.
+This is particularly important because the configuration channel can distribute service addresses and sensitive configuration values. Protecting secrets at rest is not sufficient if the channel distributing configuration is not authenticated and encrypted.
 
-This also makes reconnection and recovery much easier.
-C. Another subtle issue: sending the entire snapshot
-CloudStrategy.Set() calculates the complete next state and sends it to the server, rather than sending only the delta.
+Recommendation: make transport security an explicit configuration profile. For production, require a TLS transport, server certificate verification, client certificate authentication and peer identity validation. Do not silently fall back to plain TCP.
 
-This is not inherently wrong, but it introduces unnecessary coupling.
+Sources: network/client.go · tlsgen.go · safe-socket SocketConfig
+P1 — Configuration discovery can silently select a different file
+ResolveConfigPath() checks CONFIG_PATH, but if the specified path does not exist or is a directory, it continues searching.
 
-Imagine:
-Current configuration: 1000 keys
-Actual update: 1 key
+That means a deployment explicitly requesting:
+CONFIG_PATH=/etc/my-service/production.yaml
 
+could unexpectedly load another discovered configuration file if the requested file is missing.
 
-The client serializes and transmits all 1000 keys.
+This is dangerous because configuration selection is part of the security boundary. An operator expects the explicit path to be authoritative.
 
-That means:
-- Larger network messages.
-- More JSON serialization.
-- More server-side processing.
-- More opportunities for concurrent updates to overwrite one another.
-I would send the delta to the server and let the server perform the authoritative merge.
+Recommendation: if CONFIG_PATH is set, treat it as authoritative. Return a clear error if it cannot be resolved or loaded. Apply the same principle to explicitly configured shared paths.
 
-Then the server returns the new revision.
+Source: path_resolver.go
+P1 — YAML parsing changes quoted strings into booleans
+In ProcessNode(), all scalar values are retyped according to their text content.
 
-This makes the server the single authority over shared configuration.
+The code checks whether the lowercased value is true or false, then assigns the YAML boolean tag.
 
-6. Ordering and revision handling: an issue in the protobuf handler
-This is particularly important because config-server already has a revision mechanism.
-
-The client tracks:
-lastSeenVersion uint64
-
-
-And checks incoming broadcasts:
-if uint64(msg.Version) > h.lastSeenVersion+1 {
-    // Sequence gap detected
-}
-
-
-When a gap is detected, it triggers a FULL_REFRESH.
-
-This is a good concept.
-
-But I found two important problems.
-A. Older messages can move the revision backwards
-The current implementation does:
-if received > lastSeenVersion+1 {
-    // Gap
-} else {
-    lastSeenVersion = received
-}
-
-
-There is no explicit handling of:
-received < lastSeenVersion
-
+It does not first check whether the original YAML node was explicitly quoted as a string.
 
 For example:
-Last seen: 105
-Incoming:  104
-
-
-The code enters the else branch and sets:
-lastSeenVersion = 104
-
-
-The client has now moved backwards.
-
-It can subsequently accept stale updates that should have been rejected.
-
-Correction:
-if received <= lastSeenVersion {
-    // Ignore duplicate or stale update
-    return nil
-}
-
-if received > lastSeenVersion+1 {
-    // Trigger full refresh
-}
-
-
-Then advance the revision only after the relevant update has been safely applied.
-B. A full refresh can overwrite a newer update
-This is more subtle.
-
-Imagine:
-Client at revision 100
-
-Receives revision 103
-    |
-    v
-Detects gap
-    |
-    v
-Starts FULL_REFRESH request
-
-Receives revision 104
-    |
-    v
-Applies delta 104
-
-FULL_REFRESH response arrives with revision 103
-    |
-    v
-updateLiveConfig() replaces entire snapshot
-
-
-The client can end up with revision 103 after having already applied revision 104.
-
-The current updateLiveConfig() performs an unconditional atomic pointer swap:
-h.parentConfig.LiveConfig.Store(&sections)
-
-
-It does not check whether the snapshot is older than the currently applied state.
-Potential state rollback
-
-GitHub+1
-C. My recommended revision protocol
-I would make every update carry a revision and use one common application function:
-func (c *Config) ApplySnapshot(
-    revision uint64,
-    data map[string]map[string]string,
-) bool
-
-
-Its responsibilities:
-1. Serialize against other writers.
-2. Reject revisions older than the current snapshot.
-3. Ignore duplicate revisions.
-4. Apply the complete snapshot.
-5. Publish the new revision and map consistently.
-A revision and map should ideally be published together in one immutable snapshot:
-type LiveSnapshot struct {
-    Revision uint64
-    Data     map[string]map[string]string
-}
-
-
-This is cleaner than maintaining a separate atomic pointer and revision variable.
-
-One atomic pointer swap then represents one complete version of the configuration.
-
-That is the model I would strongly recommend.
-
-7. Configuration discovery: path resolution is more complicated than necessary
-I like the intention behind ResolveConfigPath().
-
-It attempts to support:
-- CONFIG_PATH.
-- SHARED_CONFIG_PATH.
-- Executable directory.
-- Current working directory.
-- Source-code directory when using go run.
-- Project-root discovery using .git, go.mod, Cargo.toml and pyproject.toml.
-- Profile-specific YAML files.
-- standalone.yaml fallback.
-This is quite flexible.
-
-However, I think the implementation has accumulated too many discovery rules.
-A. The SHARED_CONFIG_PATH ambiguity
-The README describes SHARED_CONFIG_PATH as accepting a configuration file or root directory.
-
-But the implementation does:
-if customPath := os.Getenv("SHARED_CONFIG_PATH"); customPath != "" {
-    if _, err := os.Stat(customPath); err == nil {
-        return customPath
-    }
-}
-
-
-It returns the path directly.
-
-If that path is a directory, LoadYAML() subsequently attempts to read it as a file.
-
-That will fail.
-
-I would define the contract explicitly:
-CONFIG_PATH
-    = exact YAML file
-
-SHARED_CONFIG_PATH
-    = directory containing profile YAML files
-
-
-Then resolve the profile filename inside the shared directory.
-B. Invalid explicit paths should not silently fall back
-Consider:
-CONFIG_PATH=/etc/myapp/production.yaml
-
-
-If the file does not exist, the resolver continues searching other directories.
-
-That is potentially dangerous.
-
-You might think you are loading the production configuration from /etc/myapp/production.yaml, while the application actually loads another file.
-
-For an explicitly configured path, I would fail immediately with a clear error.
-
-Automatic discovery should only happen when no explicit path was supplied.
-C. Caller-stack discovery is expensive conceptually
-The getCallerDir() approach uses runtime.Caller() to identify the original application's source directory.
-
-It is clever, especially for go run.
-
-But it is also quite difficult to reason about and test across:
-- Different build systems.
-- Plugins.
-- Generated binaries.
-- Test execution.
-- Symlinked executables.
-- Different deployment layouts.
-I would simplify the resolution order:
-1. Explicit configuration file.
-2. Explicit shared configuration directory.
-3. Executable directory.
-4. Working directory.
-5. Clearly defined fallback.
-I would retain caller discovery only if a concrete deployment requirement cannot be solved otherwise.
-
-GitHub+3
-8. YAML merging and environment expansion
-There are two interesting mechanisms here.
-A. Deep merging of capabilities
-LoadYAML() preserves existing capabilities and deep-merges new YAML values.
-
-This is useful because the configuration server can hydrate capabilities before the local YAML is reloaded.
-
-For example:
-
-Initial server-provided state:
 capabilities:
-  database:
-    ip: db.internal
-    port: "5432"
-    pool: "20"
+  service:
+    token: "false"
+    mode: "true"
 
+These values can be converted into booleans instead of strings.
 
-Local YAML:
-capabilities:
-  database:
-    pool: "50"
+That can produce unexpected type errors when unmarshalling into typed capability structs. It is especially undesirable for tokens, passwords, identifiers or other values whose content happens to be true or false.
 
+Recommendation: preserve explicit YAML string tags and only coerce unquoted plain scalars when that behavior is intended. Better still, avoid a global forced retyping policy and apply field-aware conversion at the capability boundary.
 
-Expected merged result:
-capabilities:
-  database:
-    ip: db.internal
-    port: "5432"
-    pool: "50"
+Source: loader.go
+P2 — Apply() does not preserve the RCU immutability contract
+The implementation correctly uses atomic.Pointer and writer serialization for most configuration updates.
 
+However, Apply() stores the supplied pointer directly:
+c.LiveConfig.Store(newMap)
 
-This is a good pattern.
+Unlike ReplaceLive(), it does not deep-copy the map.
 
-However, it reinforces the importance of defining exactly when a configuration is being merged versus replaced.
-B. The environment expansion engine
-The current implementation uses:
-var envRegex = regexp.MustCompile(
-    `\$\{([^}]+)\}`,
-)
+A caller can retain the original map and mutate it after calling Apply(). Readers access the map without locks, so this breaks the immutability assumption of the RCU model and can introduce data races.
 
+Recommendation: either clone the entire nested map inside Apply() or explicitly transfer ownership and make that contract enforceable. I would favor cloning for a public API.
 
-And supports:
-database:
-  password: "${DB_PASSWORD}"
-  host: "${DB_HOST:localhost}"
+Source: config.go
+P2 — IPv6 address construction is incorrect
+As noted above, the current implementation concatenates host and port using a string format rather than net.JoinHostPort().
 
+For IPv6, it produces malformed addresses such as:
+:::7000
 
-This is a lightweight solution.
+The current test explicitly expects this result.
 
-There are a few details I would improve:
+Use net.JoinHostPort(host, port) and update the tests to expect [::]:7000.
 
-1. Missing variables silently become empty strings.
+There is another useful improvement here: validate ports and address formats when loading configuration, rather than allowing malformed endpoints to survive until the networking layer attempts to use them.
 
-For example:
-password: "${DB_PASSWORD}"
+Source: config.go · config_test.go
+P2 — TLS generator needs stronger certificate validation and rotation rules
+The new tlsgen implementation is a good start, but its idempotency rules are too trusting.
 
+When both certificate and key files already exist and force=false, generation is skipped. The code does not establish that:
 
-If the variable is absent, the result becomes an empty string.
+- The certificate is still valid and unexpired.
+- The private key actually matches the certificate.
+- The certificate was signed by the current CA.
+- The CA is still a valid CA certificate.
+- The certificate has the intended service identity.
+  writePEMFile() also writes using O_TRUNC. If writing the certificate succeeds but writing the associated key fails, the pair can be left in an inconsistent state.
 
-For mandatory configuration values, that can create confusing failures much later.
+Finally, the generator puts localhost and loopback SANs into every service certificate. That is convenient for development, but it weakens the distinction between service identities if consumers rely on those shared names rather than validating the intended service identity.
 
-I would support an explicit strict mode:
-password: "${DB_PASSWORD:?required}"
+Recommendation: validate existing certificate/key pairs before treating them as reusable. Use temporary files and atomic rename for generation. Separate development SAN defaults from production SAN policy, and keep production certificates service-specific.
 
+Sources: tlsgen.go · tlsgen_test.go
+P2 — Production IP validation does not cover every endpoint
+CheckProductionIPs() checks whether the static capability map contains an ip equal to 127.0.0.2.
 
-Or make mandatory variables part of validation.
+It does not check grpc_ip or rest_ip, and it does not comprehensively validate alternate capability representations.
 
-2. Boolean handling is special-cased.
+Consequently, a production service could use a test address in an alternate endpoint field without this check detecting it.
 
-The implementation preserves true and false as booleans and converts other scalar values to strings.
+The separate CheckTestIPs() function is not currently integrated into the test strategy. The TODO explains that it was disabled because Docker and host-based testing use different IP ranges.
 
-That is understandable given the string-based configuration model, but it should be documented because numeric YAML values will not retain their native numeric types.
+Recommendation: validate all endpoint types through a common capability schema, with profile-specific policies. Avoid relying on one hardcoded test IP as the only environment integrity check.
 
-3. The expansion parser is simplistic.
+Source: validator.go · TODO.md
+P2 — CGO error handling has an acknowledged OS-thread issue
+The FFI bridge is a major architectural feature, and the handle/lifecycle code has received useful concurrency attention.
 
-It does not provide a proper escaping mechanism for literal ${...} expressions, and nested/default expressions are not supported.
+However, the error handling uses C _Thread_local variables:
+_Thread_local char* last_error;
+_Thread_local int last_error_code;
 
-I would not introduce a large templating engine unnecessarily, but I would make the supported syntax explicit and test it thoroughly.
+Go goroutines can migrate between OS threads between separate CGO calls. Consequently, an error written in one C call may not be available through a subsequent GetLastError() call if it runs on a different OS thread.
 
-GitHub
-9. Secret management: good foundation, but I would tighten the failure behavior
-The repository uses RSA-OAEP with SHA-256.
+There is also a memory-lifetime concern: the C code allocates error strings using strdup(), and frees them only when another error is set on that same thread.
 
-The implementation:
-- Supports PEM public and private keys.
-- Uses RSA encryption.
-- Encodes ciphertext as Base64.
-- Wraps encrypted values in ENC(...).
-- Provides decryption helpers.
-This is a reasonable approach for distributing encrypted configuration values.
+This is not just a hypothetical refactoring concern: the repository's own TODO still records the need to address thread affinity and strdup leaks.
 
-However, there are some important details.
-A. Missing private key silently bypasses processing
-In ProcessConfigSecrets():
-_, err := getPrivateKey()
+Recommendation: use an error retrieval contract that does not depend on OS-thread affinity, such as returning an allocated error value tied to the call or a per-handle error store with explicit ownership and release.
 
-if err != nil {
-    return content, nil
-}
+Sources: errors.c · helpers.h · TODO.md
+Other improvements worth including
+There are some lower-priority issues that should be covered in a broader hardening pass.
+Area	Observation	Recommendation
+Network protocol	Watch() ignores errors returned by HandleIncoming()	Log and count malformed or rejected messages; trigger recovery where appropriate
+Capability lookup	GetCapability() does not overlay LiveConfig when the static value is map[string]string	Normalize capability representations before merging
+Secret handling	config-tool encrypt --token accepts plaintext as a command-line argument	Support stdin or a hidden interactive prompt to avoid shell history and process argument exposure
+Secret processing	ProcessConfigSecrets() substitutes plaintext into raw YAML before parsing	Prefer parsing first and decrypting individual scalar values
+Versioning	Protocol version field is int32, while application revisions are uint64	Use a consistent unsigned 64-bit revision field
+CI	Shared CI workflow is referenced using mutable @develop	Pin the reusable workflow to a commit SHA
+Release checks	Release workflow tests selected packages, not the complete Go test suite	Run the full test and race suites before publishing
 
+2. What is particularly good
+   There are several design choices I would preserve.
 
-If a private key is missing, the function returns the original content without reporting an error.
+The RCU architecture is appropriate. LiveConfig uses atomic pointer swaps for read-heavy configuration access. The writer mutex added in the recent work addresses concurrent local mutation and lost-update problems. This is a good fit for services that read configuration frequently but update it relatively infrequently.
 
-Likewise, when individual decryption fails, it writes a warning to stderr and retains the original ENC(...) value.
+The OCC direction is correct. The ability to submit a versioned mutation and receive a conflict response is much safer than blindly overwriting shared configuration. The recent changes to submit deltas and apply them locally after an ACK are also a positive development.
 
-This may be acceptable for an optional decryption helper, but it is dangerous if a caller assumes that all secrets have been decrypted successfully.
-
-I would introduce explicit policies:
-Mode	Missing key / decryption failure
-Optional	Keep encrypted value, report status
-Strict	Return error and reject configuration
-Audit	Report all unresolved encrypted values
-
-For production configuration, I would use strict mode.
-B. Private key lookup
-The private key is searched in:
-1. BASTIEN_PRIVATE_KEY.
-2. BASTIEN_PRIVATE_KEY_PATH.
-3. /etc/bastien/private.pem.
-4. ./private.pem fallback.
-I would remove the working-directory fallback in production.
-
-The current working directory is not a reliable security boundary. A process launched from an unexpected directory could pick up an unintended private key.
-C. Repeated private-key parsing
-Every decryption calls getPrivateKey(), which reads and parses the PEM file again.
-
-This is unnecessary for a long-running service.
-
-I would load and validate the key once during initialization, retain the parsed key in a dedicated secret manager and provide an explicit reload operation if key rotation is required.
-
-The TODO already identifies this optimization.
-
-One further architectural point: RSA-OAEP is suitable for relatively short secrets, not arbitrary large configuration documents. If the system later needs to encrypt larger payloads, use envelope encryption with a symmetric authenticated cipher such as AES-GCM.
-
-GitHub+2
-
-10. Network client: reconnection and synchronization
-The networking implementation is more sophisticated than a basic TCP client.
-
-It includes:
-- Safe-Socket framing.
-- Handshake identity.
-- Background watching.
-- Exponential backoff.
-- Reconnection.
-- Initial synchronization.
-- Full refresh.
-- A single-reader synchronization mechanism.
-- Acknowledged OCC operations.
-I particularly like the use of syncMu to serialize request/response operations while the watcher is responsible for reading incoming frames.
-
-This avoids multiple goroutines competing to read the same socket.
-A. One weakness: non-OCC operations don't wait for acknowledgement
-We already discussed this with CloudStrategy.Set().
-
-It also affects:
-DeleteKeys()
-
-
-which sends a request without waiting for the server's response.
-
-I would make the behavior consistent:
-Set()
-    → server acknowledgement
-    → local commit
-
-Delete()
-    → server acknowledgement
-    → local commit
-
-
-No successful return should imply authoritative acceptance if only a local socket write occurred.
-B. Reconnection and lifecycle
-The Watch() loop reconnects when the socket becomes unavailable.
-
-It uses exponential backoff and resynchronizes after reconnection.
-
-That is good.
-
-However, there is a possible lifecycle race:
-1. The watcher detects a disconnected socket.
-2. It starts reconnecting.
-3. Another goroutine calls Close().
-4. The reconnect operation finishes and assigns a newly opened socket.
-The watcher may then exit because quit is closed, leaving the newly opened socket without an owner.
-
-I would serialize connection creation and shutdown, and check the closed state before publishing a newly connected socket.
-
-Also, a reconnect should always be followed by a full snapshot synchronization, not merely an assumption that the last local state remains current.
-
-The current code sends GET_SYNC after reconnection, which is the right direction.
-
-GitHub+3
-C. Callback execution
-HandleIncoming() invokes registered callbacks directly from the incoming-message processing path.
-
-For example:
-if liveCb != nil {
-    liveCb(parsed)
-}
-
-
-This is simple, but it means a slow or blocked application callback can delay processing of subsequent network messages.
-
-For a high-frequency configuration service, I would either:
-- Document that callbacks must be fast and non-blocking; or
-- Dispatch callbacks through a controlled notification mechanism.
-I would not introduce an unrestricted goroutine per callback, because that would create another ordering and lifecycle problem.
-
-11. A protocol-level issue: uint64 versus int32 revisions
-There is a small but important inconsistency in proto_handler.go.
-
-The public API uses:
-expectedVersion uint64
-
-
-And the client tracks:
-lastSeenVersion uint64
-
-
-But when building the protobuf message:
-Version: int32(version),
-
-
-This converts a 64-bit unsigned revision into a signed 32-bit integer.
-
-The maximum positive value is:
-\[
-2^{31}-1 = 2,147,483,647
-\]
-
-Beyond that, the conversion can produce negative values.
-
-The receiver then has code such as:
-if msg.Version > 0 {
-    // Update revision
-}
-
-
-A negative version will therefore no longer be processed correctly.
-
-This is unlikely to happen quickly in a configuration system, but it is an avoidable inconsistency.
-
-Recommendation: use uint64 consistently in the protobuf schema, regenerate the bindings, and preserve that type throughout the client and server.
-
-GitHub+2
-12. The polyglot architecture: ambitious, but needs strict ownership rules
-This is one of the most interesting aspects of the project.
-
-The library is not limited to Go.
-
-It exposes a C ABI through libdistconf, allowing Python, Rust and C/C++ applications to use the same configuration engine.
-
-I particularly like this direction because it avoids independently implementing configuration precedence and synchronization in every language.
-
-However, a C ABI introduces responsibilities that ordinary Go applications don't have.
-Ownership boundaries
-Go runtime
-
-Configuration snapshots, networking, callbacks
-
-
-C ABI
-
-Handles, pointers, strings, allocation
-
-
-
-Python / Rust
-
-Foreign-memory ownership and lifecycle
-
-
-C / C++
-
-ABI compatibility and thread safety
-
-
-
-
-I would insist on four rules:
-1. Every exported handle has an explicit lifecycle.
-2. Every returned allocated string has a documented release function.
-3. Closing a handle cannot race with an ongoing operation.
-4. Callbacks must have explicit threading and reentrancy guarantees.
-The TODO already identifies thread-local error reporting and strdup memory-leak concerns.
-
-I would also maintain a small ABI compatibility test suite that verifies exported symbols and function signatures across releases.
-
-This is especially important because the C ABI is intended to become a shared ecosystem-wide interface.
-
-Bastien-Antigravity/distributed-config · GitHub+2
-
-13. My proposed target architecture
-I would keep the existing architecture but make configuration resolution and mutation more centralized.
-Configuration sources
-
-Defaults · YAML · Environment · Config Server
-
-
-Config Loader
-
-Path discovery · expansion · parsing · validation
-
-
-Config Resolver
-
-One authoritative merge and precedence implementation
-
-
-Versioned Immutable Snapshot
-
-Revision + static configuration + live configuration
-
-Read API
-
-Lock-free access
-
-
-Write API
-
-Serialized updates · OCC
-
-
-
-
-Strategy adapters
-
-Standalone · Test · Staging · Production
-
-Go API
-
-
-C ABI / FFI
-
-
-
-
-What I would retain
-- Go as the configuration engine.
-- Lock-free atomic snapshot reads.
-- Copy-On-Write.
-- Profile-based strategies.
-- YAML and environment expansion.
-- Safe-Socket integration.
-- Revision-aware synchronization.
-- Optimistic concurrency control.
-- RSA-OAEP secret support.
-- C ABI for other languages.
-What I would simplify
-- Multiple independent capability merge implementations.
-- Unclear path-discovery fallback rules.
-- Separate revision and configuration state.
-- Unprotected read-modify-write operations.
-- Fire-and-forget remote mutations.
-- Repeated full-configuration transmission.
-- Implicit secret-decryption failure handling.
-
-14. Implementation priorities
-I would approach this repository in five phases.
-Phase 1 — Data consistency
-Priority 1
-
-- [ ] Protect Set(), Delete() and Apply() with a coherent writer synchronization strategy.
-- [ ] Introduce LiveSnapshot{Revision, Data}.
-- [ ] Reject stale broadcasts.
-- [ ] Prevent stale FULL_REFRESH responses from rolling back newer state.
-- [ ] Serialize strategy-level preview/commit operations.
-
-
-  Phase 2 — Remote synchronization
-  Priority 2
-- [ ] Make normal Set operations wait for acknowledgement.
-- [ ] Make Delete operations wait for acknowledgement.
-- [ ] Return the committed server revision.
-- [ ] Send deltas instead of unnecessary full snapshots.
-- [ ] Define offline update semantics.
-
-
-  Phase 3 — Configuration resolution
-  Priority 3
-- [ ] Centralize capability merging.
-- [ ] Fix dynamically introduced capabilities.
-- [ ] Formalize precedence rules.
-- [ ] Fix explicit path failure behavior.
-- [ ] Define SHARED_CONFIG_PATH as a directory or file, not ambiguously both.
-
-
-  Phase 4 — Security and lifecycle
-  Priority 4
-- [ ] Make secret resolution fail explicitly in strict mode.
-- [ ] Remove private-key working-directory fallback in production.
-- [ ] Cache parsed private keys safely.
-- [ ] Fix reconnect versus Close lifecycle races.
-- [ ] Audit FFI allocation and handle ownership.
-
-
-  Phase 5 — Performance and validation
-  Priority 5
-- [ ] Benchmark lock-free reads.
-- [ ] Benchmark concurrent writes.
-- [ ] Measure YAML and JSON allocation costs.
-- [ ] Benchmark FFI overhead.
-- [ ] Test all profiles and cross-language interfaces.
-
-15. Tests I would specifically add
-Test	Expected behavior
-100 concurrent Set() operations	No lost updates
-Concurrent Set() and Delete()	Consistent final state
-Stale broadcast revision	Ignored
-Delayed FULL_REFRESH response	Cannot roll back newer state
-Concurrent OCC updates	Exactly one conflicting revision accepted
-Server rejects update	Local configuration unchanged
-Server disconnects during update	Explicit uncertain/failed result
-New remote capability	Correctly resolvable
-YAML plus server override	Documented precedence
-Missing CONFIG_PATH	Explicit error
-Missing mandatory environment variable	Validation failure
-Missing private key in strict mode	Configuration rejected
-Concurrent Close and reconnect	No socket leak
-C ABI concurrent Close/Get	No use-after-free
-Repeated FFI operations	No memory growth
-
-For concurrency, I would make these mandatory:
-go test -race ./...
-go vet ./...
-
-
-I would also add property-based tests for configuration merging.
-
-For example, the important invariant is:
-Apply(A)
-Apply(B)
-
-
-must preserve both independent updates regardless of their execution interleaving.
-
-16. Overall assessment
-8.2 / 10
-Architectural potential
-
-Qualitative code-level assessment, not a measured benchmark or completed test-suite result.
-Area	Assessment
-Overall architecture	Very good
-Configuration discovery	Good, too complex
-Merge/precedence model	Good, needs consolidation
-Atomic reads	Very good
-Concurrent writes	Needs correction
-Remote synchronization	Needs correction
-Reconnection	Good, lifecycle refinement needed
-Secret management	Good foundation
-FFI architecture	Ambitious, needs strict ownership
-Maintainability	Good potential
-
-
-What I particularly appreciate is that the developer is thinking beyond a simple configuration loader.
-
-This is an attempt to build a genuine configuration infrastructure layer that can serve a heterogeneous microservice ecosystem.
-
-The use of a common Go engine with a C ABI is a particularly interesting architectural decision.
-
-The main problem is that the project is starting to accumulate several different mechanisms for solving similar problems:
-- Multiple merge paths.
-- Multiple ways to commit configuration.
-- Multiple synchronization semantics.
-- Multiple representations of configuration revisions.
-The result is a system that is conceptually powerful but more complicated than it needs to be.
-
-I would not rewrite it. I would consolidate its state management and make its consistency guarantees explicit.
-
-17. The most important finding: the three repositories must agree
-Now that we have examined log-server, config-server and distributed-config, I think there is a larger architectural issue worth addressing.
-
-These components form a dependency chain:
-distributed-config
-
-Loads, merges and applies configuration
-
-
-config-server
-
-Owns and distributes shared configuration
-
-
-log-server
-
-Receives, orders and persists operational events
-
-
-There are four cross-repository contracts I would standardize.
-Contract	What must be consistent
-Configuration revisions	Same revision semantics on client and server
-Merge operations	PATCH, REPLACE and DELETE behave identically
-Acknowledgements	Accepted versus persisted versus applied
-Lifecycle	Disconnect, reconnect, shutdown and recovery
-
-There is also a subtle issue with logging: if configuration changes affect the logging endpoint, the client must not lose its ability to report errors during the transition.
-
-I would therefore keep a small independent bootstrap logging mechanism rather than make the entire logging system dependent on successful configuration synchronization.
-My final recommendation
-I would prioritize the repositories in this order:
-1. distributed-config: fix concurrent state updates and revision handling.
-2. config-server: make publication and persistence revision-aware.
-3. log-server: simplify ordering and ensure one consistent persistence pipeline.
-This order addresses the shared state contract first, then the services that depend on it.
-
-One important qualification: I reviewed the current public develop source and documentation, but did not clone the repositories or execute their test suites. The findings above are code-level findings; runtime confirmation should be the next step.
-
-My preferred next step would be a cross-repository consistency audit of these three projects, producing one shared technical specification for revisions, merging, acknowledgements and failure recovery. That would eliminate the risk of each repository implementing a slightly different interpretation of the same distributed-system contract.
+The code is modular. Loading, path discovery, profile strategies, network synchronization, secrets, core state and FFI are separated into distinct packages. That gives the project room to evolve without rewriting the whole system.
+
+The loader has a useful explicit environment-expansion mechanism. The ${VAR:default} syntax is practical and makes configuration portable across local, staging and production deployments.
+
+Secret handling has a good foundation. RSA-OAEP with SHA-256, encrypted values remaining encrypted at load time, on-demand decryption and private-key caching are reasonable design decisions. The problem is more about key handling and end-to-end integration than the choice of encryption primitive.
+
+The polyglot strategy is ambitious but coherent. Using a central Go implementation exposed through a C ABI is a reasonable way to avoid implementing separate configuration engines in every language. The repository has meaningful handle-lifecycle and concurrency tests, which is important for this kind of boundary.
+
+The recent testing work is substantial. The network tests cover stale broadcasts, sequence gaps, version conflicts, full-refresh protection and deletion. The CGO stress test exercises concurrent handle creation, access and closure. The certificate generator also has dedicated certificate-chain and file-permission tests.
+
+Sources: config.go · network tests · CGO stress tests · TLS generator tests
+3. Score
+Overall engineering quality
+7.0/10
+
+Qualitative source-level assessment. Not a benchmark, runtime certification or penetration-test result.
+
+Dimension	Score
+Architecture	8.7
+Code organization	8.4
+RCU and concurrency design	7.8
+Configuration discovery	7.0
+Live synchronization	7.3
+Network reliability	6.3
+Security and secrets	6.2
+Validation	6.6
+Error handling	6.6
+CGO / FFI safety	6.5
+Testing strategy	7.6
+CI and build reproducibility	7.6
+Performance potential	8.5
+Production readiness	6.5
+
+The architecture and performance potential are strong. The lower scores reflect the difference between having the right mechanisms and ensuring that they behave correctly during disconnection, delayed responses, invalid input and security-sensitive operation.
+4. Priority remediation plan
+I would organize the next work into four groups.
+Priority	Work	Desired result
+P0	Protect generated RSA private keys with 0600 permissions	Secure default key generation
+P0	Remove false-success behavior when the live socket is disconnected	No silent local-only writes reported as acknowledged
+P0	Wire mTLS into the real config client/server path	Authenticated and encrypted fleet configuration
+P1	Add request IDs to ACK/ERROR protocol messages	Prevent delayed ACKs from confirming the wrong operation
+P1	Implement reconnection after initial connection failure	Production clients recover without process restart
+P1	Fail explicitly on invalid CONFIG_PATH	No unexpected configuration selection
+P1	Preserve explicitly quoted YAML strings	Correct interpretation of tokens and string values
+P1	Validate CA and certificate/key pairs	Reliable certificate lifecycle
+P2	Fix IPv6 address formatting and expand endpoint validation	Correct and consistent network addressing
+P2	Enforce RCU ownership in Apply()	Immutable snapshots remain safe
+P2	Correct CGO error ownership and thread-affinity design	Reliable cross-language error retrieval
+P2	Add integration tests for disconnect, timeout, late ACK and recovery	Demonstrate real synchronization guarantees
+
+The most important new tests should exercise these failure sequences:
+
+- Config server becomes unavailable immediately after startup.
+- Config server disconnects during an update.
+- Update A times out, then its ACK arrives after update B is sent.
+- Client reconnects while local changes have accumulated.
+- mTLS is enabled and an untrusted client attempts to connect.
+- A certificate/key pair is corrupt, expired or signed by an old CA.
+- Several writers update and delete different keys while full snapshots arrive.
+  These are more valuable than adding a large number of additional happy-path unit tests.
+
+5. Comparison with the other audited repositories
+   Using the same qualitative scoring approach:
+   Repository	Overall score	Main strength	Main weakness
+   tele-remote	7.8	Operational control architecture	Authorization and execution guarantees
+   flexible-logger	7.2	Modular sinks and memory ownership	Audit durability and failure visibility
+   distributed-config	7.0	RCU, configuration architecture and OCC direction	Disconnected writes and transport security
+
+The three projects are reasonably consistent in architecture and code organization. The recurring weakness is at the operational boundary: what happens when a remote service is unavailable, a request times out, a response arrives late, or an operation appears successful without being verified?
+
+This is a common reliability theme across the fleet, rather than a reason to redesign any one repository.
+6. Final verdict
+Strong foundation — retain the architecture
+I would classify distributed-config as a well-architected configuration platform with meaningful production-oriented engineering, but not yet fully hardened for critical fleet-wide configuration management.
+
+For local configuration loading and high-frequency reads, the design is promising.
+
+For production live configuration, endpoint management, credentials and coordinated fleet changes, I would address the P0 and P1 items before relying on it as an authoritative configuration control plane.
+
+The biggest risk is not that the configuration engine is too complicated. It is that certain failure paths can make the application believe a change has been synchronized when it has not.
+
+My recommendation is to keep the current architecture and concentrate engineering effort on three contracts:
+
+1. Identity: every configuration connection must authenticate the intended service.
+2. Delivery: every remote mutation must have an unambiguous, correlated acknowledgement.
+3. Consistency: offline, concurrent and delayed operations must never silently overwrite or misrepresent authoritative state.
+   One limitation of this review: I inspected the current source, tests, documentation and CI workflows, but did not execute the build, race detector, integration suite or security tests. The scores are therefore source-level assessments, not independently verified runtime results.

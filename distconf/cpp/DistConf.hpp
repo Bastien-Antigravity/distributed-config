@@ -109,6 +109,15 @@ public:
         return result;
     }
 
+    // Get a REST address for a capability
+    std::string GetRESTAddress(const std::string& capability) const {
+        char* val = DistConf_GetRESTAddress(handle_, const_cast<char*>(capability.c_str()));
+        if (!val) return "";
+        std::string result(val);
+        DistConf_FreeString(val);
+        return result;
+    }
+
     // Get full configuration as JSON
     std::string GetFullConfig() const {
         char* val = DistConf_GetFullConfig(handle_);

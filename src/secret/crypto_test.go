@@ -20,12 +20,27 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
 // -----------------------------------------------------------------------------
 
+func isolateSystemPrivateKey(t *testing.T) {
+	t.Helper()
+	prev := defaultSystemPrivateKeyPath
+	defaultSystemPrivateKeyPath = filepath.Join(t.TempDir(), "nonexistent-system-private.pem")
+	t.Setenv("BASTIEN_PRIVATE_KEY", "")
+	t.Setenv("BASTIEN_PRIVATE_KEY_PATH", "")
+	ResetKeyCache()
+	t.Cleanup(func() {
+		defaultSystemPrivateKeyPath = prev
+		ResetKeyCache()
+	})
+}
+
 func TestEncryptionRoundTrip(t *testing.T) {
+	isolateSystemPrivateKey(t)
 	// 1. Generate a temporary key pair for the test
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -72,6 +87,7 @@ func TestEncryptionRoundTrip(t *testing.T) {
 }
 
 func TestProcessConfigSecrets(t *testing.T) {
+	isolateSystemPrivateKey(t)
 	// Setup keys
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -119,7 +135,7 @@ func TestProcessConfigSecrets(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestProcessConfigSecrets_FailFastAndCaching(t *testing.T) {
-	ResetKeyCache()
+	isolateSystemPrivateKey(t)
 	_ = os.Remove("./private.pem")
 
 	// 1. Plain config without ENC(...) does not require a private key
@@ -173,5 +189,78 @@ func TestProcessConfigSecrets_FailFastAndCaching(t *testing.T) {
 		if string(dec) != "token: cached-secret-val" {
 			t.Fatalf("Unexpected decrypted output: %s", string(dec))
 		}
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+func TestPrivateKeyLookupPrecedence(t *testing.T) {
+	isolateSystemPrivateKey(t)
+
+	// Generate two distinct key pairs: system key and local CWD key
+	sysKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sysPrivPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(sysKey)})
+	sysPubBytes, _ := x509.MarshalPKIXPublicKey(&sysKey.PublicKey)
+	sysPubPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: sysPubBytes}))
+
+	localKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	localPrivPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(localKey)})
+	localPubBytes, _ := x509.MarshalPKIXPublicKey(&localKey.PublicKey)
+	localPubPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: localPubBytes}))
+
+	workDir := t.TempDir()
+	oldCwd, _ := os.Getwd()
+	if err := os.Chdir(workDir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(oldCwd) }()
+
+	if err := os.WriteFile(filepath.Join(workDir, "private.pem"), localPrivPEM, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	localCipher, err := Encrypt("local-secret", localPubPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sysCipher, err := Encrypt("system-secret", sysPubPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. In production, ./private.pem MUST NOT be used when system key is missing
+	t.Setenv("APP_ENV", "production")
+	ResetKeyCache()
+	if _, err := Decrypt(localCipher); err == nil {
+		t.Fatal("Expected APP_ENV=production to ignore ./private.pem fallback")
+	}
+
+	// 2. Outside production, ./private.pem works when system key does not exist
+	t.Setenv("APP_ENV", "")
+	ResetKeyCache()
+	gotLocal, err := Decrypt(localCipher)
+	if err != nil || gotLocal != "local-secret" {
+		t.Fatalf("Expected ./private.pem fallback outside production, got %q (err=%v)", gotLocal, err)
+	}
+
+	// 3. When system private key exists, it MUST take precedence over ./private.pem
+	sysPath := filepath.Join(t.TempDir(), "system-private.pem")
+	if err := os.WriteFile(sysPath, sysPrivPEM, 0600); err != nil {
+		t.Fatal(err)
+	}
+	defaultSystemPrivateKeyPath = sysPath
+	ResetKeyCache()
+	gotSys, err := Decrypt(sysCipher)
+	if err != nil || gotSys != "system-secret" {
+		t.Fatalf("Expected system key precedence over ./private.pem, got %q (err=%v)", gotSys, err)
+	}
+	if _, err := Decrypt(localCipher); err == nil {
+		t.Fatal("Expected localCipher not to decrypt when system key takes precedence")
 	}
 }

@@ -7,7 +7,7 @@ package loader
 //
 // DATA FLOW:
 // 1. Input: Incomplete and complete *core.Config test instances.
-// 2. Logic: Invokes ValidateCommonConfig and checks expected error responses.
+// 2. Logic: Invokes CheckTestIPs and CheckProductionIPs and checks expected error responses.
 // 3. Output: Test assertion results verifying validation boundaries.
 //
 // KEY PARAMETERS:
@@ -23,31 +23,6 @@ import (
 // -----------------------------------------------------------------------------
 
 func TestValidator(t *testing.T) {
-	t.Run("TestValidateCommonConfig", func(t *testing.T) {
-		cfg := &core.Config{}
-		cfg.Capabilities = make(map[string]interface{})
-
-		// 1. Missing Name
-		if err := ValidateCommonConfig(cfg); err == nil {
-			t.Error("Expected error for missing name, got nil")
-		}
-
-		cfg.Common.Name = "test-app"
-		// 2. Missing Server Details
-		if err := ValidateCommonConfig(cfg); err == nil {
-			t.Error("Expected error for missing server details, got nil")
-		}
-
-		cfg.Capabilities["config_server"] = map[string]interface{}{
-			"ip":   "127.0.0.1",
-			"port": "5000",
-		}
-		// 3. Valid
-		if err := ValidateCommonConfig(cfg); err != nil {
-			t.Errorf("Expected success, got error: %v", err)
-		}
-	})
-
 	t.Run("TestCheckTestIPs", func(t *testing.T) {
 		cfg := &core.Config{}
 		cfg.Capabilities = make(map[string]interface{})

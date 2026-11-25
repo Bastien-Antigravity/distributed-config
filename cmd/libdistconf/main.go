@@ -191,12 +191,12 @@ func DistConf_GetFullConfig(handle uintptr) *C.char {
 
 //export DistConf_GetLastError
 func DistConf_GetLastError() *C.char {
-	return C.last_error
+	return (*C.char)(unsafe.Pointer(C.get_last_error()))
 }
 
 //export DistConf_GetLastErrorCode
 func DistConf_GetLastErrorCode() int {
-	return int(C.last_error_code)
+	return int(C.get_last_error_code())
 }
 
 //export DistConf_Decrypt

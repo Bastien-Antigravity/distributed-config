@@ -54,12 +54,25 @@ type Config struct {
 	Capabilities map[string]interface{}                       `yaml:"capabilities" json:"capabilities"`
 	LiveConfig   atomic.Pointer[map[string]map[string]string] `yaml:"-"`
 
-	// Writer lock serializing Set, Delete, Apply, and ReplaceLive mutations
-	// while keeping Get, GetCapability, and GetAddress 100% lock-free.
+	// Writer lock serializing Set, Delete, and ReplaceLive mutations
+	// while keeping Get, GetCapability, ResolveCapability, and GetAddress 100% lock-free.
 	writeMu sync.Mutex `yaml:"-"`
+
+	// Monotonic configuration revision synchronized from config-server.
+	version atomic.Uint64 `yaml:"-"`
 
 	// Internal state
 	Logger utils.Logger `yaml:"-"`
+}
+
+// GetVersion returns the last applied configuration revision.
+func (c *Config) GetVersion() uint64 {
+	return c.version.Load()
+}
+
+// SetVersion atomically updates the tracked configuration revision.
+func (c *Config) SetVersion(v uint64) {
+	c.version.Store(v)
 }
 
 // -----------------------------------------------------------------------------
@@ -96,17 +109,6 @@ func (c *Config) Set(updates map[string]map[string]string) {
 	newMap := c.PreviewSet(updates)
 
 	// 2. Atomically swap the pointer
-	c.LiveConfig.Store(newMap)
-}
-
-// Apply replaces the current live configuration with a pre-calculated map.
-// Serialized by writeMu so concurrent updates do not race.
-func (c *Config) Apply(newMap *map[string]map[string]string) {
-	if newMap == nil {
-		return
-	}
-	c.writeMu.Lock()
-	defer c.writeMu.Unlock()
 	c.LiveConfig.Store(newMap)
 }
 
@@ -209,26 +211,25 @@ func (c *Config) Delete(deletions map[string][]string) {
 
 // -----------------------------------------------------------------------------
 
-// GetCapability extracts a specific capability dictionary and unmarshals it into the target struct.
-func (c *Config) GetCapability(key string, target interface{}) error {
-	val, ok := c.Capabilities[key]
-	if !ok || val == nil {
-		val = make(map[string]interface{})
-	}
-
-	capMap, ok := val.(map[string]interface{})
-	if !ok {
-		data, err := json.Marshal(val)
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal(data, target)
-	}
-
-	// Deep copy to avoid mutating the original
+// ResolveCapability returns a detached, merged map for the requested capability,
+// combining static Capabilities with direct and dotted LiveConfig overrides.
+// Precedence: dotted LiveConfig ("capabilities.<cap>.<k>") > direct LiveConfig ("<cap>.<k>") > static YAML.
+func (c *Config) ResolveCapability(key string) (map[string]interface{}, error) {
 	mergedMap := make(map[string]interface{})
-	for k, v := range capMap {
-		mergedMap[k] = v
+
+	if c.Capabilities != nil {
+		if val, ok := c.Capabilities[key]; ok && val != nil {
+			switch capMap := val.(type) {
+			case map[string]interface{}:
+				for k, v := range capMap {
+					mergedMap[k] = v
+				}
+			case map[string]string:
+				for k, v := range capMap {
+					mergedMap[k] = v
+				}
+			}
+		}
 	}
 
 	ptr := c.LiveConfig.Load()
@@ -251,16 +252,40 @@ func (c *Config) GetCapability(key string, target interface{}) error {
 	}
 
 	if len(mergedMap) == 0 {
-		return fmt.Errorf("capability '%s' is strictly required but missing from all sources", key)
+		return nil, fmt.Errorf("capability '%s' is strictly required but missing from all sources", key)
 	}
 
 	// Ensure scalar identifiers and ports are represented as strings
-	for _, portKey := range []string{"port", "grpc_port", "chat_id", "telegram_id"} {
+	for _, portKey := range []string{"port", "grpc_port", "rest_port", "chat_id", "telegram_id"} {
 		if v, exists := mergedMap[portKey]; exists {
 			if _, isStr := v.(string); !isStr {
 				mergedMap[portKey] = fmt.Sprintf("%v", v)
 			}
 		}
+	}
+
+	return mergedMap, nil
+}
+
+// GetCapability extracts a specific capability dictionary and unmarshals it into the target struct.
+func (c *Config) GetCapability(key string, target interface{}) error {
+	if c.Capabilities != nil {
+		if val, ok := c.Capabilities[key]; ok && val != nil {
+			switch val.(type) {
+			case map[string]interface{}, map[string]string:
+			default:
+				data, err := json.Marshal(val)
+				if err != nil {
+					return err
+				}
+				return json.Unmarshal(data, target)
+			}
+		}
+	}
+
+	mergedMap, err := c.ResolveCapability(key)
+	if err != nil {
+		return err
 	}
 
 	data, err := json.Marshal(mergedMap)

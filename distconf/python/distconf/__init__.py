@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 # coding:utf-8
 
-from os import getenv as osGetenv
-from ctypes import CDLL as ctypesCDLL, string_at as ctypesStringAt, c_char_p, c_void_p, CFUNCTYPE, c_int
+from ctypes import CDLL as ctypesCDLL, CFUNCTYPE as ctypesCFUNCTYPE, c_char_p as ctypesCCharP, c_int as ctypesCInt, c_void_p as ctypesCVoidP, string_at as ctypesStringAt
 from json import dumps as jsonDumps, loads as jsonLoads
-from typing import Any, Callable, Dict, Optional
+from os import getenv as osGetenv
+from os.path import dirname as osPathDirname, exists as osPathExists, join as osPathJoin
+from platform import system as platformSystem
+from typing import Any as typeAny, Callable as typeCallable, Dict as typeDict, Optional as typeOptional
 
 # Callback type: void (*config_update_cb)(uintptr_t handle, const char* json_data)
-CALLBACK_TYPE = CFUNCTYPE(None, c_void_p, c_char_p)
+CALLBACK_TYPE = ctypesCFUNCTYPE(None, ctypesCVoidP, ctypesCCharP)
 
 # Standardized Error Codes (must match helpers.h)
 DISTCONF_SUCCESS                = 0
@@ -34,7 +36,7 @@ class DistConfig:
     Loads shared library -> Creates session via CGO bridge -> Reads/writes state directly via ctypes.
     """
     
-    def __init__(self, profile: str, lib_path: Optional[str] = None) -> None:
+    def __init__(self, profile: str, lib_path: typeOptional[str] = None) -> None:
         self._lib = self._load_lib(lib_path)
         if not self._lib:
             raise RuntimeError("Could not load libdistconf shared library")
@@ -47,11 +49,9 @@ class DistConfig:
 
     # -----------------------------------------------------------------------------------------------
 
-    def _load_lib(self, lib_path: Optional[str]) -> Optional[Any]:
+    def _load_lib(self, lib_path: typeOptional[str]) -> typeOptional[typeAny]:
         if not lib_path:
-            import platform
-            import os
-            system = platform.system()
+            system = platformSystem()
             if system == "Darwin":
                 ext = ".dylib"
             elif system == "Windows":
@@ -63,9 +63,9 @@ class DistConfig:
             lib_path = osGetenv("LIBDISTCONF_PATH")
             if not lib_path:
                 # 2. Check current package directory (for bundled wheels)
-                pkg_dir = os.path.dirname(__file__)
-                local_lib = os.path.join(pkg_dir, f"libdistconf{ext}")
-                if os.path.exists(local_lib):
+                pkg_dir = osPathDirname(__file__)
+                local_lib = osPathJoin(pkg_dir, f"libdistconf{ext}")
+                if osPathExists(local_lib):
                     lib_path = local_lib
                 else:
                     # 3. Fallback to system search
@@ -75,61 +75,63 @@ class DistConfig:
             lib = ctypesCDLL(lib_path)
             
             # Signatures
-            lib.DistConf_New.argtypes = [c_char_p]
-            lib.DistConf_New.restype = c_void_p
+            lib.DistConf_New.argtypes = [ctypesCCharP]
+            lib.DistConf_New.restype = ctypesCVoidP
             
-            lib.DistConf_Close.argtypes = [c_void_p]
+            lib.DistConf_Close.argtypes = [ctypesCVoidP]
             lib.DistConf_Close.restype = None
             
-            lib.DistConf_Get.argtypes = [c_void_p, c_char_p, c_char_p]
-            lib.DistConf_Get.restype = c_void_p
+            lib.DistConf_Get.argtypes = [ctypesCVoidP, ctypesCCharP, ctypesCCharP]
+            lib.DistConf_Get.restype = ctypesCVoidP
             
-            lib.DistConf_Set.argtypes = [c_void_p, c_char_p, c_char_p, c_char_p]
-            lib.DistConf_Set.restype = c_int
+            lib.DistConf_Set.argtypes = [ctypesCVoidP, ctypesCCharP, ctypesCCharP, ctypesCCharP]
+            lib.DistConf_Set.restype = ctypesCInt
             
-            lib.DistConf_Sync.argtypes = [c_void_p]
-            lib.DistConf_Sync.restype = c_int
+            lib.DistConf_Sync.argtypes = [ctypesCVoidP]
+            lib.DistConf_Sync.restype = ctypesCInt
             
-            lib.DistConf_OnLiveConfUpdate.argtypes = [c_void_p, CALLBACK_TYPE]
+            lib.DistConf_OnLiveConfUpdate.argtypes = [ctypesCVoidP, CALLBACK_TYPE]
             lib.DistConf_OnLiveConfUpdate.restype = None
 
-            lib.DistConf_OnRegistryUpdate.argtypes = [c_void_p, CALLBACK_TYPE]
+            lib.DistConf_OnRegistryUpdate.argtypes = [ctypesCVoidP, CALLBACK_TYPE]
             lib.DistConf_OnRegistryUpdate.restype = None
             
-            lib.DistConf_ShareConfig.argtypes = [c_void_p, c_char_p]
-            lib.DistConf_ShareConfig.restype = c_int
+            lib.DistConf_ShareConfig.argtypes = [ctypesCVoidP, ctypesCCharP]
+            lib.DistConf_ShareConfig.restype = ctypesCInt
             
-            lib.DistConf_ValidateMandatoryServices.argtypes = [c_void_p]
-            lib.DistConf_ValidateMandatoryServices.restype = c_int
+            lib.DistConf_ValidateMandatoryServices.argtypes = [ctypesCVoidP]
+            lib.DistConf_ValidateMandatoryServices.restype = ctypesCInt
             
-            lib.DistConf_GetAddress.argtypes = [c_void_p, c_char_p]
-            lib.DistConf_GetAddress.restype = c_void_p
+            lib.DistConf_GetAddress.argtypes = [ctypesCVoidP, ctypesCCharP]
+            lib.DistConf_GetAddress.restype = ctypesCVoidP
             
-            lib.DistConf_GetGRPCAddress.argtypes = [c_void_p, c_char_p]
-            lib.DistConf_GetGRPCAddress.restype = c_void_p
+            lib.DistConf_GetGRPCAddress.argtypes = [ctypesCVoidP, ctypesCCharP]
+            lib.DistConf_GetGRPCAddress.restype = ctypesCVoidP
+
+            lib.DistConf_GetRESTAddress.argtypes = [ctypesCVoidP, ctypesCCharP]
+            lib.DistConf_GetRESTAddress.restype = ctypesCVoidP
             
-            lib.DistConf_GetCapability.argtypes = [c_void_p, c_char_p]
-            lib.DistConf_GetCapability.restype = c_void_p
+            lib.DistConf_GetCapability.argtypes = [ctypesCVoidP, ctypesCCharP]
+            lib.DistConf_GetCapability.restype = ctypesCVoidP
             
-            lib.DistConf_GetFullConfig.argtypes = [c_void_p]
-            lib.DistConf_GetFullConfig.restype = c_void_p
+            lib.DistConf_GetFullConfig.argtypes = [ctypesCVoidP]
+            lib.DistConf_GetFullConfig.restype = ctypesCVoidP
             
-            lib.DistConf_Decrypt.argtypes = [c_void_p, c_char_p]
-            lib.DistConf_Decrypt.restype = c_void_p
+            lib.DistConf_Decrypt.argtypes = [ctypesCVoidP, ctypesCCharP]
+            lib.DistConf_Decrypt.restype = ctypesCVoidP
             
-            lib.DistConf_FreeString.argtypes = [c_void_p]
+            lib.DistConf_FreeString.argtypes = [ctypesCVoidP]
             lib.DistConf_FreeString.restype = None
 
             lib.DistConf_GetLastError.argtypes = []
-            lib.DistConf_GetLastError.restype = c_char_p
+            lib.DistConf_GetLastError.restype = ctypesCCharP
 
             lib.DistConf_GetLastErrorCode.argtypes = []
-            lib.DistConf_GetLastErrorCode.restype = c_int
+            lib.DistConf_GetLastErrorCode.restype = ctypesCInt
             
             return lib
         except Exception as e:
-            print(f"Error loading libdistconf: {e}")
-            return None
+            raise RuntimeError(f"Could not load libdistconf from '{lib_path}': {e}") from e
 
     def _raise_last_error(self):
         code = self._lib.DistConf_GetLastErrorCode()
@@ -166,7 +168,7 @@ class DistConfig:
 
     # -----------------------------------------------------------------------------------------------
 
-    def share_config(self, payload: Any) -> bool:
+    def share_config(self, payload: typeAny) -> bool:
         json_data = jsonDumps(payload)
         if self._lib.DistConf_ShareConfig(self._handle, json_data.encode('utf-8')) == 0:
             self._raise_last_error()
@@ -201,7 +203,17 @@ class DistConfig:
 
     # -----------------------------------------------------------------------------------------------
 
-    def get_capability(self, capability: str) -> Dict[str, Any]:
+    def get_rest_address(self, capability: str) -> str:
+        ptr = self._lib.DistConf_GetRESTAddress(self._handle, capability.encode('utf-8'))
+        if not ptr:
+            self._raise_last_error()
+        val = ctypesStringAt(ptr).decode('utf-8')
+        self._lib.DistConf_FreeString(ptr)
+        return val
+
+    # -----------------------------------------------------------------------------------------------
+
+    def get_capability(self, capability: str) -> typeDict[str, typeAny]:
         ptr = self._lib.DistConf_GetCapability(self._handle, capability.encode('utf-8'))
         if not ptr:
             self._raise_last_error()
@@ -211,7 +223,7 @@ class DistConfig:
 
     # -----------------------------------------------------------------------------------------------
 
-    def get_full_config(self) -> Dict[str, Any]:
+    def get_full_config(self) -> typeDict[str, typeAny]:
         ptr = self._lib.DistConf_GetFullConfig(self._handle)
         if not ptr:
             self._raise_last_error()
@@ -232,7 +244,7 @@ class DistConfig:
 
     # -----------------------------------------------------------------------------------------------
 
-    def on_live_conf_update(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+    def on_live_conf_update(self, callback: typeCallable[[typeDict[str, typeAny]], None]) -> None:
         def _wrapper(handle: int, json_data: bytes):
             data = jsonLoads(json_data.decode('utf-8'))
             callback(data)
@@ -242,7 +254,7 @@ class DistConfig:
 
     # -----------------------------------------------------------------------------------------------
 
-    def on_registry_update(self, callback: Callable[[Dict[str, list]], None]) -> None:
+    def on_registry_update(self, callback: typeCallable[[typeDict[str, list]], None]) -> None:
         def _wrapper(handle: int, json_data: bytes):
             data = jsonLoads(json_data.decode('utf-8'))
             callback(data)

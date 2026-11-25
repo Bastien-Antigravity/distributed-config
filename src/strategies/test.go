@@ -16,6 +16,7 @@ package strategies
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
@@ -77,25 +78,7 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 			s.Client.Watch() // Start background hot-reloading AFTER initial sync
 			if err == nil {
 				cfg.Logger.Info("Test: Loaded from Server")
-				// Sync server-provided capability sections into cfg.Capabilities baseline
-				if livePtr := cfg.LiveConfig.Load(); livePtr != nil {
-					if cfg.Capabilities == nil {
-						cfg.Capabilities = make(map[string]interface{})
-					}
-					for section, kv := range *livePtr {
-						if section == "common" || section == "shared" || section == "local" {
-							continue
-						}
-						capMap, ok := cfg.Capabilities[section].(map[string]interface{})
-						if !ok {
-							capMap = make(map[string]interface{})
-							cfg.Capabilities[section] = capMap
-						}
-						for k, v := range kv {
-							capMap[k] = v
-						}
-					}
-				}
+				hydrateCapabilitiesFromLiveConfig(cfg)
 			}
 		} else {
 			cfg.Logger.Warning("Test: Warning - Could not connect to Config Server at %s (Mock/Dev?)", addr)
@@ -115,10 +98,16 @@ func (s *TestStrategy) Load(cfg *core.Config) error {
 		return err
 	}
 	syncCapabilitiesToLiveConfig(cfg)
-	// 5. Integrity Check (Skipped for Docker test pipelines)
-	// if err := loader.CheckTestIPs(cfg); err != nil {
-	// 	return err
-	// }
+	// 5. Integrity Check (Enforced when CHECK_TEST_IPS=true; skipped in Docker/standalone test pipelines)
+	if os.Getenv("CHECK_TEST_IPS") == "true" {
+		if err := loader.CheckTestIPs(cfg); err != nil {
+			if s.Client != nil {
+				_ = s.Client.Close()
+				s.Client = nil
+			}
+			return err
+		}
+	}
 
 	// 6. Mandatory Service Validation
 	if err := cfg.ValidateMandatoryServices(); err != nil {

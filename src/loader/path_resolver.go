@@ -123,11 +123,24 @@ func collectSearchDirs(exeDir, cwd string) []string {
 }
 
 func ResolveConfigPath(targetName string) string {
-	// 0. Explicit Environment Override (Highest Priority)
-	if customPath := os.Getenv("CONFIG_PATH"); customPath != "" {
-		if info, err := os.Stat(customPath); err == nil && !info.IsDir() {
-			return customPath
+	// 0. Explicit Environment Override (Highest Priority — Fail-Fast on invalid explicit CONFIG_PATH)
+	if customPath := strings.TrimSpace(os.Getenv("CONFIG_PATH")); customPath != "" {
+		if info, err := os.Stat(customPath); err == nil && info.IsDir() {
+			if targetName != "" {
+				candidate := filepath.Join(customPath, targetName+".yaml")
+				if st, err := os.Stat(candidate); err == nil && !st.IsDir() {
+					return candidate
+				}
+			}
+			standaloneCandidate := filepath.Join(customPath, "standalone.yaml")
+			if st, err := os.Stat(standaloneCandidate); err == nil && !st.IsDir() {
+				return standaloneCandidate
+			}
+			if targetName != "" {
+				return filepath.Join(customPath, targetName+".yaml")
+			}
 		}
+		return customPath
 	}
 	if customPath := os.Getenv("SHARED_CONFIG_PATH"); customPath != "" {
 		if info, err := os.Stat(customPath); err == nil {

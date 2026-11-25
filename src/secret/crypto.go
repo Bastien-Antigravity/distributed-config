@@ -35,6 +35,8 @@ import (
 // ENC_REGEX matches ENC(base64_blob)
 var ENC_REGEX = regexp.MustCompile(`ENC\(([^)]+)\)`)
 
+var defaultSystemPrivateKeyPath = "/etc/bastien/private.pem"
+
 var (
 	keyCacheMu    sync.RWMutex
 	cachedKey     *rsa.PrivateKey
@@ -106,10 +108,12 @@ func getPrivateKey() (*rsa.PrivateKey, error) {
 	// 2. Fallback to file path
 	keyPath := os.Getenv("BASTIEN_PRIVATE_KEY_PATH")
 	if keyPath == "" {
-		keyPath = "/etc/bastien/private.pem"
-		// Fallback for local sandbox testing
-		if _, err := os.Stat("./private.pem"); err == nil {
-			keyPath = "./private.pem"
+		keyPath = defaultSystemPrivateKeyPath
+		if _, err := os.Stat(keyPath); os.IsNotExist(err) && os.Getenv("APP_ENV") != "production" {
+			// Local sandbox fallback only when system key does not exist outside production
+			if _, localErr := os.Stat("./private.pem"); localErr == nil {
+				keyPath = "./private.pem"
+			}
 		}
 	}
 

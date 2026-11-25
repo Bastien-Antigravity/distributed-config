@@ -1,11 +1,11 @@
 /*
 ESSENTIAL PROCESS:
-Thread-local error storage for the distributed-config CGO C ABI bridge.
+Thread-local and fallback fixed-buffer error storage for the distributed-config CGO C ABI bridge.
 
 DATA FLOW:
 1. Input: Error code and C string message from CGO bridge functions.
-2. Logic: Frees previous thread-local message and duplicates the new error string.
-3. Output: Thread-local last_error and last_error_code state.
+2. Logic: Copies message into fixed-size thread-local and mutex-guarded global buffers via snprintf (zero strdup leaks).
+3. Output: Safe const char* error descriptions and integer error codes across Go scheduler thread switches.
 
 KEY PARAMETERS:
 - code: Standardized DISTCONF_* error integer code.
@@ -13,18 +13,52 @@ KEY PARAMETERS:
 */
 
 #include "helpers.h"
+#include <pthread.h>
+#include <stdio.h>
 
-_Thread_local char* last_error = NULL;
-_Thread_local int last_error_code = 0;
+#define DISTCONF_ERR_BUF_SIZE 512
+
+static _Thread_local char last_error_buf[DISTCONF_ERR_BUF_SIZE] = {0};
+static _Thread_local int last_error_code = 0;
+
+static pthread_mutex_t global_err_mu = PTHREAD_MUTEX_INITIALIZER;
+static char global_last_error_buf[DISTCONF_ERR_BUF_SIZE] = {0};
+static int global_last_error_code = 0;
 
 void set_last_error(int code, const char* err) {
     last_error_code = code;
-    if (last_error != NULL) {
-        free(last_error);
-    }
-    if (err == NULL) {
-        last_error = NULL;
+    if (err == NULL || err[0] == '\0') {
+        last_error_buf[0] = '\0';
     } else {
-        last_error = strdup(err);
+        snprintf(last_error_buf, sizeof(last_error_buf), "%s", err);
     }
+
+    pthread_mutex_lock(&global_err_mu);
+    global_last_error_code = code;
+    if (err == NULL || err[0] == '\0') {
+        global_last_error_buf[0] = '\0';
+    } else {
+        snprintf(global_last_error_buf, sizeof(global_last_error_buf), "%s", err);
+    }
+    pthread_mutex_unlock(&global_err_mu);
+}
+
+const char* get_last_error(void) {
+    if (last_error_code != 0 && last_error_buf[0] != '\0') {
+        return last_error_buf;
+    }
+    pthread_mutex_lock(&global_err_mu);
+    const char* res = (global_last_error_code != 0 && global_last_error_buf[0] != '\0') ? global_last_error_buf : NULL;
+    pthread_mutex_unlock(&global_err_mu);
+    return res;
+}
+
+int get_last_error_code(void) {
+    if (last_error_code != 0) {
+        return last_error_code;
+    }
+    pthread_mutex_lock(&global_err_mu);
+    int code = global_last_error_code;
+    pthread_mutex_unlock(&global_err_mu);
+    return code;
 }

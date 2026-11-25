@@ -60,7 +60,9 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 
 	// 1. Initial File Load (Gets Capabilities & config_server IP)
 	fullPath := loader.ResolveConfigPath(s.Profile)
-	_ = loader.LoadConfigFromFileSafe(cfg, fullPath)
+	if err := loader.LoadConfigFromFileSafe(cfg, fullPath); err != nil {
+		return err
+	}
 
 	// 2. Env Load (Overrides IP or NAME if provided dynamically)
 	loader.LoadCommonFromEnv(cfg)
@@ -80,25 +82,7 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 			s.Client.Watch() // Start background hot-reloading AFTER initial sync
 			if err == nil {
 				cfg.Logger.Info("Cloud (%s): Loaded configuration from Server", s.Profile)
-				// Sync server-provided capability sections into cfg.Capabilities baseline
-				if livePtr := cfg.LiveConfig.Load(); livePtr != nil {
-					if cfg.Capabilities == nil {
-						cfg.Capabilities = make(map[string]interface{})
-					}
-					for section, kv := range *livePtr {
-						if section == "common" || section == "shared" || section == "local" {
-							continue
-						}
-						capMap, ok := cfg.Capabilities[section].(map[string]interface{})
-						if !ok {
-							capMap = make(map[string]interface{})
-							cfg.Capabilities[section] = capMap
-						}
-						for k, v := range kv {
-							capMap[k] = v
-						}
-					}
-				}
+				hydrateCapabilitiesFromLiveConfig(cfg)
 			} else {
 				cfg.Logger.Warning("Cloud (%s): Failed to load configuration from Server: %v", s.Profile, err)
 			}
@@ -319,5 +303,32 @@ func syncCapabilitiesToLiveConfig(cfg *core.Config) {
 	}
 	if len(capUpdates) > 0 {
 		cfg.Set(capUpdates)
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+// hydrateCapabilitiesFromLiveConfig copies server-provided capability sections
+// from LiveConfig into cfg.Capabilities before the local YAML override pass.
+func hydrateCapabilitiesFromLiveConfig(cfg *core.Config) {
+	livePtr := cfg.LiveConfig.Load()
+	if livePtr == nil {
+		return
+	}
+	if cfg.Capabilities == nil {
+		cfg.Capabilities = make(map[string]interface{})
+	}
+	for section, kv := range *livePtr {
+		if section == "common" || section == "shared" || section == "local" {
+			continue
+		}
+		capMap, ok := cfg.Capabilities[section].(map[string]interface{})
+		if !ok {
+			capMap = make(map[string]interface{})
+			cfg.Capabilities[section] = capMap
+		}
+		for k, v := range kv {
+			capMap[k] = v
+		}
 	}
 }

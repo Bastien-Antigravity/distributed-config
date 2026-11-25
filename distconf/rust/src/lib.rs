@@ -184,6 +184,21 @@ impl DistConfig {
         }
     }
 
+    pub fn get_rest_address(&self, capability: &str) -> Result<String, DistConfError> {
+        unsafe {
+            let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char) -> *mut c_char> =
+                self.lib.get(b"DistConf_GetRESTAddress").unwrap();
+            let cap_c = CString::new(capability).unwrap();
+            let res = func(self.handle, cap_c.as_ptr());
+            if res.is_null() {
+                return Err(self.raise_last_error());
+            }
+            let val = CStr::from_ptr(res).to_string_lossy().into_owned();
+            self.free_string(res);
+            Ok(val)
+        }
+    }
+
     pub fn decrypt(&self, ciphertext: &str) -> Result<String, DistConfError> {
         unsafe {
             let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char) -> *mut c_char> = 

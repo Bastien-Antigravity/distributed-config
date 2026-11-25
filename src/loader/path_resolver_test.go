@@ -19,6 +19,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Bastien-Antigravity/distributed-config/src/core"
+	"github.com/Bastien-Antigravity/distributed-config/src/utils"
 )
 
 // -----------------------------------------------------------------------------
@@ -85,6 +88,27 @@ func TestResolveConfigPath(t *testing.T) {
 		gotFallback := ResolveConfigPath("nonexistent_profile")
 		if gotFallback != standaloneFile {
 			t.Errorf("Expected SHARED_CONFIG_PATH directory fallback to resolve %s, got %s", standaloneFile, gotFallback)
+		}
+	})
+
+	t.Run("Priority-0-ExplicitConfigPath-FailFast", func(t *testing.T) {
+		// Create a valid staging.yaml in CWD to prove explicit missing CONFIG_PATH does NOT silently fall back
+		tempRun, _ := os.MkdirTemp(tempDir, "run-explicit-*")
+		_ = os.Chdir(tempRun)
+		defer func() { _ = os.Chdir(tempDir) }()
+		_ = os.WriteFile(filepath.Join(tempRun, "staging.yaml"), []byte("common:\n  name: fallback\n"), 0644)
+
+		missingPath := filepath.Join(tempRun, "does-not-exist.yaml")
+		t.Setenv("CONFIG_PATH", missingPath)
+
+		got := ResolveConfigPath("staging")
+		if got != missingPath {
+			t.Fatalf("Expected ResolveConfigPath to return explicit missing path %q without fallback, got %q", missingPath, got)
+		}
+
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
+		if err := LoadConfigFromFileSafe(cfg, got); err == nil {
+			t.Fatal("Expected LoadConfigFromFileSafe to fail fast when explicit CONFIG_PATH does not exist")
 		}
 	})
 }

@@ -35,6 +35,15 @@ type ConfigStrategy interface {
 	// Set handles local configuration updates according to the strategy's consistency model.
 	Set(cfg *core.Config, updates map[string]map[string]string) error
 
+	// SetWithOCC pushes updates with optimistic concurrency control.
+	SetWithOCC(cfg *core.Config, updates map[string]map[string]string, expectedVersion uint64) error
+
+	// DeleteKeys removes specified section keys from live configuration and syncs according to strategy.
+	DeleteKeys(cfg *core.Config, deletions map[string][]string) error
+
+	// DeleteKeysWithOCC removes specified section keys with optimistic concurrency control.
+	DeleteKeysWithOCC(cfg *core.Config, deletions map[string][]string, expectedVersion uint64) error
+
 	// GetHandler returns the network handler if the strategy supports it.
 	GetHandler() *network.ConfigProtoHandler
 
@@ -44,14 +53,6 @@ type ConfigStrategy interface {
 
 // -----------------------------------------------------------------------------
 
-// ConfigStrategyOCC is an optional extension interface for strategies supporting Optimistic Concurrency Control.
-type ConfigStrategyOCC interface {
-	ConfigStrategy
-	SetWithOCC(cfg *core.Config, updates map[string]map[string]string, expectedVersion uint64) error
-	DeleteKeysWithOCC(cfg *core.Config, deletions map[string][]string, expectedVersion uint64) error
-}
-
-// ConfigStrategyDeleter is an optional extension interface for strategies supporting explicit key deletions.
-type ConfigStrategyDeleter interface {
-	DeleteKeys(cfg *core.Config, deletions map[string][]string) error
-}
+// ConfigStrategyOCC and ConfigStrategyDeleter are retained as type aliases for backwards compatibility.
+type ConfigStrategyOCC = ConfigStrategy
+type ConfigStrategyDeleter = ConfigStrategy

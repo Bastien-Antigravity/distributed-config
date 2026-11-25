@@ -7,11 +7,11 @@ package loader
 //
 // DATA FLOW:
 // 1. Input: Populated *core.Config pointer.
-// 2. Logic: Validates presence of Common.Name and required capability endpoints.
-// 3. Output: Error if mandatory configuration keys or service definitions are missing.
+// 2. Logic: Enforces test and production IP isolation rules across capability maps.
+// 3. Output: Error if forbidden capability IP addresses are detected.
 //
 // KEY PARAMETERS:
-// - Common.Name: Service name identifier.
+// - DOCKER_ENV: Allows Docker bridge/loopback IPs when set to "true".
 // =============================================================================
 
 import (
@@ -22,29 +22,6 @@ import (
 )
 
 // -----------------------------------------------------------------------------
-
-func ValidateCommonConfig(config *core.Config) error {
-	if config.Common.Name == "" {
-		return fmt.Errorf("missing required common config: NAME")
-	}
-
-	// Assuming Config Server details are required for Distributed Mode
-	val, ok := config.Capabilities["config_server"]
-	if !ok {
-		return fmt.Errorf("missing required config server details (CF_IP, CF_PORT) for distributed mode")
-	}
-	if m, ok := val.(map[string]interface{}); ok {
-		ip, _ := m["ip"].(string)
-		port, _ := m["port"].(string)
-		if ip == "" || port == "" {
-			return fmt.Errorf("missing required config server details")
-		}
-	} else {
-		return fmt.Errorf("invalid config_server capability map")
-	}
-
-	return nil
-}
 
 func CheckTestIPs(config *core.Config) error {
 	for name, capInterface := range config.Capabilities {

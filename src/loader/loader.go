@@ -79,6 +79,9 @@ func loadPublicKey(config *models.Config) {
 // config tags like CF_IP/CF_PORT are provided via ENV variables.
 func LoadConfigFromFileSafe(config *models.Config, filePath string) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		if strings.TrimSpace(os.Getenv("CONFIG_PATH")) != "" {
+			return fmt.Errorf("explicit CONFIG_PATH file not found: %s", filePath)
+		}
 		config.Logger.Info("Config file missing at '%s'. Proceeding with Environment/Server discovery...", filePath)
 		return nil
 	}

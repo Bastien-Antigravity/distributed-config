@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 
@@ -111,6 +112,10 @@ func (h *ConfigProtoHandler) HandleOutgoing(cmd pb.ConfigMsg_Cmd, payload interf
 // -----------------------------------------------------------------------------
 
 func (h *ConfigProtoHandler) HandleOutgoingWithVersion(cmd pb.ConfigMsg_Cmd, payload interface{}, version uint64) ([]byte, error) {
+	if version > math.MaxInt32 {
+		return nil, fmt.Errorf("version %d exceeds protobuf int32 maximum", version)
+	}
+
 	var payloadBytes []byte
 	var err error
 
@@ -169,12 +174,18 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 				gapCb := h.onGapDetected
 				expected := h.lastSeenVersion + 1
 				h.lastSeenVersion = incomingVer
+				if h.parentConfig != nil {
+					h.parentConfig.SetVersion(incomingVer)
+				}
 				h.mu.Unlock()
 				if gapCb != nil {
 					gapCb(expected, incomingVer)
 				}
 			} else {
 				h.lastSeenVersion = incomingVer
+				if h.parentConfig != nil {
+					h.parentConfig.SetVersion(incomingVer)
+				}
 				h.mu.Unlock()
 			}
 		}
@@ -205,6 +216,9 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 			h.mu.Lock()
 			if uint64(msg.Version) > h.lastSeenVersion {
 				h.lastSeenVersion = uint64(msg.Version)
+				if h.parentConfig != nil {
+					h.parentConfig.SetVersion(h.lastSeenVersion)
+				}
 			}
 			h.mu.Unlock()
 		}
@@ -232,6 +246,9 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 				return nil
 			}
 			h.lastSeenVersion = incomingVer
+			if h.parentConfig != nil {
+				h.parentConfig.SetVersion(incomingVer)
+			}
 			h.mu.Unlock()
 		}
 		h.updateLiveConfig(parsed)
@@ -254,6 +271,9 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 			h.mu.Lock()
 			if uint64(msg.Version) > h.lastSeenVersion {
 				h.lastSeenVersion = uint64(msg.Version)
+				if h.parentConfig != nil {
+					h.parentConfig.SetVersion(h.lastSeenVersion)
+				}
 			}
 			h.mu.Unlock()
 		}
