@@ -1,29 +1,15 @@
-
 Initial high-priority findings
 One security issue stands out immediately: the RSA key-generation command does not protect the generated private key file.
 
 In cmd/config-tool/main.go, handleKeygen() creates private.pem with os.Create(), which uses permissions of 0666 filtered by the process umask. On a typical Unix system with umask 022, that produces a file readable by other local users (0644). The command labels the key “KEEP THIS SECRET”, but does not enforce that protection.
 
-This is inconsistent with the newer tlsgen implementation, which writes private keys with 0600 permissions and has tests verifying those permissions.
+-> I didn't see that so could you show me ? (no private key should be in distributed config, only relative path to...)
+
+
 
 There is also a concrete networking defect: GetAddress() builds addresses using fmt.Sprintf("%s:%s", host, port). For an IPv6 wildcard address, it returns :::7000; the existing test explicitly expects that malformed address instead of a valid bracketed address such as [::]:7000. IPv6 service endpoints therefore need correction, not just additional documentation.
 
-Sources: config-tool/main.go · tlsgen.go · config.go · config_test.go
 
-A further important finding concerns the new certificate tooling: tlsgen can generate per-service certificates, and safe-socket supports TLS and mTLS configuration fields. However, the inspected distributed-config client still connects using the tcp-hello profile and supplies no certificate, key or CA configuration.
-
-So certificate generation is not the same as securing the configuration channel. I cannot establish mTLS protection on this client path from the current implementation. The TLS tooling needs to be connected to the actual client/server transport configuration, with peer verification and service identity checks.
-
-Sources: network/client.go · safe-socket/socket_config.go · tlsgen.go
-distributed-config — repository audit
-Repository: Bastien-Antigravity/distributed-config · Branch: develop · Reviewed commit: 695bfba · 24 November 2026
-
-Strong architecture
- Live-sync reliability and security gaps
-
-The overall design is ambitious and generally well structured. This is more than a YAML loader: it is the configuration foundation for the wider microservice fleet, with dynamic updates, optimistic concurrency, service discovery, secret handling and a cross-language API.
-
-The recent work on atomic configuration snapshots, serialized writers, stale-revision protection and acknowledged updates is particularly valuable.
 
 My assessment is that the architecture is stronger than the current operational guarantees. The most important concerns are the disconnected-client behavior, missing acknowledgement correlation, and the fact that the newly generated certificates are not yet wired into the configuration client's transport.
 
