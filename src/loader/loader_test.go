@@ -211,6 +211,40 @@ capabilities:
 		}
 	})
 
+	t.Run("TestTypes-QuotedBooleansPreservedAsString", func(t *testing.T) {
+		yamlContent := `
+capabilities:
+  service:
+    token: "false"
+    mode: 'true'
+    flag: true
+    enabled: ${UNSET_BOOL_VAR:false}
+`
+		configPath := filepath.Join(tempDir, "quoted_bools.yaml")
+		if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}
+		if err := LoadConfigFromFile(cfg, configPath); err != nil {
+			t.Fatal(err)
+		}
+
+		svc := cfg.Capabilities["service"].(map[string]interface{})
+		if token, ok := svc["token"].(string); !ok || token != "false" {
+			t.Errorf("expected quoted token to remain string \"false\", got %T (%v)", svc["token"], svc["token"])
+		}
+		if mode, ok := svc["mode"].(string); !ok || mode != "true" {
+			t.Errorf("expected single-quoted mode to remain string 'true', got %T (%v)", svc["mode"], svc["mode"])
+		}
+		if flag, ok := svc["flag"].(bool); !ok || !flag {
+			t.Errorf("expected unquoted flag to be bool true, got %T (%v)", svc["flag"], svc["flag"])
+		}
+		if enabled, ok := svc["enabled"].(bool); !ok || enabled {
+			t.Errorf("expected unquoted env fallback false to be bool false, got %T (%v)", svc["enabled"], svc["enabled"])
+		}
+	})
+
 	t.Run("TestFailFastOnMissingFile", func(t *testing.T) {
 		configPath := filepath.Join(tempDir, "missing.yaml")
 		cfg := &core.Config{Logger: utils.EnsureSafeLogger(nil)}

@@ -115,3 +115,57 @@ func TestMergeBugReproduction(t *testing.T) {
 		}
 	})
 }
+
+// -----------------------------------------------------------------------------
+
+func TestProtoHandler_ServerRestartResetAndAckDedup(t *testing.T) {
+	cfg := &core.Config{}
+	liveCount := 0
+	handler := NewConfigHandler("RestartHandler", cfg)
+	handler.SetOnLiveConfUpdate(func(_ map[string]map[string]string) {
+		liveCount++
+	})
+
+	// 1. Client reaches version 15 from initial server session.
+	snap15, _ := json.Marshal(map[string]map[string]string{"svc": {"port": "8080"}})
+	raw15, _ := proto.Marshal(&pb.ConfigMsg{Command: pb.ConfigMsg_GET_SYNC, Version: 15, Payload: snap15})
+	if err := handler.HandleIncoming(raw15); err != nil {
+		t.Fatalf("HandleIncoming(v15) failed: %v", err)
+	}
+	if handler.GetLastSeenVersion() != 15 {
+		t.Fatalf("Expected lastSeenVersion 15, got %d", handler.GetLastSeenVersion())
+	}
+
+	// 2. TCP reconnect calls ResetSessionVersion before GET_SYNC; server restart with lower version 2 is adopted.
+	handler.ResetSessionVersion()
+	snap2, _ := json.Marshal(map[string]map[string]string{"svc": {"port": "9090"}})
+	raw2, _ := proto.Marshal(&pb.ConfigMsg{Command: pb.ConfigMsg_GET_SYNC, Version: 2, Payload: snap2})
+	if err := handler.HandleIncoming(raw2); err != nil {
+		t.Fatalf("HandleIncoming(v2) failed: %v", err)
+	}
+	if handler.GetLastSeenVersion() != 2 {
+		t.Fatalf("Expected lastSeenVersion 2 after restart snapshot, got %d", handler.GetLastSeenVersion())
+	}
+	if cfg.Get("svc", "port") != "9090" {
+		t.Fatalf("Expected port 9090 from restart snapshot, got %q", cfg.Get("svc", "port"))
+	}
+
+	// 3. Subsequent ACK at v3 followed by BROADCAST_SYNC at v3 fires onLiveConfUpdate once,
+	//    and any duplicate BROADCAST_SYNC at v3 is ignored.
+	beforeLive := liveCount
+	ackRaw, _ := proto.Marshal(&pb.ConfigMsg{Command: pb.ConfigMsg_ACK, Version: 3})
+	if err := handler.HandleIncoming(ackRaw); err != nil {
+		t.Fatalf("HandleIncoming(ACK v3) failed: %v", err)
+	}
+	bcastPayload, _ := json.Marshal(map[string]map[string]string{"svc": {"port": "9091"}})
+	bcastRaw, _ := proto.Marshal(&pb.ConfigMsg{Command: pb.ConfigMsg_BROADCAST_SYNC, Version: 3, Payload: bcastPayload})
+	if err := handler.HandleIncoming(bcastRaw); err != nil {
+		t.Fatalf("HandleIncoming(BROADCAST v3 #1) failed: %v", err)
+	}
+	if err := handler.HandleIncoming(bcastRaw); err != nil {
+		t.Fatalf("HandleIncoming(BROADCAST v3 #2) failed: %v", err)
+	}
+	if liveCount != beforeLive+1 {
+		t.Fatalf("Expected exactly one onLiveConfUpdate for ACK+duplicate BROADCAST, got %d -> %d", beforeLive, liveCount)
+	}
+}

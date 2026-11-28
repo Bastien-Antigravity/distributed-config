@@ -14,22 +14,23 @@ tags:
 
 Detailed technical breakdown of the behaviors and logic patterns within `distributed-config`.
 
-## 1. CloudStrategy (Production & Staging)
+## 1. CloudStrategy (Production, Staging & Test)
 
 The `CloudStrategy` (in `src/strategies/cloud.go`) is the primary mechanism for microservices connecting to the central `config-server`.
 
 ### Consolidation Logic
-To adhere to the **Purger Rule**, the once separate `ProductionStrategy` and `StagingStrategy` have been merged into this unified strategy. It uses a `ReadOnly` toggle and a `Profile` string to differentiate behavior.
+To adhere to the **Purger Rule**, `ProductionStrategy`, `StagingStrategy`, and `TestStrategy` all share `CloudStrategy` execution logic (`TestStrategy` delegates to `CloudStrategy` with `Profile: "test"` and `RequireFile: true`). It uses `ReadOnly`, `RequireFile`, and `Profile` to differentiate behavior.
 
 ### Loading Hierarchy
-1.  **Local Discovery**: Tries to find `config/[profile].yaml`.
-2.  **Environment Expansion**: Injects `${VAR}` tokens (e.g., `CF_IP`, `CF_PORT`).
-3.  **Server Baseline**: Connects to the Config Server and fetches the global registry.
-4.  **Local Override (Authoritative)**: Re-reads the local file. **The local file always wins** over server data to allow per-node fine-tuning.
+1.  **Local Discovery (Single Disk Read)**: Resolves the profile YAML (or `standalone.yaml` seed) and reads it from disk once, snapshotting file capabilities in memory.
+2.  **Environment Expansion**: Injects `${VAR}` tokens and reserved bootstrap variables (`CF_IP`, `CF_PORT`, `LS_IP`, `LS_PORT`) for Environment-First bootstrapping.
+3.  **Server Baseline**: Connects to the Config Server (`GET_SYNC`), starts the `Watch()` stream, and hydrates server capabilities.
+4.  **Local Override (Authoritative)**: Re-applies the in-memory file snapshot over server data (unless `ResolveConfigPath` fell back to `standalone.yaml` as a seed while connected to `config-server`).
 
 ### Profile-Specific Integrity
--   **Production**: Enforces `CheckProductionIPs`. It will return an error (preventing boot) if any capability IP is detected as `127.0.0.2` (the test IP).
--   **Staging**: Read-Only mode by default. Synchronization (`Sync`) and remote `Set` requests are disabled to prevent staging environments from polluting the central config store.
+-   **Production**: Enforces `CheckProductionIPs` across `ip`, `grpc_ip`, and `rest_ip` endpoints (preventing `127.0.0.2` outside `DOCKER_ENV=true`).
+-   **Staging**: Read-Only mode (`ReadOnly: true`). Synchronization (`Sync`), `SetWithOCC`, and deletions are disabled to prevent staging environments from polluting the central config store.
+-   **Test**: Requires a local YAML file (`RequireFile: true`) and enforces `CheckTestIPs` across `ip`, `grpc_ip`, and `rest_ip` when `CHECK_TEST_IPS=true`.
 
 ## 2. Lock-Free Live Config (RCU)
 

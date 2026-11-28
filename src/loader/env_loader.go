@@ -24,6 +24,24 @@ import (
 
 // -----------------------------------------------------------------------------
 
+func setCapabilityEnv(config *core.Config, capName, key, envVar string) {
+	val, exists := os.LookupEnv(envVar)
+	if !exists {
+		return
+	}
+	if config.Capabilities == nil {
+		config.Capabilities = make(map[string]interface{})
+	}
+	if config.Capabilities[capName] == nil {
+		config.Capabilities[capName] = make(map[string]interface{})
+	}
+	if m, ok := config.Capabilities[capName].(map[string]interface{}); ok {
+		m[key] = val
+	}
+}
+
+// -----------------------------------------------------------------------------
+
 func LoadCommonFromEnv(config *core.Config) {
 	if val, exists := os.LookupEnv("NAME"); exists {
 		config.Common.Name = val
@@ -37,28 +55,9 @@ func LoadCommonFromEnv(config *core.Config) {
 		}
 	}
 
-	// Wait: generic approach for ConfigServer bootstrapping if missing YAML
-	if val, exists := os.LookupEnv("CF_IP"); exists {
-		if config.Capabilities == nil {
-			config.Capabilities = make(map[string]interface{})
-		}
-		if config.Capabilities["config_server"] == nil {
-			config.Capabilities["config_server"] = make(map[string]interface{})
-		}
-		// Go type assertion trick for nested maps
-		if m, ok := config.Capabilities["config_server"].(map[string]interface{}); ok {
-			m["ip"] = val
-		}
-	}
-	if val, exists := os.LookupEnv("CF_PORT"); exists {
-		if config.Capabilities == nil {
-			config.Capabilities = make(map[string]interface{})
-		}
-		if config.Capabilities["config_server"] == nil {
-			config.Capabilities["config_server"] = make(map[string]interface{})
-		}
-		if m, ok := config.Capabilities["config_server"].(map[string]interface{}); ok {
-			m["port"] = val
-		}
-	}
+	// Environment-First bootstrapping for mandatory infrastructure services
+	setCapabilityEnv(config, "config_server", "ip", "CF_IP")
+	setCapabilityEnv(config, "config_server", "port", "CF_PORT")
+	setCapabilityEnv(config, "log_server", "ip", "LS_IP")
+	setCapabilityEnv(config, "log_server", "port", "LS_PORT")
 }

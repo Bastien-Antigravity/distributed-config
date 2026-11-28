@@ -27,7 +27,6 @@ import (
 	"github.com/Bastien-Antigravity/distributed-config/src/loader"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 	"github.com/Bastien-Antigravity/distributed-config/src/utils"
-	"gopkg.in/yaml.v3"
 )
 
 // -----------------------------------------------------------------------------
@@ -289,41 +288,13 @@ func (config *Config) ShareConfigWithOCC(payload interface{}, expectedVersion ui
 // to be managed by the calling AppConfig wrapper.
 // -----------------------------------------------------------------------------
 func (config *Config) ApplyFileOverride(filePath string) (string, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read override file: %w", err)
+	if err := loader.LoadYAML(filePath, config.Config); err != nil {
+		return "", fmt.Errorf("failed to apply override file: %w", err)
 	}
 
-	var root yaml.Node
-	if err := yaml.Unmarshal(data, &root); err != nil {
-		return "", fmt.Errorf("failed to parse override yaml: %w", err)
-	}
-
-	// Apply Go-native expansion and type forcing
-	loader.ProcessNode(&root)
-
-	// Decode into core.Config to leverage existing field mapping (Common, Capabilities, etc)
-	var raw map[string]interface{}
-	if err := root.Decode(&raw); err != nil {
-		return "", fmt.Errorf("failed to decode override map: %w", err)
-	}
-
-	// 1. Handle standard sections (Common)
-	if comm, ok := raw["common"].(map[string]interface{}); ok {
-		if name, ok := comm["name"].(string); ok {
-			config.Config.Common.Name = name
-		}
-	}
-
-	// 2. Handle capabilities (Merge)
-	if caps, ok := raw["capabilities"].(map[string]interface{}); ok {
-		config.Config.Capabilities = core.DeepMerge(config.Config.Capabilities, caps)
-	}
-
-	// 3. Extract 'local' section (Toolbox ownership)
 	localJSON := "{}"
-	if priv, ok := raw["local"].(map[string]interface{}); ok {
-		b, err := json.Marshal(priv)
+	if len(config.Config.Local) > 0 {
+		b, err := json.Marshal(config.Config.Local)
 		if err == nil {
 			localJSON = string(b)
 		}

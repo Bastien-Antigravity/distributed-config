@@ -15,12 +15,48 @@ package facade
 // =============================================================================
 
 import (
+	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 )
 
 // -----------------------------------------------------------------------------
 
+func writeTempConfigFixture(t *testing.T) {
+	t.Helper()
+	closedPort := 59999
+	if ln, err := net.Listen("tcp", "127.0.0.1:0"); err == nil {
+		closedPort = ln.Addr().(*net.TCPAddr).Port
+		_ = ln.Close()
+	}
+	tempDir := t.TempDir()
+	fixturePath := filepath.Join(tempDir, "facade_test.yaml")
+	fixture := fmt.Sprintf(`
+common:
+  name: "facade-test"
+capabilities:
+  log_server:
+    ip: "127.0.0.1"
+    port: "9020"
+  config_server:
+    ip: "127.0.0.1"
+    port: "%d"
+`, closedPort)
+	if err := os.WriteFile(fixturePath, []byte(fixture), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CONFIG_PATH", fixturePath)
+	t.Setenv("DOCKER_ENV", "true")
+}
+
+// -----------------------------------------------------------------------------
+
 func TestNewConfig(t *testing.T) {
+	writeTempConfigFixture(t)
 	profiles := []string{"standalone", "test", "staging", "production"}
 
 	for _, profile := range profiles {
@@ -29,16 +65,20 @@ func TestNewConfig(t *testing.T) {
 			if cfg == nil {
 				t.Fatalf("NewConfig(%s) returned nil", profile)
 			}
+			defer func() { _ = cfg.Close() }()
 			if cfg.Config == nil {
 				t.Fatalf("NewConfig(%s).Config is nil", profile)
 			}
 
 			// Test callback registration & local trigger via SetSingle
-			triggered := false
+			var triggered atomic.Bool
+			var mu sync.Mutex
 			var capturedUpdates map[string]map[string]string
 			cfg.OnLiveConfUpdate(func(updates map[string]map[string]string) {
-				triggered = true
+				mu.Lock()
 				capturedUpdates = updates
+				mu.Unlock()
+				triggered.Store(true)
 			})
 
 			_ = cfg.SetSingle("TEST_SECTION", "TEST_KEY", "TEST_VAL")
@@ -46,15 +86,18 @@ func TestNewConfig(t *testing.T) {
 			if cfg.strategy != nil {
 				expectTrigger := profile == "standalone" || profile == "staging"
 
-				if expectTrigger && !triggered {
+				if expectTrigger && !triggered.Load() {
 					t.Errorf("NewConfig(%s): SetSingle should have triggered the local callback", profile)
-				} else if !expectTrigger && triggered {
+				} else if !expectTrigger && triggered.Load() {
 					t.Errorf("NewConfig(%s): SetSingle should NOT have triggered the local callback (Strict Eventing)", profile)
 				}
 
 				if expectTrigger {
-					if capturedUpdates["TEST_SECTION"]["TEST_KEY"] != "TEST_VAL" {
-						t.Errorf("NewConfig(%s): Callback captured wrong value: %v", profile, capturedUpdates["TEST_SECTION"]["TEST_KEY"])
+					mu.Lock()
+					gotVal := capturedUpdates["TEST_SECTION"]["TEST_KEY"]
+					mu.Unlock()
+					if gotVal != "TEST_VAL" {
+						t.Errorf("NewConfig(%s): Callback captured wrong value: %v", profile, gotVal)
 					}
 				}
 			}
@@ -69,6 +112,7 @@ func TestNewConfig(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestFacade_OCCAndDeletions(t *testing.T) {
+	writeTempConfigFixture(t)
 	cfg := NewConfig("standalone")
 	if cfg == nil {
 		t.Fatal("Failed to create standalone config")

@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"github.com/Bastien-Antigravity/distributed-config"
+	"github.com/Bastien-Antigravity/distributed-config/src/factory"
 )
 
 // ConfigSession holds the state for a single library instantiation.
@@ -45,10 +46,7 @@ var (
 func New(profile string) uintptr {
 	prof := sanitizeString(profile)
 
-	switch prof {
-	case "standalone", "test", "staging", "production":
-		// Allowed profiles
-	default:
+	if _, err := factory.NewStrategy(prof); err != nil {
 		return 0
 	}
 

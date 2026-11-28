@@ -297,8 +297,8 @@ func TestConfig_WildcardBindPreservedOverLiveConfig(t *testing.T) {
 	if addr, err := cfg.GetRESTAddress("notif_server"); err != nil || addr != "0.0.0.0:1029" {
 		t.Fatalf("Expected GetRESTAddress to preserve wildcard 0.0.0.0:1029, got %q (err=%v)", addr, err)
 	}
-	if addr, err := cfg.GetAddress("ipv6_service"); err != nil || addr != ":::7000" {
-		t.Fatalf("Expected GetAddress to preserve wildcard :::7000, got %q (err=%v)", addr, err)
+	if addr, err := cfg.GetAddress("ipv6_service"); err != nil || addr != "[::]:7000" {
+		t.Fatalf("Expected GetAddress to preserve wildcard [::]:7000, got %q (err=%v)", addr, err)
 	}
 	if addr, err := cfg.GetAddress("peer_service"); err != nil || addr != "peer-service:8000" {
 		t.Fatalf("Expected non-wildcard LiveConfig override to return peer-service:8000, got %q (err=%v)", addr, err)
@@ -438,12 +438,16 @@ func TestConfig_ResolveCapabilityAndVersion(t *testing.T) {
 		"port":      5432,
 		"rest_port": 8080,
 		"pool":      "10",
+		"servers":   []interface{}{"nats://127.0.0.1:4222"},
+		"dashboard": map[string]interface{}{"ip": "127.0.0.1", "port": "8082"},
 	}
 
 	cfg.Set(map[string]map[string]string{
 		"db": {
-			"ip":   "10.0.0.2",
-			"pool": "20",
+			"ip":        "10.0.0.2",
+			"pool":      "20",
+			"servers":   "[nats://127.0.0.1:4222]",
+			"dashboard": "map[ip:127.0.0.1 port:8082]",
 		},
 		"capabilities": {
 			"db.pool": "30",
@@ -453,6 +457,12 @@ func TestConfig_ResolveCapabilityAndVersion(t *testing.T) {
 	resolved, err := cfg.ResolveCapability("db")
 	if err != nil {
 		t.Fatalf("ResolveCapability failed: %v", err)
+	}
+	if _, isSlice := resolved["servers"].([]interface{}); !isSlice {
+		t.Errorf("Expected structured slice 'servers' preserved, got %T (%v)", resolved["servers"], resolved["servers"])
+	}
+	if _, isMap := resolved["dashboard"].(map[string]interface{}); !isMap {
+		t.Errorf("Expected structured map 'dashboard' preserved, got %T (%v)", resolved["dashboard"], resolved["dashboard"])
 	}
 	if resolved["ip"] != "10.0.0.2" {
 		t.Errorf("Expected direct LiveConfig ip 10.0.0.2, got %v", resolved["ip"])
@@ -485,5 +495,36 @@ func TestConfig_ResolveCapabilityAndVersion(t *testing.T) {
 	cfg.SetVersion(42)
 	if cfg.GetVersion() != 42 {
 		t.Errorf("Expected version 42, got %d", cfg.GetVersion())
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+func BenchmarkConfig_Get(b *testing.B) {
+	cfg := &Config{}
+	initial := map[string]map[string]string{
+		"timescale_db": {"host": "127.0.0.1", "port": "5432"},
+		"nats":         {"ip": "127.0.0.1", "port": "4222"},
+	}
+	cfg.LiveConfig.Store(&initial)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = cfg.Get("timescale_db", "port")
+	}
+}
+
+func BenchmarkConfig_SetDelta(b *testing.B) {
+	cfg := &Config{}
+	initial := make(map[string]map[string]string, 32)
+	for i := 0; i < 32; i++ {
+		initial["service_"+string(rune('A'+i))] = map[string]string{"ip": "127.0.0.1", "port": "8000"}
+	}
+	cfg.LiveConfig.Store(&initial)
+	delta := map[string]map[string]string{"service_A": {"port": "9000"}}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cfg.Set(delta)
 	}
 }

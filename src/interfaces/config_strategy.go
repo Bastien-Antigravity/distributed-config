@@ -50,9 +50,3 @@ type ConfigStrategy interface {
 	// Close shuts down the strategy and any associated resources (e.g. network client).
 	Close() error
 }
-
-// -----------------------------------------------------------------------------
-
-// ConfigStrategyOCC and ConfigStrategyDeleter are retained as type aliases for backwards compatibility.
-type ConfigStrategyOCC = ConfigStrategy
-type ConfigStrategyDeleter = ConfigStrategy

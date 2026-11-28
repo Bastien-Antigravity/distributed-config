@@ -31,18 +31,16 @@ The library uses **Strategies** to determine how to bootstrap and synchronize da
 
 ---
 
-## 2. Resolution Hierarchy (The 6-Step Path)
+## 2. Resolution Hierarchy (`ResolveConfigPath`)
 
-When searching for target config files (e.g., "staging"), the `PathResolver` follows this strict priority:
+When searching for target config files (e.g., `"staging"`), `ResolveConfigPath` evaluates candidates in this strict priority:
 
-1. `config/staging.yaml` (Current Working Directory)
-2. `config/staging.yaml` (Executable Directory)
-3. `config/[ExecutableName].yaml` (Current Working Directory)
-4. `config/[ExecutableName].yaml` (Executable Directory)
-5. `[ExecutableName].yaml` (Current Working Directory)
-6. `[ExecutableName].yaml` (Executable Directory)
-
-*Note: Steps 1 & 2 are skipped if no profile is provided.*
+1. **`CONFIG_PATH`** (File path or directory containing `<profile>.yaml` / `standalone.yaml`; fails fast if explicit file is missing)
+2. **`SHARED_CONFIG_PATH`** (File path or directory containing `<profile>.yaml` / `standalone.yaml`)
+3. **Direct `.yaml`/`.yml` Target** (If `targetName` itself is an existing YAML file path)
+4. **`<searchDir>/<profile>.yaml`** (Executable/caller directory and CWD, walking up to 4 levels to a project root marker `.git` / `go.mod` / `Cargo.toml` / `pyproject.toml`)
+5. **`<searchDir>/standalone.yaml`** (Seed fallback across the same search directories when `<profile> != "standalone"`)
+6. **Default Fallback** (`<baseDir>/<profile>.yaml` or `config.yaml`)
 
 ---
 
@@ -74,6 +72,7 @@ The library supports dynamic expansion using `${VAR_NAME}` or `${VAR_NAME:defaul
 ### Reserved System Variables
 - `NAME`: System Distributed Identity.
 - `CF_IP` / `CF_PORT`: Fallback connection parameters for the Config Server.
+- `LS_IP` / `LS_PORT`: Fallback connection parameters for the Log Server in Environment-First mode.
 - `RESET`: If "true", triggers a local state reset.
 
 ---

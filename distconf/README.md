@@ -24,6 +24,11 @@ All wrappers follow the same naming convention and provide the following core me
 | `Decrypt(ciphertext)` | Decrypts RSA-protected secrets. |
 | `OnLiveConfUpdate(cb)` | Registers a listener for real-time config updates. |
 | `OnRegistryUpdate(cb)` | Registers a listener for service registry updates. |
+| `GetAddress(capability)` | Resolves primary `host:port` for a capability. |
+| `GetGRPCAddress(capability)` | Resolves gRPC `host:port` for a capability. |
+| `GetRESTAddress(capability)` | Resolves REST `host:port` for a capability. |
+| `GetCapability(capability)` | Returns merged capability fields as a dictionary/JSON object. |
+| `GetFullConfig()` | Returns the full `common`, `capabilities`, and `live` snapshot. |
 
 ## Build Instructions
 

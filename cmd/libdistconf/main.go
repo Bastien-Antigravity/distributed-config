@@ -201,6 +201,10 @@ func DistConf_GetLastErrorCode() int {
 
 //export DistConf_Decrypt
 func DistConf_Decrypt(handle uintptr, ciphertext *C.char) *C.char {
+	if handle != 0 && !cgo_bridge.IsValid(handle) {
+		setLastError(C.DISTCONF_ERR_INVALID_HANDLE, "invalid handle")
+		return nil
+	}
 	decrypted, err := cgo_bridge.Decrypt(C.GoString(ciphertext))
 	if err != nil {
 		setLastError(mapErrorCode(err), err.Error())

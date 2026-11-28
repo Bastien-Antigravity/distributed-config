@@ -25,6 +25,8 @@ static pthread_mutex_t global_err_mu = PTHREAD_MUTEX_INITIALIZER;
 static char global_last_error_buf[DISTCONF_ERR_BUF_SIZE] = {0};
 static int global_last_error_code = 0;
 
+// -----------------------------------------------------------------------------
+
 void set_last_error(int code, const char* err) {
     last_error_code = code;
     if (err == NULL || err[0] == '\0') {
@@ -43,6 +45,8 @@ void set_last_error(int code, const char* err) {
     pthread_mutex_unlock(&global_err_mu);
 }
 
+// -----------------------------------------------------------------------------
+
 const char* get_last_error(void) {
     if (last_error_code != 0 && last_error_buf[0] != '\0') {
         return last_error_buf;
@@ -52,6 +56,8 @@ const char* get_last_error(void) {
     pthread_mutex_unlock(&global_err_mu);
     return res;
 }
+
+// -----------------------------------------------------------------------------
 
 int get_last_error_code(void) {
     if (last_error_code != 0) {

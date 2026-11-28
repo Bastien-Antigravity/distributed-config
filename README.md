@@ -25,23 +25,17 @@ A robust, strategy-based configuration management library for distributed system
 The library uses a layered approach to build the final configuration:
 
 1.  **Code Defaults**: The application initializes with a hardcoded set of "safe" defaults (defined in `src/core/defaults.go`). This ensures the application can always start, even without a config file.
-2.  **Configuration Discovery (Fail-Fast)**: The library automatically searches for a YAML configuration file with strict priority and fails fast if the required configuration file is missing:
+2.  **Configuration Discovery (`ResolveConfigPath`)**: The library searches for a YAML configuration file in strict priority order:
     *   **Priority 0 — Explicit Environment Overrides (Highest Precedence)**:
-        *   `CONFIG_PATH`: Directly specifies the absolute or relative path to the YAML configuration file (e.g., `docker-deployment/modes/local/config/native.yaml`).
-        *   `SHARED_CONFIG_PATH`: Alternative environment override pointing to the configuration file or a shared configuration directory (resolving `<SHARED_CONFIG_PATH>/<profile>.yaml` or `<SHARED_CONFIG_PATH>/standalone.yaml`).
-    *   **Priority 1 — Profile-Based Search** (Target provided, e.g. `standalone`):
-        1. `config/[profile].yaml` (Current Working Directory)
-        2. `config/[profile].yaml` (Executable Directory)
-        3. `[profile].yaml` (Current Working Directory)
-    *   **Priority 2 — Default Fallbacks** (In order):
-        4. `config/[executable_name].yaml` (Current Working Directory)
-        5. `config/[executable_name].yaml` (Executable Directory)
-        6. `[executable_name].yaml` (Current Working Directory)
-        7. `[executable_name].yaml` (Executable Directory)
-    
-    The binary name acts as the final global fallback.
-4.  **Environment Variables**: Values in the YAML file can use `${VAR_NAME:default}` syntax. These are expanded using the system's environment variables at runtime.
-5.  **Remote Sync**: Finally, if the selected profile supports it (like `production`), the library connects to the Config Server to fetch the latest "LiveConfig" updates.
+        *   `CONFIG_PATH`: Directly specifies the file path (fail-fast if missing when explicitly set) or a directory containing `<profile>.yaml` / `standalone.yaml`.
+        *   `SHARED_CONFIG_PATH`: Alternative environment override pointing to a file or shared configuration directory (resolving `<SHARED_CONFIG_PATH>/<profile>.yaml` or `<SHARED_CONFIG_PATH>/standalone.yaml`).
+    *   **Priority 1 — Direct YAML Target**: If the target name ends with `.yaml`/`.yml` and exists directly on disk, it is used immediately.
+    *   **Priority 2 — Locality & Project-Root Search**: Collects search directories starting from the executable directory (or caller source directory under `go run`) and current working directory, walking up to 4 ancestor levels when inside a repository marker (`.git`, `go.mod`, `Cargo.toml`, `pyproject.toml`):
+        1. `<dir>/<profile>.yaml`
+        2. `<dir>/standalone.yaml` (fallback when `<profile> != "standalone"`)
+    *   **Fallback Path**: `<baseDir>/<profile>.yaml` (or `config.yaml` if no target profile was given).
+3.  **Environment Variables**: Values in the YAML file can use `${VAR_NAME:default}` syntax. These are expanded using the system's environment variables at runtime (and `NAME`, `RESET`, `CF_IP`, `CF_PORT`, `LS_IP`, `LS_PORT` are applied via `LoadCommonFromEnv`).
+4.  **Remote Sync**: For `test`, `staging`, and `production`, the library connects to `config-server` to fetch `LiveConfig` updates (`GET_SYNC`) and starts the background `Watch()` listener.
 
 ## Features
 

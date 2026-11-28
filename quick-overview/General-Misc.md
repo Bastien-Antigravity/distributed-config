@@ -23,11 +23,11 @@ This document provides a quick reference for the project structure, configuratio
     - `strategies/`: Environment-specific logic (Production, Staging, etc.).
     - `cgo_bridge/`: FFI layer for multi-language support.
 - **`cmd/`**: Entry points for binaries and shared libraries.
-    - `config-cli/`: CLI tool for managing configurations.
+    - `config-cli/`: CLI tool for inspecting configurations and watching live updates.
+    - `config-tool/`: Fleet administrative CLI for RSA keypair generation (`keygen`), secret token encryption (`encrypt`), and X.509 mTLS certificate generation (`tlsgen`).
     - `libdistconf/`: The CGO-exported shared library (`.so`, `.dylib`, `.dll`).
 - **`distconf/`**: Language-specific bindings and examples.
     - `cpp/`, `python/`, `rust/`, `vba/`.
-- **`config/`**: Default configuration files used by the library.
 - **`quick-overview/`**: This documentation directory.
 
 ## Key Configuration Files

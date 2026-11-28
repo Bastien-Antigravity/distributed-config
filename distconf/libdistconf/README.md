@@ -20,14 +20,19 @@ The following table maps the C ABI exports to their original Go counterparts in 
 | `DistConf_Set(handle, sec, key, val)` | `cfg.Set(sec, key, val)` | Updates a local value (triggers callbacks). |
 | `DistConf_Sync(handle)` | `cfg.Sync()` | Triggers manual synchronization with server. |
 | `DistConf_OnLiveConfUpdate(h, cb)` | `cfg.OnLiveConfUpdate(f)` | Registers a dynamic update listener. |
-| `DistConf_ShareObject(h, sec, json)` | `cfg.ShareObject(sec, obj)` | Broadcasts state to the ecosystem. |
+| `DistConf_OnRegistryUpdate(h, cb)` | `cfg.OnRegistryUpdate(f)` | Registers a service registry update listener. |
+| `DistConf_ShareConfig(h, json)` | `cfg.ShareConfig(payload)` | Broadcasts state to the ecosystem. |
 | `DistConf_ApplyFileOverride(h, f)` | `cfg.ApplyFileOverride(f)` | Loads YAML override, returns 'local' as JSON. |
 | `DistConf_ValidateMandatoryServices(h)` | `cfg.ValidateMandatoryServices()` | Validates required infrastructure. |
 | `DistConf_GetAddress(h, cap)` | `cfg.GetAddress(cap)` | Resolves `host:port` for a capability. |
 | `DistConf_GetGRPCAddress(h, cap)` | `cfg.GetGRPCAddress(cap)` | Resolves gRPC `host:port`. |
+| `DistConf_GetRESTAddress(h, cap)` | `cfg.GetRESTAddress(cap)` | Resolves REST `host:port`. |
 | `DistConf_GetCapability(h, cap)` | `cfg.GetCapability(cap, &t)` | Returns capability as JSON string. |
 | `DistConf_GetFullConfig(h)` | `cfg` (Live/Common) | Returns the entire configuration as JSON. |
 | `DistConf_Decrypt(h, ciphertext)` | `cfg.Decrypt(ciphertext)` | Decrypts an RSA secret. |
+| `DistConf_IsValid(h)` | N/A | Checks whether a session handle is active. |
+| `DistConf_GetLastError()` | N/A | Returns the last error message string. |
+| `DistConf_GetLastErrorCode()` | N/A | Returns the last standardized `DISTCONF_*` error code. |
 | `DistConf_FreeString(ptr)` | N/A (Internal) | **MANDATORY** helper to free Go-allocated strings. |
 
 ### Note on Manual Synchronization (`Sync`)

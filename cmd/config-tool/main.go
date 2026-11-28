@@ -72,22 +72,35 @@ func handleKeygen() {
 		os.Exit(1)
 	}
 
-	if err := os.MkdirAll(*outputDir, 0755); err != nil {
-		fmt.Printf("Error creating directory: %v\n", err)
+	privPath, pubPath, err := generateRSAKeyPair(*outputDir)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
+	}
+
+	fmt.Println("----------------------------------------------------------------")
+	fmt.Println("RSA Key Pair Generated Successfully!")
+	fmt.Printf(" - %s (KEEP THIS SECRET)\n", privPath)
+	fmt.Printf(" - %s (Non-sensitive, used for encryption)\n", pubPath)
+	fmt.Println("----------------------------------------------------------------")
+}
+
+// -----------------------------------------------------------------------------
+
+func generateRSAKeyPair(outputDir string) (privPath, pubPath string, err error) {
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return "", "", fmt.Errorf("creating directory: %w", err)
 	}
 
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		fmt.Printf("Error generating key: %v\n", err)
-		os.Exit(1)
+		return "", "", fmt.Errorf("generating key: %w", err)
 	}
 
-	privPath := filepath.Join(*outputDir, "private.pem")
-	privFile, err := os.Create(privPath)
+	privPath = filepath.Join(outputDir, "private.pem")
+	privFile, err := os.OpenFile(privPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		fmt.Printf("Error creating private.pem: %v\n", err)
-		os.Exit(1)
+		return "", "", fmt.Errorf("creating private.pem: %w", err)
 	}
 	defer func() {
 		_ = privFile.Close()
@@ -98,15 +111,16 @@ func handleKeygen() {
 		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
 	}
 	if err := pem.Encode(privFile, privPEM); err != nil {
-		fmt.Printf("Error encoding private key: %v\n", err)
-		os.Exit(1)
+		return "", "", fmt.Errorf("encoding private key: %w", err)
+	}
+	if err := os.Chmod(privPath, 0600); err != nil {
+		return "", "", fmt.Errorf("setting permissions on private.pem: %w", err)
 	}
 
-	pubPath := filepath.Join(*outputDir, "public.pem")
-	pubFile, err := os.Create(pubPath)
+	pubPath = filepath.Join(outputDir, "public.pem")
+	pubFile, err := os.OpenFile(pubPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		fmt.Printf("Error creating public.pem: %v\n", err)
-		os.Exit(1)
+		return "", "", fmt.Errorf("creating public.pem: %w", err)
 	}
 	defer func() {
 		_ = pubFile.Close()
@@ -118,15 +132,10 @@ func handleKeygen() {
 		Bytes: pubBytes,
 	}
 	if err := pem.Encode(pubFile, pubPEM); err != nil {
-		fmt.Printf("Error encoding public key: %v\n", err)
-		os.Exit(1)
+		return "", "", fmt.Errorf("encoding public key: %w", err)
 	}
 
-	fmt.Println("----------------------------------------------------------------")
-	fmt.Println("RSA Key Pair Generated Successfully!")
-	fmt.Printf(" - %s (KEEP THIS SECRET)\n", privPath)
-	fmt.Printf(" - %s (Non-sensitive, used for encryption)\n", pubPath)
-	fmt.Println("----------------------------------------------------------------")
+	return privPath, pubPath, nil
 }
 
 func handleEncrypt() {

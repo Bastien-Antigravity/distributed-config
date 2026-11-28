@@ -71,13 +71,18 @@ func (s *StandaloneStrategy) Sync(cfg *core.Config) error {
 
 func (s *StandaloneStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
 	cfg.Set(updates)
+	cfg.SetVersion(cfg.GetVersion() + 1)
 	return nil
 }
 
 // -----------------------------------------------------------------------------
 
 func (s *StandaloneStrategy) SetWithOCC(cfg *core.Config, updates map[string]map[string]string, expectedVersion uint64) error {
+	if expectedVersion > 0 && expectedVersion != cfg.GetVersion() {
+		return network.ErrVersionConflict
+	}
 	cfg.Set(updates)
+	cfg.SetVersion(cfg.GetVersion() + 1)
 	return nil
 }
 
@@ -85,13 +90,18 @@ func (s *StandaloneStrategy) SetWithOCC(cfg *core.Config, updates map[string]map
 
 func (s *StandaloneStrategy) DeleteKeys(cfg *core.Config, deletions map[string][]string) error {
 	cfg.Delete(deletions)
+	cfg.SetVersion(cfg.GetVersion() + 1)
 	return nil
 }
 
 // -----------------------------------------------------------------------------
 
 func (s *StandaloneStrategy) DeleteKeysWithOCC(cfg *core.Config, deletions map[string][]string, expectedVersion uint64) error {
+	if expectedVersion > 0 && expectedVersion != cfg.GetVersion() {
+		return network.ErrVersionConflict
+	}
 	cfg.Delete(deletions)
+	cfg.SetVersion(cfg.GetVersion() + 1)
 	return nil
 }
 

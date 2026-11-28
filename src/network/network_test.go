@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
@@ -424,4 +425,79 @@ func TestNetworkProtoHandler(t *testing.T) {
 			t.Fatal("Expected error when outgoing version exceeds protobuf int32 maximum")
 		}
 	})
+
+	t.Run("TestACKFollowedByBroadcastSyncTriggersCallbackOnce", func(t *testing.T) {
+		ackCfg := &core.Config{}
+		empty := make(map[string]map[string]string)
+		ackCfg.LiveConfig.Store(&empty)
+		h := NewConfigHandler("AckBroadcastHandler", ackCfg)
+
+		cbCount := 0
+		h.SetOnLiveConfUpdate(func(updates map[string]map[string]string) {
+			cbCount++
+		})
+
+		// 1. ACK arrives with version 12 before BROADCAST_SYNC
+		ackMsg, _ := proto.Marshal(&pb.ConfigMsg{
+			Command: pb.ConfigMsg_ACK,
+			Version: 12,
+		})
+		if err := h.HandleIncoming(ackMsg); err != nil {
+			t.Fatalf("HandleIncoming ACK failed: %v", err)
+		}
+
+		// 2. Self-broadcast BROADCAST_SYNC arrives with version 12 -> must invoke callback once
+		p12, _ := json.Marshal(map[string]map[string]string{"SEC": {"KEY": "V12"}})
+		b12, _ := proto.Marshal(&pb.ConfigMsg{
+			Command: pb.ConfigMsg_BROADCAST_SYNC,
+			Payload: p12,
+			Version: 12,
+		})
+		if err := h.HandleIncoming(b12); err != nil {
+			t.Fatalf("HandleIncoming first BROADCAST_SYNC v12 failed: %v", err)
+		}
+		if cbCount != 1 {
+			t.Fatalf("Expected callback to fire once after ACK+BROADCAST_SYNC v12, got %d", cbCount)
+		}
+		if ackCfg.Get("SEC", "KEY") != "V12" {
+			t.Fatalf("Expected LiveConfig SEC.KEY='V12', got %q", ackCfg.Get("SEC", "KEY"))
+		}
+
+		// 3. Duplicate BROADCAST_SYNC with version 12 -> must be ignored
+		if err := h.HandleIncoming(b12); err != nil {
+			t.Fatalf("HandleIncoming duplicate BROADCAST_SYNC v12 failed: %v", err)
+		}
+		if cbCount != 1 {
+			t.Fatalf("Expected duplicate BROADCAST_SYNC v12 to be ignored, got cbCount=%d", cbCount)
+		}
+	})
+}
+
+// -----------------------------------------------------------------------------
+
+func TestDisconnectedClient_ReturnsError(t *testing.T) {
+	cfg := core.NewDefaultConfig()
+	client := &Client{
+		addr:    "127.0.0.1:3306",
+		Handler: NewConfigHandler("Disconnected", cfg),
+	}
+
+	assertDisconnectedErr := func(op string, err error) {
+		t.Helper()
+		if err == nil || !strings.Contains(err.Error(), "client not connected") {
+			t.Fatalf("%s: expected 'client not connected' error, got %v", op, err)
+		}
+	}
+
+	_, err := client.GetConfig()
+	assertDisconnectedErr("GetConfig", err)
+
+	_, err = client.FullRefresh()
+	assertDisconnectedErr("FullRefresh", err)
+
+	err = client.UpdateConfigMapWithOCC(map[string]map[string]string{"S": {"K": "V"}}, 0)
+	assertDisconnectedErr("UpdateConfigMapWithOCC", err)
+
+	err = client.DeleteKeysWithOCC(map[string][]string{"S": {"K"}}, 0)
+	assertDisconnectedErr("DeleteKeysWithOCC", err)
 }

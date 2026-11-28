@@ -15,34 +15,34 @@ package strategies
 // =============================================================================
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
-	"github.com/Bastien-Antigravity/distributed-config/src/loader"
 	"github.com/Bastien-Antigravity/distributed-config/src/network"
 )
 
 // -----------------------------------------------------------------------------
 
 // TestStrategy: Local YAML. Uses "Test Defaults" (127.0.0.2).
-// Runs EXACTLY like Production (Connects to Server & Syncs), but bootstraps from Defaults.
-//
-// 1. Common Config:
-//   - Source: Defaults (127.0.0.2) -> Environment -> Server -> File (Re-read).
-//   - Logic: Local File is the authoritative source (overrides Server).
-//   - Integrity: PANICS if any IP is NOT 127.0.0.2.
-//
-// 2. Live Config:
-//   - Behavior: Fetched from Server (GET).
-//
-// 3. Persistence / Dump:
-//   - On Missing File: Fails fast (never auto-generates skeleton files).
-//   - Sync: ACTIVE. Pushes local changes to the Server (PUT).
+// Runs like Production (Connects to Server & Syncs), requiring a local YAML file
+// and enforcing 127.0.0.2 loopback IPs when CHECK_TEST_IPS=true.
 // -----------------------------------------------------------------------------
 
 type TestStrategy struct {
 	Client *network.Client
+	cloud  *CloudStrategy
+}
+
+// -----------------------------------------------------------------------------
+
+func (s *TestStrategy) delegate() *CloudStrategy {
+	if s.cloud == nil {
+		s.cloud = &CloudStrategy{
+			Profile:     "test",
+			ReadOnly:    false,
+			RequireFile: true,
+		}
+	}
+	s.cloud.Client = s.Client
+	return s.cloud
 }
 
 // -----------------------------------------------------------------------------
@@ -52,155 +52,55 @@ func (s *TestStrategy) Name() string { return "test" }
 // -----------------------------------------------------------------------------
 
 func (s *TestStrategy) Load(cfg *core.Config) error {
-	cfg.Logger.Info("Strategy: Test (Production-Like Logic)")
-
-	// 1. Bootstrap: Resolve Path and Load Default File
-	fullPath := loader.ResolveConfigPath("test")
-	if err := loader.LoadConfigFromFile(cfg, fullPath); err != nil {
-		return err
-	}
-
-	// 2. Env Load (Overrides Defaults)
-	loader.LoadCommonFromEnv(cfg)
-
-	// 3. Server Load (Using IP from Bootstrap/Env)
-	if s.Client != nil {
-		_ = s.Client.Close()
-		s.Client = nil
-	}
-	var cs core.ConfigServerCap
-	if err := cfg.GetCapability("config_server", &cs); err == nil {
-		addr := fmt.Sprintf("%s:%s", cs.IP, cs.Port)
-		client, err := network.NewClient(addr, cfg)
-		if err == nil {
-			s.Client = client
-			_, err := client.GetConfig()
-			s.Client.Watch() // Start background hot-reloading AFTER initial sync
-			if err == nil {
-				cfg.Logger.Info("Test: Loaded from Server")
-				hydrateCapabilitiesFromLiveConfig(cfg)
-			}
-		} else {
-			cfg.Logger.Warning("Test: Warning - Could not connect to Config Server at %s (Mock/Dev?)", addr)
-		}
-	} else {
-		cfg.Logger.Warning("Test: Required capability 'config_server' is missing! proceeding locally.")
-	}
-
-	// 4. File Load Override (File Wins)
-	// We reload the file to ensure local file edits override whatever the server sent.
-	// This matches Production precedence (File > Server).
-	if err := loader.LoadConfigFromFile(cfg, fullPath); err != nil {
-		if s.Client != nil {
-			_ = s.Client.Close()
-			s.Client = nil
-		}
-		return err
-	}
-	syncCapabilitiesToLiveConfig(cfg)
-	// 5. Integrity Check (Enforced when CHECK_TEST_IPS=true; skipped in Docker/standalone test pipelines)
-	if os.Getenv("CHECK_TEST_IPS") == "true" {
-		if err := loader.CheckTestIPs(cfg); err != nil {
-			if s.Client != nil {
-				_ = s.Client.Close()
-				s.Client = nil
-			}
-			return err
-		}
-	}
-
-	// 6. Mandatory Service Validation
-	if err := cfg.ValidateMandatoryServices(); err != nil {
-		if s.Client != nil {
-			_ = s.Client.Close()
-			s.Client = nil
-		}
-		return fmt.Errorf("test: validation failed: %w", err)
-	}
-
-	return nil
+	d := s.delegate()
+	err := d.Load(cfg)
+	s.Client = d.Client
+	return err
 }
 
 // -----------------------------------------------------------------------------
 
 func (s *TestStrategy) Sync(cfg *core.Config) error {
-	if s.Client != nil {
-		cfg.Logger.Info("Test: Syncing updates to Server...")
-		return s.Client.UpdateConfig(cfg)
-	}
-	return nil
+	return s.delegate().Sync(cfg)
 }
 
 // -----------------------------------------------------------------------------
 
 func (s *TestStrategy) GetHandler() *network.ConfigProtoHandler {
-	if s.Client != nil {
-		return s.Client.Handler
-	}
-	return nil
+	return s.delegate().GetHandler()
 }
 
 // -----------------------------------------------------------------------------
 
 func (s *TestStrategy) Set(cfg *core.Config, updates map[string]map[string]string) error {
-	if s.Client != nil {
-		cfg.Logger.Info("Test: Pushing update request to Server...")
-		if err := s.Client.UpdateConfigMapWithOCC(updates, 0); err != nil {
-			return fmt.Errorf("test: server rejected update: %w", err)
-		}
-	}
-
-	cfg.Set(updates)
-	return nil
+	return s.delegate().Set(cfg, updates)
 }
 
 // -----------------------------------------------------------------------------
 
 // SetWithOCC pushes updates with an expected version to validate OCC.
 func (s *TestStrategy) SetWithOCC(cfg *core.Config, updates map[string]map[string]string, expectedVersion uint64) error {
-	if s.Client != nil {
-		cfg.Logger.Info("Test: Pushing OCC update request to Server (expected version: %d)...", expectedVersion)
-		if err := s.Client.UpdateConfigMapWithOCC(updates, expectedVersion); err != nil {
-			return err
-		}
-	}
-	cfg.Set(updates)
-	return nil
+	return s.delegate().SetWithOCC(cfg, updates, expectedVersion)
 }
 
 // -----------------------------------------------------------------------------
 
 // DeleteKeys sends key deletion request to the server.
 func (s *TestStrategy) DeleteKeys(cfg *core.Config, deletions map[string][]string) error {
-	if s.Client != nil {
-		cfg.Logger.Info("Test: Pushing key deletions to Server...")
-		if err := s.Client.DeleteKeysWithOCC(deletions, 0); err != nil {
-			return err
-		}
-	}
-	cfg.Delete(deletions)
-	return nil
+	return s.delegate().DeleteKeys(cfg, deletions)
 }
 
 // -----------------------------------------------------------------------------
 
 // DeleteKeysWithOCC sends key deletion request to the server with OCC validation.
 func (s *TestStrategy) DeleteKeysWithOCC(cfg *core.Config, deletions map[string][]string, expectedVersion uint64) error {
-	if s.Client != nil {
-		cfg.Logger.Info("Test: Pushing OCC key deletions to Server (expected version: %d)...", expectedVersion)
-		if err := s.Client.DeleteKeysWithOCC(deletions, expectedVersion); err != nil {
-			return err
-		}
-	}
-	cfg.Delete(deletions)
-	return nil
+	return s.delegate().DeleteKeysWithOCC(cfg, deletions, expectedVersion)
 }
 
 // -----------------------------------------------------------------------------
 
 func (s *TestStrategy) Close() error {
-	if s.Client != nil {
-		return s.Client.Close()
-	}
-	return nil
+	err := s.delegate().Close()
+	s.Client = nil
+	return err
 }

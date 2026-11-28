@@ -16,9 +16,11 @@ package strategies
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -50,23 +52,43 @@ func TestStandaloneStrategy(t *testing.T) {
 		}
 	})
 
-	t.Run("TestStandalone_LoadsCanonicalStandaloneYAML", func(t *testing.T) {
-		_ = os.Chdir(oldCwd)
+	t.Run("TestStandalone_LoadsSelfContainedStandaloneYAML", func(t *testing.T) {
+		standaloneDir := t.TempDir()
+		standaloneYAML := filepath.Join(standaloneDir, "standalone.yaml")
+		yamlContent := `
+common:
+  name: "common"
+capabilities:
+  log_server:
+    ip: "127.0.0.1"
+    port: "9020"
+  config_server:
+    ip: "127.0.0.1"
+    port: "3306"
+`
+		if err := os.WriteFile(standaloneYAML, []byte(yamlContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("CONFIG_PATH", standaloneYAML)
 
 		cfg := &core.Config{Logger: &strategyTestLogger{t: t}}
 		strategy := &StandaloneStrategy{}
 
 		err := strategy.Load(cfg)
 		if err != nil {
-			t.Errorf("Expected StandaloneStrategy Load to succeed from canonical standalone.yaml, got: %v", err)
+			t.Errorf("Expected StandaloneStrategy Load to succeed from standalone.yaml, got: %v", err)
 		}
 
 		if cfg.Common.Name != "common" {
 			t.Errorf("Expected name 'common' from standalone.yaml, got: %v", cfg.Common.Name)
 		}
 
+		if addr, err := cfg.GetAddress("log_server"); err != nil || addr != "127.0.0.1:9020" {
+			t.Errorf("Expected GetAddress('log_server') == '127.0.0.1:9020', got %q (err=%v)", addr, err)
+		}
+
 		if err := cfg.ValidateMandatoryServices(); err != nil {
-			t.Errorf("Expected canonical Standalone configuration to pass mandatory service validation, got: %v", err)
+			t.Errorf("Expected Standalone configuration to pass mandatory service validation, got: %v", err)
 		}
 	})
 }
@@ -734,6 +756,91 @@ func TestCloudStrategy_SetAndDeleteWaitForServerAck(t *testing.T) {
 	}
 	if cfg.Get("delta_sec", "k") != "" {
 		t.Fatalf("expected key to be deleted after ACK, got %q", cfg.Get("delta_sec", "k"))
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+func TestStandaloneStrategy_OCCAndVersionIncrement(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "standalone.yaml")
+	if err := os.WriteFile(yamlPath, []byte("common:\n  name: occ-standalone\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CONFIG_PATH", yamlPath)
+
+	cfg := core.NewDefaultConfig()
+	cfg.Logger = &strategyTestLogger{t: t}
+	strategy := &StandaloneStrategy{}
+
+	if err := strategy.Load(cfg); err != nil {
+		t.Fatalf("StandaloneStrategy.Load failed: %v", err)
+	}
+	if cfg.GetVersion() != 0 {
+		t.Fatalf("expected initial version 0, got %d", cfg.GetVersion())
+	}
+
+	if err := strategy.Set(cfg, map[string]map[string]string{"sec": {"k": "v1"}}); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	if cfg.GetVersion() != 1 {
+		t.Fatalf("expected version 1 after Set, got %d", cfg.GetVersion())
+	}
+
+	if err := strategy.SetWithOCC(cfg, map[string]map[string]string{"sec": {"k": "v2"}}, 1); err != nil {
+		t.Fatalf("SetWithOCC(1) failed: %v", err)
+	}
+	if cfg.GetVersion() != 2 || cfg.Get("sec", "k") != "v2" {
+		t.Fatalf("expected version 2 and v2, got ver=%d val=%q", cfg.GetVersion(), cfg.Get("sec", "k"))
+	}
+
+	if err := strategy.SetWithOCC(cfg, map[string]map[string]string{"sec": {"k": "stale"}}, 1); !errors.Is(err, network.ErrVersionConflict) {
+		t.Fatalf("expected ErrVersionConflict for stale SetWithOCC, got %v", err)
+	}
+	if cfg.GetVersion() != 2 || cfg.Get("sec", "k") != "v2" {
+		t.Fatalf("expected version 2 and v2 after failed SetWithOCC, got ver=%d val=%q", cfg.GetVersion(), cfg.Get("sec", "k"))
+	}
+
+	if err := strategy.DeleteKeysWithOCC(cfg, map[string][]string{"sec": {"k"}}, 1); !errors.Is(err, network.ErrVersionConflict) {
+		t.Fatalf("expected ErrVersionConflict for stale DeleteKeysWithOCC, got %v", err)
+	}
+	if err := strategy.DeleteKeysWithOCC(cfg, map[string][]string{"sec": {"k"}}, 2); err != nil {
+		t.Fatalf("DeleteKeysWithOCC(2) failed: %v", err)
+	}
+	if cfg.GetVersion() != 3 || cfg.Get("sec", "k") != "" {
+		t.Fatalf("expected version 3 and empty key after DeleteKeysWithOCC, got ver=%d val=%q", cfg.GetVersion(), cfg.Get("sec", "k"))
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+func TestCloudStrategy_EnvironmentFirstBootWithCFAndLS(t *testing.T) {
+	emptyDir := t.TempDir()
+	oldCwd, _ := os.Getwd()
+	_ = os.Chdir(emptyDir)
+	defer func() { _ = os.Chdir(oldCwd) }()
+
+	t.Setenv("CONFIG_PATH", "")
+	t.Setenv("SHARED_CONFIG_PATH", "")
+	t.Setenv("CF_IP", "10.0.0.10")
+	t.Setenv("CF_PORT", "3306")
+	t.Setenv("LS_IP", "10.0.0.11")
+	t.Setenv("LS_PORT", "9020")
+
+	cfg := core.NewDefaultConfig()
+	cfg.Logger = &strategyTestLogger{t: t}
+	strategy := &CloudStrategy{Profile: "staging", ReadOnly: true}
+	defer func() { _ = strategy.Close() }()
+
+	if err := strategy.Load(cfg); err != nil {
+		t.Fatalf("expected Environment-First CloudStrategy.Load to succeed without YAML, got: %v", err)
+	}
+
+	if addr, err := cfg.GetAddress("config_server"); err != nil || addr != "10.0.0.10:3306" {
+		t.Fatalf("expected config_server 10.0.0.10:3306, got %q (err=%v)", addr, err)
+	}
+	if addr, err := cfg.GetAddress("log_server"); err != nil || addr != "10.0.0.11:9020" {
+		t.Fatalf("expected log_server 10.0.0.11:9020, got %q (err=%v)", addr, err)
 	}
 }
 

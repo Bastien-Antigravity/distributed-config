@@ -18,6 +18,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -52,6 +53,7 @@ type Config struct {
 	// Data storage for Config params
 	// main config
 	Capabilities map[string]interface{}                       `yaml:"capabilities" json:"capabilities"`
+	Local        map[string]interface{}                       `yaml:"local" json:"local"`
 	LiveConfig   atomic.Pointer[map[string]map[string]string] `yaml:"-"`
 
 	// Writer lock serializing Set, Delete, and ReplaceLive mutations
@@ -129,39 +131,43 @@ func (c *Config) ReplaceLive(sections map[string]map[string]string) {
 }
 
 // PreviewSet calculates the resulting configuration map after applying updates
-// but DOES NOT store it. Useful for strategies that need to push to a server
-// before committing locally. Supports "__DELETED__" sentinel values to remove keys.
+// but DOES NOT store it. Uses path-copying to clone only touched sections while
+// structurally sharing untouched immutable sections. Supports "__DELETED__" sentinel values.
 func (c *Config) PreviewSet(updates map[string]map[string]string) *map[string]map[string]string {
 	if updates == nil {
 		return c.LiveConfig.Load()
 	}
 
-	// 1. Create a deep copy of the current state
-	newMap := make(map[string]map[string]string)
 	oldPtr := c.LiveConfig.Load()
+	oldLen := 0
+	if oldPtr != nil {
+		oldLen = len(*oldPtr)
+	}
+
+	newMap := make(map[string]map[string]string, oldLen+len(updates))
 	if oldPtr != nil {
 		for s, kv := range *oldPtr {
-			newMap[s] = make(map[string]string)
-			for k, v := range kv {
-				newMap[s][k] = v
-			}
+			newMap[s] = kv
 		}
 	}
 
-	// 2. Apply the changes (Merge / Sentinel Delete)
 	for section, kv := range updates {
-		if _, ok := newMap[section]; !ok {
-			newMap[section] = make(map[string]string)
+		existingSec := newMap[section]
+		clonedSec := make(map[string]string, len(existingSec)+len(kv))
+		for k, v := range existingSec {
+			clonedSec[k] = v
 		}
 		for k, v := range kv {
 			if v == "__DELETED__" {
-				delete(newMap[section], k)
+				delete(clonedSec, k)
 			} else {
-				newMap[section][k] = v
+				clonedSec[k] = v
 			}
 		}
-		if len(newMap[section]) == 0 {
+		if len(clonedSec) == 0 {
 			delete(newMap, section)
+		} else {
+			newMap[section] = clonedSec
 		}
 	}
 
@@ -170,7 +176,7 @@ func (c *Config) PreviewSet(updates map[string]map[string]string) *map[string]ma
 
 // -----------------------------------------------------------------------------
 
-// Delete removes specified section keys from the live configuration.
+// Delete removes specified section keys from the live configuration using path-copying.
 // If keys slice is empty, removes the entire section.
 func (c *Config) Delete(deletions map[string][]string) {
 	if len(deletions) == 0 {
@@ -180,27 +186,32 @@ func (c *Config) Delete(deletions map[string][]string) {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 
-	newMap := make(map[string]map[string]string)
 	oldPtr := c.LiveConfig.Load()
-	if oldPtr != nil {
-		for s, kv := range *oldPtr {
-			newMap[s] = make(map[string]string)
-			for k, v := range kv {
-				newMap[s][k] = v
-			}
-		}
+	if oldPtr == nil {
+		return
+	}
+
+	newMap := make(map[string]map[string]string, len(*oldPtr))
+	for s, kv := range *oldPtr {
+		newMap[s] = kv
 	}
 
 	for section, keys := range deletions {
-		if secMap, ok := newMap[section]; ok {
+		if existingSec, ok := newMap[section]; ok {
 			if len(keys) == 0 {
 				delete(newMap, section)
 			} else {
-				for _, k := range keys {
-					delete(secMap, k)
+				clonedSec := make(map[string]string, len(existingSec))
+				for k, v := range existingSec {
+					clonedSec[k] = v
 				}
-				if len(secMap) == 0 {
+				for _, k := range keys {
+					delete(clonedSec, k)
+				}
+				if len(clonedSec) == 0 {
 					delete(newMap, section)
+				} else {
+					newMap[section] = clonedSec
 				}
 			}
 		}
@@ -237,6 +248,10 @@ func (c *Config) ResolveCapability(key string) (map[string]interface{}, error) {
 		live := *ptr
 		if overrides, ok := live[key]; ok {
 			for k, v := range overrides {
+				switch mergedMap[k].(type) {
+				case map[string]interface{}, map[string]string, []interface{}, []string:
+					continue
+				}
 				mergedMap[k] = v
 			}
 		}
@@ -503,5 +518,5 @@ func (c *Config) getAddr(capability, hostKey, portKey string) (string, error) {
 		return "", fmt.Errorf("port key %s missing or empty in capability %s", portKey, capability)
 	}
 
-	return fmt.Sprintf("%s:%s", host, port), nil
+	return net.JoinHostPort(host, port), nil
 }

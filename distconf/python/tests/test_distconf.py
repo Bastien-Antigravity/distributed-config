@@ -16,18 +16,23 @@ KEY PARAMETERS:
 """
 
 
-import unittest
 from os import getenv as osGetenv
 from os.path import abspath as osPathAbspath, dirname as osPathDirname, exists as osPathExists, join as osPathJoin
+from platform import system as platformSystem
+from subprocess import run as subprocessRun
 from sys import path as sysPath
 from time import sleep as timeSleep
+from unittest import TestCase as unittestTestCase, main as unittestMain
 
 # Add parent dir to path to import distconf
 sysPath.append(osPathDirname(osPathDirname(osPathAbspath(__file__))))
 
-from distconf import DistConfig
+from distconf import DistConfig, DistConfError
 
-class TestDistConfigFull(unittest.TestCase):
+# -----------------------------------------------------------------------------------------------
+
+
+class TestDistConfigFull(unittestTestCase):
     @classmethod
     def setUpClass(cls):
         # 1. Prioritize the environment variable (Set by Fleet CI or manual dev)
@@ -35,20 +40,18 @@ class TestDistConfigFull(unittest.TestCase):
         
         # 2. If not set, try to find it in the standard relative location
         if not cls.lib_path:
-            import platform
-            system = platform.system()
+            system = platformSystem()
             ext = ".dylib" if system == "Darwin" else (".dll" if system == "Windows" else ".so")
             cls.lib_path = osPathAbspath(f"../../distconf/libdistconf/libdistconf{ext}")
             
         # 3. Safety Hatch: If the library is missing, attempt to build it via the root Makefile
         if not osPathExists(cls.lib_path):
-            import subprocess
             # Climb 4 levels: tests/ -> python/ -> distconf/ -> distributed-config/ (ROOT)
             root_dir = osPathDirname(osPathDirname(osPathDirname(osPathDirname(osPathAbspath(__file__)))))
             makefile = osPathJoin(root_dir, "Makefile")
             if osPathExists(makefile):
                 print(f"Library missing at {cls.lib_path}. Attempting auto-build via {root_dir}...")
-                subprocess.run(["make", "-C", root_dir, "build-lib"], check=False)
+                subprocessRun(["make", "-C", root_dir, "build-lib"], check=False)
             else:
                 print(f"Warning: Library missing and root Makefile not found at {root_dir}")
 
@@ -111,17 +114,12 @@ class TestDistConfigFull(unittest.TestCase):
 
     def test_05_security(self):
         cfg = DistConfig("standalone", lib_path=self.lib_path)
-        
+
         ciphertext = "ENC(hello)"
-        try:
-            decrypted = cfg.decrypt(ciphertext)
-            self.assertIsNotNone(decrypted)
-        except Exception as e:
-            if "private key not found" in str(e):
-                self.skipTest("Skipping security test: private key not found")
-            else:
-                raise e
-        
+        with self.assertRaises(DistConfError) as ctx:
+            cfg.decrypt(ciphertext)
+        self.assertGreater(len(str(ctx.exception)), 0)
+
         cfg.close()
 
     # -----------------------------------------------------------------------------------------------
@@ -171,5 +169,8 @@ class TestDistConfigFull(unittest.TestCase):
         
         cfg.close()
 
+
+# -----------------------------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    unittest.main()
+    unittestMain()

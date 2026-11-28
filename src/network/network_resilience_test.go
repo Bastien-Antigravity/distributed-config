@@ -16,6 +16,7 @@ package network
 
 import (
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -27,7 +28,12 @@ import (
 // -----------------------------------------------------------------------------
 
 func TestNetworkResilience_Reconnection(t *testing.T) {
-	addr := "127.0.0.1:9999"
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to allocate ephemeral port: %v", err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
 
 	server1, err := safesocket.Create("tcp-hello:server", addr, "127.0.0.1", "server", false)
 	if err != nil {
@@ -38,6 +44,10 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 	serverStop1 := make(chan struct{})
 	serverReady1 := make(chan struct{})
 	go func() {
+		<-serverStop1
+		_ = server1.Close()
+	}()
+	go func() {
 		if err := server1.Listen(); err != nil {
 			fmt.Printf("Server Listen Error: %v\n", err)
 			return
@@ -45,25 +55,19 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 		close(serverReady1)
 
 		for {
-			select {
-			case <-serverStop1:
-				_ = server1.Close()
+			conn, err := server1.Accept()
+			if err != nil {
 				return
-			default:
-				conn, err := server1.Accept()
-				if err != nil {
-					return
-				}
-				go func() {
-					defer func() { _ = conn.Close() }()
-					for {
-						_, err := conn.ReadMessage()
-						if err != nil {
-							return
-						}
-					}
-				}()
 			}
+			go func() {
+				defer func() { _ = conn.Close() }()
+				for {
+					_, err := conn.ReadMessage()
+					if err != nil {
+						return
+					}
+				}
+			}()
 		}
 	}()
 
@@ -103,30 +107,28 @@ func TestNetworkResilience_Reconnection(t *testing.T) {
 	}
 
 	go func() {
+		<-serverStop2
+		_ = newServer.Close()
+	}()
+	go func() {
 		if err := newServer.Listen(); err != nil {
 			return
 		}
 		close(serverReady2)
 		for {
-			select {
-			case <-serverStop2:
-				_ = newServer.Close()
+			conn, err := newServer.Accept()
+			if err != nil {
 				return
-			default:
-				conn, err := newServer.Accept()
-				if err != nil {
-					return
-				}
-				go func() {
-					defer func() { _ = conn.Close() }()
-					for {
-						_, err := conn.ReadMessage()
-						if err != nil {
-							return
-						}
-					}
-				}()
 			}
+			go func() {
+				defer func() { _ = conn.Close() }()
+				for {
+					_, err := conn.ReadMessage()
+					if err != nil {
+						return
+					}
+				}
+			}()
 		}
 	}()
 	<-serverReady2

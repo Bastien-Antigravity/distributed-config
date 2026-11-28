@@ -18,6 +18,7 @@ package strategies
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
@@ -44,9 +45,10 @@ import (
 // -----------------------------------------------------------------------------
 
 type CloudStrategy struct {
-	Client   *network.Client
-	Profile  string // "production" or "staging"
-	ReadOnly bool   // Disables remote sync/authoritative updates
+	Client      *network.Client
+	Profile     string // "production", "staging", or "test"
+	ReadOnly    bool   // Disables remote sync/authoritative updates
+	RequireFile bool   // Fails fast if local YAML file is missing
 }
 
 // -----------------------------------------------------------------------------
@@ -55,14 +57,50 @@ func (s *CloudStrategy) Name() string { return s.Profile }
 
 // -----------------------------------------------------------------------------
 
+func deepCopyInterfaceMap(src map[string]interface{}) map[string]interface{} {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]interface{}, len(src))
+	for k, v := range src {
+		switch typed := v.(type) {
+		case map[string]interface{}:
+			dst[k] = deepCopyInterfaceMap(typed)
+		case map[string]string:
+			inner := make(map[string]string, len(typed))
+			for sk, sv := range typed {
+				inner[sk] = sv
+			}
+			dst[k] = inner
+		default:
+			dst[k] = v
+		}
+	}
+	return dst
+}
+
+// -----------------------------------------------------------------------------
+
 func (s *CloudStrategy) Load(cfg *core.Config) error {
 	cfg.Logger.Info("Strategy: Cloud (%s)", s.Profile)
 
-	// 1. Initial File Load (Gets Capabilities & config_server IP)
+	// 1. Initial File Load (Reads YAML from disk once; fails fast when RequireFile is true)
 	fullPath := loader.ResolveConfigPath(s.Profile)
-	if err := loader.LoadConfigFromFileSafe(cfg, fullPath); err != nil {
-		return err
+	if s.RequireFile {
+		if err := loader.LoadConfigFromFile(cfg, fullPath); err != nil {
+			return err
+		}
+	} else {
+		if err := loader.LoadConfigFromFileSafe(cfg, fullPath); err != nil {
+			return err
+		}
 	}
+
+	_, statErr := os.Stat(fullPath)
+	fileExists := statErr == nil
+	fileName := cfg.Common.Name
+	filePublicIP := cfg.Common.PublicIP
+	fileCaps := deepCopyInterfaceMap(cfg.Capabilities)
 
 	// 2. Env Load (Overrides IP or NAME if provided dynamically)
 	loader.LoadCommonFromEnv(cfg)
@@ -93,22 +131,36 @@ func (s *CloudStrategy) Load(cfg *core.Config) error {
 		cfg.Logger.Error("Cloud (%s): Required capability 'config_server' is missing!", s.Profile)
 	}
 
-	// 4. File Load Override (File Wins)
-	// We reload the file to ensure local file edits strictly override whatever the server sent.
-	if _, err := os.Stat(fullPath); err == nil {
-		if err := loader.LoadYAML(fullPath, cfg); err != nil {
+	// 4. In-Memory File Override (File Wins when an explicit profile YAML exists)
+	// When ResolveConfigPath fell back to standalone.yaml solely as bootstrap seed and
+	// s.Client is connected, preserve server-hydrated capabilities as authoritative.
+	if fileExists {
+		isSeedFallback := s.Client != nil && strings.TrimSpace(os.Getenv("CONFIG_PATH")) == "" && filepath.Base(fullPath) == "standalone.yaml"
+		if !isSeedFallback {
+			if len(fileCaps) > 0 {
+				cfg.Capabilities = core.DeepMerge(cfg.Capabilities, fileCaps)
+			}
+			if fileName != "" && os.Getenv("NAME") == "" {
+				cfg.Common.Name = fileName
+			}
+			if filePublicIP != "" {
+				cfg.Common.PublicIP = filePublicIP
+			}
+		}
+	}
+	syncCapabilitiesToLiveConfig(cfg)
+
+	// 5. Integrity Check (Profile-specific)
+	if s.Profile == "production" {
+		if err := loader.CheckProductionIPs(cfg); err != nil {
 			if s.Client != nil {
 				_ = s.Client.Close()
 				s.Client = nil
 			}
 			return err
 		}
-	}
-	syncCapabilitiesToLiveConfig(cfg)
-
-	// 5. Integrity Check (Production only)
-	if s.Profile == "production" {
-		if err := loader.CheckProductionIPs(cfg); err != nil {
+	} else if s.Profile == "test" && os.Getenv("CHECK_TEST_IPS") == "true" {
+		if err := loader.CheckTestIPs(cfg); err != nil {
 			if s.Client != nil {
 				_ = s.Client.Close()
 				s.Client = nil
@@ -328,6 +380,10 @@ func hydrateCapabilitiesFromLiveConfig(cfg *core.Config) {
 			cfg.Capabilities[section] = capMap
 		}
 		for k, v := range kv {
+			switch capMap[k].(type) {
+			case map[string]interface{}, map[string]string, []interface{}, []string:
+				continue
+			}
 			capMap[k] = v
 		}
 	}

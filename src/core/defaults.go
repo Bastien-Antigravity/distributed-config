@@ -28,6 +28,7 @@ func NewDefaultConfig() *Config {
 			RetryMaxSec: "5",
 		},
 		Capabilities: make(map[string]interface{}),
+		Local:        make(map[string]interface{}),
 	}
 	cfg.LiveConfig.Store(&initialLive)
 	return cfg

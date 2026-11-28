@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/Bastien-Antigravity/distributed-config/src/secret"
 )
 
 func TestTLSGen_CAAndServiceLeafChain(t *testing.T) {
@@ -191,4 +193,44 @@ func mustReadRSAPrivateKey(t *testing.T, path string) *rsa.PrivateKey {
 		t.Fatalf("failed to parse RSA key %s: %v", path, err)
 	}
 	return key
+}
+
+func TestKeygen_PermissionsAndRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	privPath, pubPath, err := generateRSAKeyPair(dir)
+	if err != nil {
+		t.Fatalf("generateRSAKeyPair failed: %v", err)
+	}
+
+	info, err := os.Stat(privPath)
+	if err != nil {
+		t.Fatalf("stat private.pem failed: %v", err)
+	}
+	if mode := info.Mode().Perm(); mode != 0600 {
+		t.Fatalf("expected private.pem mode 0600, got %04o", mode)
+	}
+	if _, err := os.Stat(pubPath); err != nil {
+		t.Fatalf("stat public.pem failed: %v", err)
+	}
+
+	pubBytes, err := os.ReadFile(pubPath)
+	if err != nil {
+		t.Fatalf("read public.pem failed: %v", err)
+	}
+
+	t.Setenv("BASTIEN_PRIVATE_KEY_PATH", privPath)
+	secret.ResetKeyCache()
+	defer secret.ResetKeyCache()
+
+	enc, err := secret.Encrypt("super-secret-value", string(pubBytes))
+	if err != nil {
+		t.Fatalf("secret.Encrypt failed: %v", err)
+	}
+	dec, err := secret.Decrypt(enc)
+	if err != nil {
+		t.Fatalf("secret.Decrypt failed: %v", err)
+	}
+	if dec != "super-secret-value" {
+		t.Fatalf("expected 'super-secret-value', got %q", dec)
+	}
 }

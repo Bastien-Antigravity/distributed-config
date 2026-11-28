@@ -47,6 +47,7 @@ type ConfigProtoHandler struct {
 	onUpdateResult   func(newVersion uint64, err error)
 	onGapDetected    func(expected, received uint64)
 	lastSeenVersion  uint64
+	lastAckedVersion uint64
 	mu               sync.RWMutex
 }
 
@@ -99,6 +100,15 @@ func (h *ConfigProtoHandler) GetLastSeenVersion() uint64 {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.lastSeenVersion
+}
+
+// ResetSessionVersion clears session-local version tracking on TCP reconnect so a
+// restarted config-server with a lower store revision can be resynchronized via GET_SYNC.
+func (h *ConfigProtoHandler) ResetSessionVersion() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.lastSeenVersion = 0
+	h.lastAckedVersion = 0
 }
 
 // HandleOutgoing implements generic outgoing message creation
@@ -167,13 +177,19 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 			incomingVer := uint64(msg.Version)
 			h.mu.Lock()
 			if h.lastSeenVersion > 0 && incomingVer <= h.lastSeenVersion {
-				h.mu.Unlock()
-				return nil
+				if incomingVer == h.lastAckedVersion {
+					// Own mutation ACK arrived first; allow the matching broadcast through once so onLiveConfUpdate fires once.
+					h.lastAckedVersion = 0
+				} else {
+					h.mu.Unlock()
+					return nil
+				}
 			}
 			if h.lastSeenVersion > 0 && incomingVer > h.lastSeenVersion+1 {
 				gapCb := h.onGapDetected
 				expected := h.lastSeenVersion + 1
 				h.lastSeenVersion = incomingVer
+				h.lastAckedVersion = 0
 				if h.parentConfig != nil {
 					h.parentConfig.SetVersion(incomingVer)
 				}
@@ -182,9 +198,12 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 					gapCb(expected, incomingVer)
 				}
 			} else {
-				h.lastSeenVersion = incomingVer
-				if h.parentConfig != nil {
-					h.parentConfig.SetVersion(incomingVer)
+				if incomingVer > h.lastSeenVersion {
+					h.lastSeenVersion = incomingVer
+					h.lastAckedVersion = 0
+					if h.parentConfig != nil {
+						h.parentConfig.SetVersion(incomingVer)
+					}
 				}
 				h.mu.Unlock()
 			}
@@ -216,6 +235,7 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 			h.mu.Lock()
 			if uint64(msg.Version) > h.lastSeenVersion {
 				h.lastSeenVersion = uint64(msg.Version)
+				h.lastAckedVersion = uint64(msg.Version)
 				if h.parentConfig != nil {
 					h.parentConfig.SetVersion(h.lastSeenVersion)
 				}
@@ -246,6 +266,7 @@ func (h *ConfigProtoHandler) HandleIncoming(dataSer []byte) error {
 				return nil
 			}
 			h.lastSeenVersion = incomingVer
+			h.lastAckedVersion = 0
 			if h.parentConfig != nil {
 				h.parentConfig.SetVersion(incomingVer)
 			}

@@ -39,6 +39,22 @@ func TestValidator(t *testing.T) {
 		if err := CheckTestIPs(cfg); err == nil {
 			t.Error("Expected error when non-test IP is used in test mode, got nil")
 		}
+
+		// 3. Invalid grpc_ip / rest_ip in test mode
+		cfg.Capabilities["timescale_db"] = map[string]interface{}{"ip": "127.0.0.2", "grpc_ip": "10.0.0.8"}
+		if err := CheckTestIPs(cfg); err == nil {
+			t.Error("Expected error when non-test grpc_ip is used in test mode, got nil")
+		}
+		cfg.Capabilities["timescale_db"] = map[string]interface{}{"ip": "127.0.0.2", "rest_ip": "10.0.0.9"}
+		if err := CheckTestIPs(cfg); err == nil {
+			t.Error("Expected error when non-test rest_ip is used in test mode, got nil")
+		}
+
+		// 4. Wildcard bind IPs allowed in test mode
+		cfg.Capabilities["timescale_db"] = map[string]interface{}{"ip": "0.0.0.0", "grpc_ip": "::"}
+		if err := CheckTestIPs(cfg); err != nil {
+			t.Errorf("Expected wildcard bind IPs to be allowed in test mode, got: %v", err)
+		}
 	})
 
 	t.Run("TestCheckProductionIPs", func(t *testing.T) {
@@ -57,6 +73,16 @@ func TestValidator(t *testing.T) {
 		cfg.Capabilities["timescale_db"].(map[string]interface{})["ip"] = "127.0.0.2"
 		if err := CheckProductionIPs(cfg); err == nil {
 			t.Error("Expected error when test IP (127.0.0.2) is detected in production, got nil")
+		}
+
+		// 2b. Invalid grpc_ip / rest_ip (Test IP leaked to production)
+		cfg.Capabilities["timescale_db"] = map[string]interface{}{"ip": "10.0.0.5", "grpc_ip": "127.0.0.2"}
+		if err := CheckProductionIPs(cfg); err == nil {
+			t.Error("Expected error when test grpc_ip (127.0.0.2) is detected in production, got nil")
+		}
+		cfg.Capabilities["timescale_db"] = map[string]interface{}{"ip": "10.0.0.5", "rest_ip": "127.0.0.2"}
+		if err := CheckProductionIPs(cfg); err == nil {
+			t.Error("Expected error when test rest_ip (127.0.0.2) is detected in production, got nil")
 		}
 
 		// 3. Allowed inside Docker container (DOCKER_ENV == "true")

@@ -17,18 +17,39 @@ package loader
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
 )
 
 // -----------------------------------------------------------------------------
 
+var endpointIPKeys = []string{"ip", "grpc_ip", "rest_ip"}
+
+func extractEndpointIP(capInterface interface{}, key string) (string, bool) {
+	switch m := capInterface.(type) {
+	case map[string]interface{}:
+		if ipRaw, exists := m[key]; exists {
+			if ip, ok := ipRaw.(string); ok {
+				return strings.TrimSpace(ip), true
+			}
+		}
+	case map[string]string:
+		if ip, exists := m[key]; exists {
+			return strings.TrimSpace(ip), true
+		}
+	}
+	return "", false
+}
+
+// -----------------------------------------------------------------------------
+
 func CheckTestIPs(config *core.Config) error {
 	for name, capInterface := range config.Capabilities {
-		if m, ok := capInterface.(map[string]interface{}); ok {
-			if ipRaw, exists := m["ip"]; exists {
-				if ip, ok := ipRaw.(string); ok && ip != "127.0.0.2" && ip != "" {
-					return fmt.Errorf("test integrity failure: %s IP must be 127.0.0.2 in test mode, got %s", name, ip)
+		for _, key := range endpointIPKeys {
+			if ip, ok := extractEndpointIP(capInterface, key); ok {
+				if ip != "" && ip != "127.0.0.2" && ip != "0.0.0.0" && ip != "::" {
+					return fmt.Errorf("test integrity failure: %s %s must be 127.0.0.2 in test mode, got %s", name, key, ip)
 				}
 			}
 		}
@@ -45,11 +66,9 @@ func CheckProductionIPs(config *core.Config) error {
 		return nil
 	}
 	for name, capInterface := range config.Capabilities {
-		if m, ok := capInterface.(map[string]interface{}); ok {
-			if ipRaw, exists := m["ip"]; exists {
-				if ip, ok := ipRaw.(string); ok && ip == "127.0.0.2" {
-					return fmt.Errorf("production integrity failure: %s IP cannot be 127.0.0.2 (Test IP detected)", name)
-				}
+		for _, key := range endpointIPKeys {
+			if ip, ok := extractEndpointIP(capInterface, key); ok && ip == "127.0.0.2" {
+				return fmt.Errorf("production integrity failure: %s %s cannot be 127.0.0.2 (Test IP detected)", name, key)
 			}
 		}
 	}

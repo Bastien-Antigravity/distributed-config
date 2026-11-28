@@ -17,18 +17,41 @@ package cgo_bridge
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
 
 // -----------------------------------------------------------------------------
 
+func setupBridgeTempConfig(t *testing.T) {
+	t.Helper()
+	tempDir := t.TempDir()
+	fixturePath := filepath.Join(tempDir, "bridge_standalone.yaml")
+	fixture := `
+common:
+  name: "bridge-test"
+capabilities:
+  log_server:
+    ip: "127.0.0.1"
+    port: "9020"
+  config_server:
+    ip: "127.0.0.1"
+    port: "3306"
+`
+	if err := os.WriteFile(fixturePath, []byte(fixture), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CONFIG_PATH", fixturePath)
+}
+
+// -----------------------------------------------------------------------------
+
 func TestBridge_ExpandedName(t *testing.T) {
+	setupBridgeTempConfig(t)
 	// Set the environment variable for testing expansion
-	_ = os.Setenv("NAME", "dynamic-bridge-app")
-	defer func() {
-		_ = os.Unsetenv("NAME")
-	}()
+	t.Setenv("NAME", "dynamic-bridge-app")
 
 	t.Run("Initialize and check expanded name", func(t *testing.T) {
 		handle := testInit("standalone")
@@ -47,6 +70,7 @@ func TestBridge_ExpandedName(t *testing.T) {
 // -------------------------------------------------------------------------
 
 func TestBridge_GetSet(t *testing.T) {
+	setupBridgeTempConfig(t)
 	t.Run("Set and Get configuration", func(t *testing.T) {
 		handle := testInit("standalone")
 		defer Close(handle)
@@ -71,6 +95,7 @@ func TestBridge_GetSet(t *testing.T) {
 // -------------------------------------------------------------------------
 
 func TestBridge_LiveUpdate(t *testing.T) {
+	setupBridgeTempConfig(t)
 	t.Run("Receive live update callback", func(t *testing.T) {
 		handle := testInit("standalone")
 		defer Close(handle)
@@ -106,6 +131,7 @@ func TestBridge_LiveUpdate(t *testing.T) {
 // -------------------------------------------------------------------------
 
 func TestBridge_Sync(t *testing.T) {
+	setupBridgeTempConfig(t)
 	t.Run("Perform configuration sync", func(t *testing.T) {
 		handle := testInit("standalone")
 		defer Close(handle)
@@ -120,6 +146,7 @@ func TestBridge_Sync(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestBridge_LiveCapabilityUpdate(t *testing.T) {
+	setupBridgeTempConfig(t)
 	t.Run("GetCapability reflects live config overrides", func(t *testing.T) {
 		handle := testInit("standalone")
 		defer Close(handle)
@@ -153,6 +180,60 @@ func TestBridge_LiveCapabilityUpdate(t *testing.T) {
 			t.Errorf("Expected LiveConfig overridden port 9999, got %v", parsed["port"])
 		}
 	})
+}
+
+// -----------------------------------------------------------------------------
+
+func TestBridge_ProfileAliasesAndApplyFileOverride(t *testing.T) {
+	setupBridgeTempConfig(t)
+
+	for _, alias := range []string{"dev", "stage"} {
+		h := New(alias)
+		if h == 0 {
+			t.Fatalf("Expected non-zero handle for profile alias %q", alias)
+		}
+		Close(h)
+	}
+
+	if bad := New("invalid-profile"); bad != 0 {
+		Close(bad)
+		t.Fatalf("Expected handle 0 for invalid profile, got %d", bad)
+	}
+
+	handle := New("standalone")
+	if handle == 0 {
+		t.Fatal("Expected non-zero handle for standalone")
+	}
+	defer Close(handle)
+
+	overridePath := filepath.Join(t.TempDir(), "override.yaml")
+	overrideYAML := `
+common:
+  name: "overridden-app"
+capabilities:
+  custom_svc:
+    ip: "10.20.30.40"
+    port: 7777
+local:
+  feature_flag: true
+  token: "false"
+`
+	if err := os.WriteFile(overridePath, []byte(overrideYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	localJSON, err := ApplyFileOverride(handle, overridePath)
+	if err != nil {
+		t.Fatalf("ApplyFileOverride failed: %v", err)
+	}
+	if !strings.Contains(localJSON, `"feature_flag":true`) || !strings.Contains(localJSON, `"token":"false"`) {
+		t.Fatalf("Unexpected local JSON from ApplyFileOverride: %s", localJSON)
+	}
+
+	addr, err := GetAddress(handle, "custom_svc")
+	if err != nil || addr != "10.20.30.40:7777" {
+		t.Fatalf("Expected custom_svc 10.20.30.40:7777, got %q (err=%v)", addr, err)
+	}
 }
 
 // -----------------------------------------------------------------------------

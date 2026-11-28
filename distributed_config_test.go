@@ -25,6 +25,25 @@ import (
 // -----------------------------------------------------------------------------
 
 func TestTopLevel_New(t *testing.T) {
+	tempDir := t.TempDir()
+	fixturePath := filepath.Join(tempDir, "config.yaml")
+	fixture := `
+common:
+  name: "top-level-test"
+capabilities:
+  log_server:
+    ip: "127.0.0.1"
+    port: "9020"
+  config_server:
+    ip: "127.0.0.1"
+    port: "3306"
+`
+	if err := os.WriteFile(fixturePath, []byte(fixture), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CONFIG_PATH", fixturePath)
+	t.Setenv("DOCKER_ENV", "true")
+
 	profiles := []string{"standalone", "test", "staging", "production"}
 	for _, p := range profiles {
 		cfg := New(p)
@@ -37,7 +56,15 @@ func TestTopLevel_New(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestTopLevel_ResolveConfigPath(t *testing.T) {
-	// Should resolve standalone.yaml in current repository root
+	tempDir := t.TempDir()
+	standalonePath := filepath.Join(tempDir, "standalone.yaml")
+	if err := os.WriteFile(standalonePath, []byte("common:\n  name: isolated\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	oldCwd, _ := os.Getwd()
+	_ = os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(oldCwd) }()
+
 	path := ResolveConfigPath("standalone")
 	if path == "" {
 		t.Fatalf("Expected ResolveConfigPath('standalone') to return path, got empty")

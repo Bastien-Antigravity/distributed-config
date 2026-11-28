@@ -51,6 +51,8 @@ dist/
 # C++ & Polyglot Shared Libraries
 build/
 bin/
+cmd/config-tool/config-tool
+cmd/config-cli/config-cli
 obj/
 *.o
 *.a

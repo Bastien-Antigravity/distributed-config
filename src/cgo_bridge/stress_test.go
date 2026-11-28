@@ -17,6 +17,8 @@ package cgo_bridge
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -27,6 +29,23 @@ import (
 func TestCGOBridge_StressRace(t *testing.T) {
 	// Stress test for concurrent New, Get, Set, and Close.
 	// This should be run with -race flag.
+	tempDir := t.TempDir()
+	fixturePath := filepath.Join(tempDir, "stress_standalone.yaml")
+	fixture := `
+common:
+  name: "stress-test"
+capabilities:
+  log_server:
+    ip: "127.0.0.1"
+    port: "9020"
+  config_server:
+    ip: "127.0.0.1"
+    port: "3306"
+`
+	if err := os.WriteFile(fixturePath, []byte(fixture), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CONFIG_PATH", fixturePath)
 
 	const numGoroutines = 50
 	const iterations = 100

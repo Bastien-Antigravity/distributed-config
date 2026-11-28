@@ -96,9 +96,10 @@ func LoadConfigFromFileSafe(config *models.Config, filePath string) error {
 // -----------------------------------------------------------------------------
 
 // ProcessNode recursively traverses the YAML node tree.
-// It expands env variables and forces all scalars to strings, except for booleans.
+// It expands env variables and forces all scalars to strings, except for unquoted booleans.
 func ProcessNode(n *yaml.Node) {
 	if n.Kind == yaml.ScalarNode {
+		wasQuoted := n.Style == yaml.DoubleQuotedStyle || n.Style == yaml.SingleQuotedStyle
 		// Expand Environment Variables using Regex (more robust than os.Expand for custom syntax)
 		if strings.Contains(n.Value, "${") {
 			n.Value = envRegex.ReplaceAllStringFunc(n.Value, func(m string) string {
@@ -113,9 +114,9 @@ func ProcessNode(n *yaml.Node) {
 			})
 		}
 
-		// Force types: Booleans remain bool, everything else becomes string
+		// Force types: Unquoted booleans remain bool, everything else (including quoted "true"/"false") becomes string
 		lowerVal := strings.ToLower(n.Value)
-		if lowerVal == "true" || lowerVal == "false" {
+		if !wasQuoted && (lowerVal == "true" || lowerVal == "false") {
 			n.Tag = "!!bool"
 			n.Style = 0 // Plain style for booleans
 		} else {
@@ -153,15 +154,20 @@ func LoadYAML(filePath string, target interface{}) error {
 			return fmt.Errorf("failed to decode yaml file '%s' into map: %w", filePath, err)
 		}
 
-		// Preserve existing capabilities in a separate copy before root.Decode(cfg),
+		// Preserve existing capabilities and local sections before root.Decode(cfg),
 		// because yaml.Node.Decode mutates non-nil maps in-place and overwrites sub-keys.
 		var existingCaps map[string]interface{}
 		if len(cfg.Capabilities) > 0 {
 			existingCaps = models.DeepMerge(make(map[string]interface{}), cfg.Capabilities)
 			cfg.Capabilities = nil
 		}
+		var existingLocal map[string]interface{}
+		if len(cfg.Local) > 0 {
+			existingLocal = models.DeepMerge(make(map[string]interface{}), cfg.Local)
+			cfg.Local = nil
+		}
 
-		// 1. Decode standard sections (Common, Capabilities)
+		// 1. Decode standard sections (Common, Capabilities, Local)
 		if err := root.Decode(cfg); err != nil {
 			return fmt.Errorf("failed to decode yaml file '%s' into config: %w", filePath, err)
 		}
@@ -174,6 +180,16 @@ func LoadYAML(filePath string, target interface{}) error {
 		}
 		if cfg.Capabilities == nil {
 			cfg.Capabilities = make(map[string]interface{})
+		}
+
+		// 3. Perform Deep Merge on Local so existing sub-keys are preserved and overridden by file keys
+		if localMap, ok := raw["local"].(map[string]interface{}); ok {
+			cfg.Local = models.DeepMerge(existingLocal, localMap)
+		} else if len(existingLocal) > 0 {
+			cfg.Local = models.DeepMerge(existingLocal, cfg.Local)
+		}
+		if cfg.Local == nil {
+			cfg.Local = make(map[string]interface{})
 		}
 	} else {
 		if err := root.Decode(target); err != nil {

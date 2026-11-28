@@ -16,7 +16,9 @@ package network
 
 import (
 	"fmt"
+	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Bastien-Antigravity/distributed-config/src/core"
@@ -36,7 +38,7 @@ type Client struct {
 	closeOnce sync.Once
 	backoff   *Backoff
 	mu        sync.RWMutex
-	watching  bool
+	watching  atomic.Bool
 	syncMu    sync.Mutex
 }
 
@@ -136,20 +138,12 @@ func (c *Client) Close() error {
 
 // Watch starts a background goroutine to handle asynchronous updates (BROADCASTs).
 func (c *Client) Watch() {
-	c.mu.Lock()
-	if c.watching {
-		c.mu.Unlock()
+	if !c.watching.CompareAndSwap(false, true) {
 		return
 	}
-	c.watching = true
-	c.mu.Unlock()
 
 	go func() {
-		defer func() {
-			c.mu.Lock()
-			c.watching = false
-			c.mu.Unlock()
-		}()
+		defer c.watching.Store(false)
 		attempt := 0
 		for {
 			select {
@@ -172,6 +166,8 @@ func (c *Client) Watch() {
 					if err := c.connect(); err == nil {
 						c.Handler.parentConfig.Logger.Info("Client: Reconnected to %s", c.addr)
 						attempt = 0
+						// Reset session version before GET_SYNC so a restarted config-server with lower revision is accepted
+						c.Handler.ResetSessionVersion()
 						// Re-sync after reconnection (send GET_SYNC; the main Watch loop will receive and process it)
 						c.mu.RLock()
 						reconnectedSock := c.sock
@@ -189,6 +185,9 @@ func (c *Client) Watch() {
 
 				data, err := sock.Receive()
 				if err != nil {
+					if ne, ok := err.(net.Error); ok && ne.Timeout() {
+						continue
+					}
 					// Connection likely closed or failed
 					c.mu.Lock()
 					if c.sock == sock {
@@ -227,8 +226,8 @@ func (c *Client) requestSync(cmd pb.ConfigMsg_Cmd) (*core.Config, error) {
 
 	c.mu.RLock()
 	sock := c.sock
-	watching := c.watching
 	c.mu.RUnlock()
+	watching := c.watching.Load()
 
 	if sock != nil {
 		c.syncMu.Lock()
@@ -282,8 +281,7 @@ func (c *Client) requestSync(cmd pb.ConfigMsg_Cmd) (*core.Config, error) {
 			}
 		}
 	} else {
-		// Mock behavior
-		c.Handler.parentConfig.Logger.Info("Mock: Client.requestSync(%v) simulated", cmd)
+		return nil, fmt.Errorf("client not connected to %s", c.addr)
 	}
 
 	return c.Handler.parentConfig, nil
@@ -367,12 +365,11 @@ func (c *Client) DeleteKeysWithOCC(deletions map[string][]string, expectedVersio
 func (c *Client) sendWithUpdateAck(data []byte) error {
 	c.mu.RLock()
 	sock := c.sock
-	watching := c.watching
 	c.mu.RUnlock()
+	watching := c.watching.Load()
 
 	if sock == nil {
-		c.Handler.parentConfig.Logger.Info("Mock: sendWithUpdateAck simulated")
-		return nil
+		return fmt.Errorf("client not connected to %s", c.addr)
 	}
 
 	c.syncMu.Lock()

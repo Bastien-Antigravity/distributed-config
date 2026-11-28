@@ -14,10 +14,14 @@
 // =============================================================================
 
 use libc::{c_char, uintptr_t, c_int};
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use libloading::{Library, Symbol};
 use serde_json::Value;
 use std::fmt;
+use std::sync::{Mutex, OnceLock};
+
+static LIB_CACHE: OnceLock<Mutex<HashMap<String, &'static Library>>> = OnceLock::new();
 
 pub type ConfigUpdateCb = extern "C" fn(handle: uintptr_t, json_data: *const c_char);
 
@@ -52,9 +56,18 @@ pub struct DistConfig {
 
 impl DistConfig {
     pub fn new(profile: &str, lib_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        // We use a static reference and leak the library because Go's runtime 
-        // does not support being unloaded (dlclose) and will hang.
-        let lib = Box::leak(Box::new(unsafe { Library::new(lib_path)? }));
+        // Cache static reference because Go's runtime does not support being unloaded (dlclose) and will hang.
+        let cache = LIB_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+        let lib = {
+            let mut guard = cache.lock().unwrap();
+            if let Some(&cached) = guard.get(lib_path) {
+                cached
+            } else {
+                let leaked: &'static Library = Box::leak(Box::new(unsafe { Library::new(lib_path)? }));
+                guard.insert(lib_path.to_string(), leaked);
+                leaked
+            }
+        };
         
         let handle = unsafe {
             let func: Symbol<unsafe extern "C" fn(*const c_char) -> uintptr_t> = lib.get(b"DistConf_New")?;
@@ -199,6 +212,56 @@ impl DistConfig {
         }
     }
 
+    pub fn get_grpc_address(&self, capability: &str) -> Result<String, DistConfError> {
+        unsafe {
+            let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char) -> *mut c_char> =
+                self.lib.get(b"DistConf_GetGRPCAddress").unwrap();
+            let cap_c = CString::new(capability).unwrap();
+            let res = func(self.handle, cap_c.as_ptr());
+            if res.is_null() {
+                return Err(self.raise_last_error());
+            }
+            let val = CStr::from_ptr(res).to_string_lossy().into_owned();
+            self.free_string(res);
+            Ok(val)
+        }
+    }
+
+    pub fn get_capability(&self, capability: &str) -> Result<Value, DistConfError> {
+        unsafe {
+            let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char) -> *mut c_char> =
+                self.lib.get(b"DistConf_GetCapability").unwrap();
+            let cap_c = CString::new(capability).unwrap();
+            let res = func(self.handle, cap_c.as_ptr());
+            if res.is_null() {
+                return Err(self.raise_last_error());
+            }
+            let val = CStr::from_ptr(res).to_string_lossy().into_owned();
+            self.free_string(res);
+            serde_json::from_str(&val).map_err(|e| DistConfError {
+                message: format!("invalid capability JSON: {}", e),
+                code: DISTCONF_ERR_GENERIC,
+            })
+        }
+    }
+
+    pub fn get_full_config(&self) -> Result<Value, DistConfError> {
+        unsafe {
+            let func: Symbol<unsafe extern "C" fn(uintptr_t) -> *mut c_char> =
+                self.lib.get(b"DistConf_GetFullConfig").unwrap();
+            let res = func(self.handle);
+            if res.is_null() {
+                return Err(self.raise_last_error());
+            }
+            let val = CStr::from_ptr(res).to_string_lossy().into_owned();
+            self.free_string(res);
+            serde_json::from_str(&val).map_err(|e| DistConfError {
+                message: format!("invalid full config JSON: {}", e),
+                code: DISTCONF_ERR_GENERIC,
+            })
+        }
+    }
+
     pub fn decrypt(&self, ciphertext: &str) -> Result<String, DistConfError> {
         unsafe {
             let func: Symbol<unsafe extern "C" fn(uintptr_t, *const c_char) -> *mut c_char> = 
@@ -235,21 +298,19 @@ impl Drop for DistConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
 
     fn get_lib_path() -> String {
         if let Ok(path) = std::env::var("LIBDISTCONF_PATH") {
             return path;
         }
-        let mut path = "../libdistconf/libdistconf.so".to_string();
-        if !Path::new(&path).exists() {
-            if cfg!(target_os = "macos") {
-                path = path.replace(".so", ".dylib");
-            } else if cfg!(target_os = "windows") {
-                path = path.replace(".so", ".dll");
-            }
-        }
-        path
+        let ext = if cfg!(target_os = "macos") {
+            "dylib"
+        } else if cfg!(target_os = "windows") {
+            "dll"
+        } else {
+            "so"
+        };
+        format!("../libdistconf/libdistconf.{}", ext)
     }
 
     #[test]
@@ -271,5 +332,22 @@ mod tests {
         let val = cfg.get("rust_test", "key");
         println!("get() returned: {}", val);
         assert_eq!(val, "val");
+    }
+
+    #[test]
+    fn test_capabilities_and_cache_reuse() {
+        let lib_path = get_lib_path();
+        let cfg1 = DistConfig::new("dev", &lib_path).expect("dev alias init failed");
+        let cfg2 = DistConfig::new("dev", &lib_path).expect("second dev alias init failed");
+
+        let cap = cfg1.get_capability("config_server").expect("get_capability failed");
+        assert!(cap.get("ip").is_some());
+        assert!(cap.get("port").is_some());
+
+        let addr = cfg1.get_address("config_server").expect("get_address failed");
+        assert!(addr.contains(':'));
+
+        let full = cfg2.get_full_config().expect("get_full_config failed");
+        assert!(full.get("capabilities").is_some());
     }
 }

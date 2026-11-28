@@ -38,8 +38,14 @@ Every SDK provides the following standardized interface:
 - `Get(section, key)`: Retrieve a value.
 - `Set(section, key, val)`: Update a value locally and sync.
 - `OnLiveConfUpdate(callback)`: Listen for real-time remote updates.
+- `OnRegistryUpdate(callback)`: Listen for real-time service registry updates.
 - `ShareConfig(json_payload)`: Broadcast local state to the ecosystem.
 - `ApplyFileOverride(filename)`: Load a local YAML override and return the 'local' section as JSON.
+- `GetAddress(capability)`: Resolve primary `host:port` for a capability.
+- `GetGRPCAddress(capability)`: Resolve gRPC `host:port` for a capability.
+- `GetRESTAddress(capability)`: Resolve REST `host:port` for a capability.
+- `GetCapability(capability)`: Retrieve merged capability metadata as JSON/dict.
+- `GetFullConfig()`: Retrieve full `common`, `capabilities`, and `live` configuration state.
 - `Decrypt(ciphertext)`: Decrypt RSA secrets.
 
 ## 🚀 Building the Bridge
